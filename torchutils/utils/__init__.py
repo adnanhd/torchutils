@@ -6,12 +6,12 @@ from .mthdutils import hybridmethod
 from .decorators import verbose, profile
 from .config import INIObject
 from .hash import Hashable
-import data.utils.config
+import torchutils.utils.config
 #import torchutils.data.utils.preprocessing
 import numpy as np
 import torch
 
-_str2types = {
+string_to_types = {
     'string': str, 'str': str,
     'integer': int, 'int': int,
     'boolean': bool, 'bool': bool,
@@ -24,6 +24,7 @@ _str2types = {
     'torch.int16': torch.int16,
     'torch.int32': torch.int32,
     'torch.int64': torch.int64,
+    'np.float16': np.float16, 
     'np.float32': np.float32, 
     'np.float64': np.float64,
     'np.float128': np.float128,
@@ -36,5 +37,8 @@ _str2types = {
     'np.uint32': np.uint32,
     'np.uint64': np.uint64,
 }
-_types2str = {t: s for s, t in _str2types.items()}
 
+types_to_string = {t: s for s, t in string_to_types.items()}
+
+_str2types = string_to_types
+_types2str = types_to_string

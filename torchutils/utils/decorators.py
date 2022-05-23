@@ -4,17 +4,20 @@ logger = logging.getLogger(__name__)
 #set logging level
 logger.setLevel(logging.DEBUG)
 
-# create a log file
-try:
-    os.mkdir('log')
-except FileExistsError:
-    pass
-handler = logging.FileHandler(f'log/{__name__}.log')
 
-# create a logging format
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+def log_to_file(path: str):
+    global logger
+    # create a log file
+    dirname, basename = os.path.split(path)
+    os.makedirs(dirname, exist_ok=True)
+    handler = logging.FileHandler(path)
+
+    # create a logging format
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    
+    # add a logging destination (file)
+    logger.addHandler(handler)
 
 def verbose(fn):
     def wrapped_fn(*args, **kwargs):

@@ -5,7 +5,7 @@ from .utils import hybridmethod, INIObject, Version
 
 @dataclass
 class Metadata(INIObject):
-    from .dtypes import Value
+    from .dtypes import DType
     from .features import Features
 
     # Set in the dataset scripts

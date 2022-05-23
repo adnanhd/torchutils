@@ -1,5 +1,5 @@
 import os
-import data
+import torchutils.data as data
 import meshio
 import numpy as np
 import matplotlib.pyplot as plt

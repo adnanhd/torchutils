@@ -1,61 +1,81 @@
-import os
-import re
 import torch
-import hashlib
-import scipy.io
 import numpy as np
-import matplotlib.pyplot as plt
-from .utils import _str2types, _types2str
-
-from copy import deepcopy
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import Union, Optional
 from pydantic import BaseModel, validator
-from .utils import Hashable
+from torchutils.utils import string_to_types, Hashable, hybridmethod
+from abc import ABC, ABCMeta
 
 
-class TorchTensorType(type):  
+class NpScalarType(ABC):
+    """
+    A generic array/tensor type that returns true for every 
+    f. call isinstance() with any torch.tensor and np.ndarray
+    """
     @classmethod  
     def __get_validators__(cls):  
-        yield cls.validate
+        yield cls.validate_np_scalar
 
     @classmethod
-    def validate(cls, dtype: torch.dtype) -> torch.dtype:
-        if isinstance(dtype, torch.dtype):
-            return dtype
-        else:
-            raise ValueError('invalid torch.dtype')
+    def validate_np_scalar(cls, dtype: torch.dtype) -> torch.dtype:
+        if isinstance(dtype, np.generic): return dtype
+        else: raise ValueError('invalid datatype')
 
 
-class Value(BaseModel, Hashable):
-    dtype: Union[type, str, TorchTensorType]
+class NpTorchType(ABC):
+    """
+    A generic array/tensor type that returns true for every 
+    f. call isinstance() with any torch.tensor and np.ndarray
+    """
+    @classmethod  
+    def __get_validators__(cls):  
+        yield cls.validate_np_array
+        yield cls.validate_torch_array
+
+    @classmethod
+    def validate_np_array(cls, arr):
+        if isinstance(arr, np.ndarray): return arr
+        else: raise ValueError('invalid datatype')
+
+    @classmethod
+    def validate_torch_array(cls, arr):
+        if isinstance(arr, torch.Tensor): return arr
+        else: raise ValueError('invalid datatype')
+
+
+class DType(BaseModel, Hashable):
+    dtype: Union[type, str, NpScalarType, NpTorchType]
     shape: Optional[Union[tuple, torch.Size]] = None
 
     def __init__(self, dtype, shape=None) -> None:
-        super().__init__(dtype=dtype, shape=shape)
-
+        super(DType, self).__init__(dtype=dtype, shape=shape)
+    
     @validator('dtype')
     @classmethod
     def string_to_dtype(cls, dtype):
         if not isinstance(dtype, str):
             return dtype
         dtype = dtype.lower().strip()
-        assert dtype in _str2types
-        return _str2types[dtype]
+        assert dtype in string_to_types
+        return string_to_types[dtype]
+
+    #@validator('shape')
+    #@classmethod
+    #def check_shape(cls, shape):
+    #    if NpTorchType.validate(cls.dtype):
+    #        return tuple(shape)
+
+    def __instancecheck__(self, other):
+        return isinstance(other, (np.ndarray, torch.Tensor)) and other.dtype == self.dtype or isinstance(other, self.dtype)
     
     def __hash__(self):
         return int(self._md5(), 16)
 
+    def __call__(self, value):
+        value = self.dtype(value)
+        if self.shape is None: return value
+        else: return value.reshape(self.shape)
+
     def __repr__(self):
-        dtype = _types2str[self.dtype] if isinstance(self.dtype, type) else self.dtype
-        return f'{self.__class__.__name__}(dtype={dtype}, shape={self.shape})'
-
-    def __str__(self):
-        dtype = _types2str[self.dtype] if isinstance(self.dtype, type) else self.dtype
-        return f'(dtype={dtype}, shape={self.shape})'
-
-
-class TensorValue(Value):
-    pass
+        if self.shape is None: return f'{self.__class__.__name__}(dtype={self.dtype})'
+        else: return f'{self.__class__.__name__}(dtype={self.dtype}, shape={self.shape})'
 
