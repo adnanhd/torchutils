@@ -147,7 +147,7 @@ class Trainer:
             dataset.features = dataset.features.to(device=self.device, dtype=self.xtype)
             dataset.labels = dataset.labels.to(device=self.device, dtype=self.ytype)
         except AttributeError:
-            warnings.warn("Not using a conventional dataset derived from utils.data.Dataset")
+            warnings.warn("Using a Dataset not derived from torchutils.data.Dataset is dangerous for dtype integrity")
 
         kwargs.setdefault('shuffle', train_mode)
         kwargs.setdefault('pin_memory', not torch.cuda.is_available())
