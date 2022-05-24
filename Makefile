@@ -1,7 +1,15 @@
+utils_files=$(wildcard /home/ceng/public/torchutils/torchutils/**/*.py)
+env_path=/home/ceng/public/cnnfoil/envs/cnnfoil
+install_path=${env_path}/lib/python3.6/site-packages/torchutils
 
-tests: build 
-	@echo python3 -m pytest $@
+all: ${install_path}
 
-build:
-	@pip install .
-.PHONY: tests build
+${install_path}: ${utils_files}
+	@-pip uninstall -y torchutils
+	@pip install -U ./
+
+tests: ${install_path}
+	#cd tests/ && python3 -c 'import torchutils'
+	@python3 -m pytest tests/
+
+.PHONY:
