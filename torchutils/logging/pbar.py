@@ -37,8 +37,8 @@ class ProgressBarLogger(TrainerLogger):
         self.update(n=n)
 
 class EpochProgressBarLogger(ProgressBarLogger):
-    def get_logger(self):
-        self.open(
+    def open(self):
+        super().open(
             total=self._total,
             unit="epoch",
             initial=0,
@@ -50,8 +50,8 @@ class EpochProgressBarLogger(ProgressBarLogger):
         )
 
 class StepProgressBarLogger(ProgressBarLogger):
-    def get_logger(self, epoch):
-        self.open(
+    def open(self, epoch):
+        super().open(
             total=self._total,
             unit=f"batch",
             file=os.sys.stdout,
@@ -61,8 +61,8 @@ class StepProgressBarLogger(ProgressBarLogger):
         )
 
 class TestProgressBarLogger(ProgressBarLogger):
-    def get_logger(self):
-        self.open(
+    def open(self):
+        super().open(
             total=self._total,
             unit="sample",
             file=os.sys.stdout,

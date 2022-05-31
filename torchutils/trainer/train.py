@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import torch
 from .valid import _run_validating
-from .utils import profile
+from torchutils.utils import profile
 from typing import (
     List,
     Dict,

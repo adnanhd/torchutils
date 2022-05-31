@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Union
 from .mthdutils import hybridmethod
     
 
+
 @dataclass
 class Version:
     """
@@ -75,11 +76,10 @@ class Version:
         pass # update self._features
 
     @from_dict.instancemethod
-    def from_dict(self, _dict):
         pass
 
-    def __eq__(self, other):
         assert isinstance(other, self.__class__)
+    def __eq__(self, other):
         return all(s_version == o_version 
                 for s_version, o_version in 
             zip(self.__slot__, other.__slot__))

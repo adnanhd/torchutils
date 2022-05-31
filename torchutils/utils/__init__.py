@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from .version import Version
+from .version_v2 import Version
 from .fnctutils import overload
 from .mthdutils import hybridmethod
 from .decorators import verbose, profile

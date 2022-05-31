@@ -1,10 +1,15 @@
-# Copyright © 2022 Adnan Harun Dogan
+# Copyright © 2021 Chris Hughes
+import inspect
+import logging
+import sys, os
+import time
+from abc import ABC
+
+import numpy as np
+import torch
+from torch import nn
+from tqdm import tqdm
 from .base import TrainerCallback, StopTrainingError
-import gym
-
-class Environment(gym.Env):
-    pass
-
 
 class EarlyStopping(TrainerCallback):
     """Early stops the training if validation loss doesn't improve after a given patience."""

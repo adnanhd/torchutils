@@ -94,6 +94,7 @@ class Trainer:
 
     # if loss is not then model saves the best results only
     def save_checkpoint(self, path=None, **state):
+        warnings.warn(f"save_checkpoint will be depricated in v1.1.0.", DeprecationWarning)
         makedirs(self.model_path)
         if path is None:
             path = self.model_path
@@ -112,6 +113,7 @@ class Trainer:
         torch.save(state, path)
 
     def load_checkpoint(self, epoch=None, path=None):
+        warnings.warn(f"load_checkpoint will be depricated in v1.1.0.", DeprecationWarning)
         if path is None:
             path = self.model_path
 
@@ -141,11 +143,18 @@ class Trainer:
         batch_size: Optional[int] = None,
         **kwargs,
     ) -> torch.utils.data.DataLoader:
-        assert isinstance(dataset, torch.utils.data.Dataset), """type(dataset), {} must be a descendant of torch.utils.data.Dataset""".format(type(dataset))
+        assert isinstance(dataset, torch.utils.data.Dataset), """type(dataset), {} must be inherited from torch.utils.data.Dataset""".format(type(dataset))
+        import numpy as np
         
         try:
+            if isinstance(dataset.features, np.ndarray):
+                dataset.features = torch.from_numpy(dataset.features)
             dataset.features = dataset.features.to(device=self.device, dtype=self.xtype)
+            
+            if isinstance(dataset.labels, np.ndarray):
+                dataset.labels = torch.from_numpy(dataset.labels)
             dataset.labels = dataset.labels.to(device=self.device, dtype=self.ytype)
+
         except AttributeError:
             warnings.warn("Using a Dataset not derived from torchutils.data.Dataset is dangerous for dtype integrity")
 

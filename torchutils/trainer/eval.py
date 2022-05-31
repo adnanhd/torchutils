@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import torch
-from .utils import profile
+from torchutils.utils import profile
 from typing import (
     List,
     Dict,
@@ -46,7 +46,7 @@ def _run_evaluating(
         last_batch=len(preds)
     )
 
-    return torch.concat(preds)
+    return torch.cat(preds)
 
 
 def _run_evaluating_step(

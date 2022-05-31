@@ -1,27 +1,25 @@
 from torchutils.callbacks.base import TrainerCallback
-from torchutils.logging.pbar import (
-        TestProgressBarLogger, 
-        EpochProgressBarLogger, 
-        StepProgressBarLogger
-)
+from torchutils.logging import NoneLogger, TrainerLogger
+from typing import NewType
+LOGGER_CLASS = NewType('LOGGER_CLASS', type(TrainerLogger))
 
-
-class ProgressBar(TrainerCallback):
+class _LoggingBaseCallback(TrainerCallback):
     """
     A callback which visualises the state of each training and evaluation epoch using a progress bar
     """
+    TEST_LOGGER_CLASS: LOGGER_CLASS = NoneLogger
+    STEP_LOGGER_CLASS: LOGGER_CLASS = NoneLogger
+    EPOCH_LOGGER_CLASS: LOGGER_CLASS = NoneLogger
+    #__slots__ = ('_test_bar', '_epoch_bar', '_step_bar', '_step_size')
+
     def __init__(self):
-        self._test_bar: TestProgressBarLogger = None
-        self._epoch_bar: EpochProgressBarLogger = None
-        self._step_bar: StepProgressBarLogger = None
+        self._test_bar: TrainerLogger = self.TEST_LOGGER_CLASS()
+        self._step_bar: TrainerLogger = self.STEP_LOGGER_CLASS()
+        self._epoch_bar: TrainerLogger = self.EPOCH_LOGGER_CLASS()
         self._step_size: int = None
 
-    def on_initialization(self):
-        ...
-
     def on_training_begin(self, num_epochs=None, batch_size=None, step_size=None, **kwargs):
-        self._epoch_bar = EpochProgressBarLogger(num_epochs)
-        self._epoch_bar.open()
+        self._epoch_bar.open(num_epochs)
         self._step_size = step_size
 
     def on_training_epoch_begin(self, trainer, epoch=None, **kwargs):

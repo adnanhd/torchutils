@@ -1,4 +1,6 @@
 torch>=1.8.0
 sklearn
+pandas
+numpy
 pydantic
 tqdm
