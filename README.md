@@ -19,4 +19,6 @@
 	- [ ] create CallbackArguments (data)class containing all dataloader size etc. information and to be passed at anytime
 
 ## Changelog
-
+- **v1.1 Update**:
+    - Create TrainerMetric class calculating related and depended scores in one shot
+    - Create MetricHandler class registering and feeding and monitoring desired scores
