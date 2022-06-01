@@ -4,6 +4,20 @@ from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from typing import Optional, Any
+from .pydantic_validators import validate_torch_dataset
+from .pydantic_validators import validate_torch_dataloader
+
+
+class DatasetType(ABC):
+    @classmethod
+    def __get_validators__(cls):
+        yield validate_torch_dataset
+
+
+class DataLoaderType(ABC):
+    @classmethod
+    def __get_validators__(cls):
+        yield validate_torch_dataloader
 
 
 class ModuleType(ABC):
@@ -57,4 +71,3 @@ class SchedulerType(ABC):
         if isinstance(other, _LRScheduler): return other
         else: raise ValueError(f'{other} is not an instance of a class inherited from {_LRScheduler.__qualname__}')
 
-__all__ = [ModuleType, OptimizerType, SchedulerType]
