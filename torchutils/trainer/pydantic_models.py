@@ -36,7 +36,7 @@ class TrainerModel(pydantic.BaseModel):
                 if device is None:
                     device = attr.device
                 elif attr.device != device:
-                warnings.warn(f"{attr_name} is on different device.", RuntimeWarning)
+                    warnings.warn(f"{attr_name} is on different device.", RuntimeWarning)
         return device
 
     @device.setter
