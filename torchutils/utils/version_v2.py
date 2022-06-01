@@ -33,4 +33,10 @@ class Version(object):
         if self.minor != other.minor: return False
         if self.patch != other.patch: return False
         return True
+    
+    def __str__(self):
+        return f"{self.major}.{self.minor}.{self.patch}"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.major}.{self.minor}.{self.patch})"
 
