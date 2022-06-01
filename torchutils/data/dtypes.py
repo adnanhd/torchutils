@@ -16,7 +16,7 @@ class NpScalarType(ABC):
         yield cls.validate_np_scalar
 
     @classmethod
-    def validate_np_scalar(cls, dtype: torch.dtype) -> torch.dtype:
+    def validate_np_scalar(cls, dtype) -> np.generic:
         if isinstance(dtype, np.generic): return dtype
         else: raise ValueError('invalid datatype')
 
@@ -32,19 +32,19 @@ class NpTorchType(ABC):
         yield cls.validate_torch_array
 
     @classmethod
-    def validate_np_array(cls, arr):
+    def validate_np_array(cls, arr) -> np.ndarray:
         if isinstance(arr, np.ndarray): return arr
         else: raise ValueError('invalid datatype')
 
     @classmethod
-    def validate_torch_array(cls, arr):
+    def validate_torch_array(cls, arr) -> torch.Tensor:
         if isinstance(arr, torch.Tensor): return arr
         else: raise ValueError('invalid datatype')
 
 
 class DType(BaseModel, Hashable):
     dtype: Union[type, str, NpScalarType, NpTorchType]
-    shape: Optional[Union[tuple, torch.Size]] = None
+    shape: Union[tuple, torch.Size, None] = None
 
     def __init__(self, dtype, shape=None) -> None:
         super(DType, self).__init__(dtype=dtype, shape=shape)
