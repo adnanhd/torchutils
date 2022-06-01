@@ -14,9 +14,17 @@ class Transform(abc.ABC):
         self._original = data.copy()
         self._reference = data
 
-    @abc.abstractproperty
-    def normalized_data(self):
+    @abc.abstractmethod
+    def normalize_arr(self, arr):
         ...
+
+    @abc.abstractmethod
+    def denormalize_arr(self, arr):
+        ...
+
+    @property
+    def normalized_data(self):
+        return self.normalize_arr(self._original)
     
     @property
     def denormalized_data(self):
@@ -31,6 +39,9 @@ class Transform(abc.ABC):
 
     def denormalize(self):
         self._reference[:] = self.denormalized_data
+    
+    def __call__(self, arr):
+        return self.denormalize_arr(arr)
 
     def __enter__(self):
         self.normalize()
@@ -48,10 +59,17 @@ class MinMaxTransform(Transform):
         self._max = data.max(axis=axis)
         self._min = self._min.reshape(_obtain_shape(axis, data.shape))
         self._max = self._max.reshape(_obtain_shape(axis, data.shape))
+    
+    def to_tensor(self, device):
+        from torch import from_numpy
+        self._min = from_numpy(self._min).to(device=device)
+        self._max = from_numpy(self._max).to(device=device)
 
-    @property
-    def normalized_data(self):
-        return (self._original - self._min) / (self._max - self._min)
+    def normalize_arr(self, arr):
+        return (arr - self._min) / (self._max - self_min)
+
+    def denormalize_arr(self, arr):
+        return arr * (self._max - self_min) + self._min
 
 
 class MeanStdTransform(Transform):
@@ -61,7 +79,15 @@ class MeanStdTransform(Transform):
         self._std = data.std(axis=axis)
         self._mean = self._mean.reshape(_obtain_shape(axis, data.shape))
         self._std = self._std.reshape(_obtain_shape(axis, data.shape))
+    
+    def to_tensor(self, device):
+        from torch import from_numpy
+        self._mean = from_numpy(self._mean).to(device=device)
+        self._std = from_numpy(self._std).to(device=device)
 
-    @property
-    def normalized_data(self):
-        return (self._original - self._mean) / self._std
+    def normalize_arr(self, arr):
+        return (arr - self._mean) / self._std
+
+    def denormalize_arr(self, arr):
+        return arr * self._std + self._mean
+
