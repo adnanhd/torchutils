@@ -1,11 +1,18 @@
-from dataclasses import dataclass, field
 from typing import Union
+from pydantic import BaseModel
 
-@dataclass
-class Version(object):
-    major: int = field() 
-    minor: int = field() 
-    patch: Union[int, str] = field()
+class Version(BaseModel):
+    major: int 
+    minor: int 
+    patch: Union[int, str]
+
+    def __init__(self, *args):
+        if len(args) == 1 and isinstance(args[0], str):
+            major, minor, patch = args[0].split('.')
+            super(Version, self).__init__(major=int(major), minor=int(minor), patch=patch)
+        else:
+            major, minor, patch = args
+            super(Version, self).__init__(major=major, minor=minor, patch=patch)
 
     def __lt__(self, other: "Version") -> bool:
         assert isinstance(other, self.__class__)
