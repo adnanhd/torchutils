@@ -15,12 +15,14 @@ from torchutils.utils.pydantic import (
     HandlerArguments, 
     TrainerStatus,
     StepResults,
-    EpochResults
+    EpochResults,
+    TrainerModel,
+    TrainerArguments
 )
 
 
 #class HandlerArguments:
-class TrainerHandler(object):
+class TrainerHandler():
     # train_dl: TrainerDataLoaderArguments
     # valid_dl: TrainerDataLoaderArguments
     # test_dl: TrainerDataLoaderArguments
@@ -30,18 +32,23 @@ class TrainerHandler(object):
             '_arguments', '_status', '_tracker']
 
     def __init__(self, 
+            args: TrainerArguments,
+            model: TrainerModel,
             status: TrainerStatus,
             **kwargs
         ):
+        for key in ('train_dl', 'valid_dl', 'test_dl'):
+            if kwargs.setdefault(key, None) is None: 
+                kwargs.pop(key)
         self._loggers = LoggingHandler()
         self._metrics = MetricHandler()
         self._callbacks = CallbackHandler()
-        self._arguments = HandlerArguments(**kwargs)
+        self._arguments = HandlerArguments(args=args, model=model, status=status)
         self._status = status
         self._tracker = LossTracker()
 
     # Tracker manipulation functions
-    def update(self, batch_loss, num_batchs):
+    def update(self, batch_loss, num_batchs=1):
         self._tracker.update(loss_batch_value=batch_loss, batch_size=num_batchs)
 
     def reset(self):
@@ -83,10 +90,11 @@ class TrainerHandler(object):
         self._callbacks.on_training_step_begin(self._status)
 
     def on_training_step_end(self, x, y, y_pred):
-        batch = StepResults(x=x, y=y, y_pred=y_pred)
+        batch = StepResults(x=x, y_true=y, y_pred=y_pred)
         self._callbacks.on_training_step_end(batch)
 
-    def on_training_epoch_end(self, epoch: EpochResults):
+    def on_training_epoch_end(self):
+        epoch = EpochResults()
         self._callbacks.on_training_epoch_end(epoch)
 
     def on_training_end(self):
@@ -102,7 +110,8 @@ class TrainerHandler(object):
         batch = StepResults(x=x, y=y, y_pred=y_pred)
         self._callbacks.on_validation_step_end(batch)
 
-    def on_validation_run_end(self, epoch: EpochResults):
+    def on_validation_run_end(self):
+        epoch = EpochResults()
         self._callbacks.on_validation_run_end(epoch)
 
     def on_evaluation_run_begin(self):
@@ -115,6 +124,7 @@ class TrainerHandler(object):
         batch = StepResults(x=x, y=y, y_pred=y_pred)
         self._callbacks.on_evaluation_step_end(batch)
 
-    def on_evaluation_run_end(self, epoch: EpochResults):
+    def on_evaluation_run_end(self):
+        epoch = EpochResults()
         self._callbacks.on_evaluation_run_end(epoch)
 

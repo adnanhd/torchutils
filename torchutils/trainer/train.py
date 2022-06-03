@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import torch
-from .valid2 import _run_validating
-from torchutils.trainer.engine2 import Trainer
+from .valid import _run_validating
 from torchutils.callbacks import StopTrainingError
 from torchutils.utils.pydantic import TrainerArguments, HandlerArguments
 from torchutils.utils import profile
+Trainer = "Trainer"
 from typing import (
     List,
     Dict,
@@ -40,7 +40,7 @@ def _run_training(
             _run_training_epoch(trainer, train_loader, valid_loader)
 
         for epoch in range((trainer_arguments.num_epochs // _UNROLLING_N) * _UNROLLING_N, trainer_arguments.num_epochs):
-            _run_training_epoch(epoch, train_loader, valid_loader)
+            _run_training_epoch(trainer, train_loader, valid_loader)
     except StopTrainingError:
         trainer.on_stop_training_error()
 
@@ -68,11 +68,7 @@ def _run_training_epoch(
     trainer._handler.on_training_epoch_end()
 
     if valid_loader is not None:
-        val_results = _run_validating(
-            trainer,
-            valid_loader,
-            **kwargs,
-        )
+        val_results = _run_validating(trainer, valid_loader)
 
 
 def _run_training_step(
@@ -82,7 +78,7 @@ def _run_training_step(
 ) -> torch.Tensor:
     trainer._handler.on_training_step_begin()
 
-    y_pred, loss = trainer._model.attached_step(batch=x, batch_idx=0)
+    y_pred, loss = trainer._model.attached_step(x=x, y=y, batch_idx=trainer._status.current_batch)
     trainer._handler.update(batch_loss=loss.detach())
 
     with torch.no_grad():
