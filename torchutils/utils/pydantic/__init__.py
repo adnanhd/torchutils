@@ -1,11 +1,20 @@
 from .pydantic_models import (
+
         TrainerArguments, 
-        TrainerCallbackArguments, 
-        TrainerDataLoaderArguments, 
-        TrainerModel
+        
+        TrainerModel,
+        TrainerDataLoader, 
+        
+        HandlerArguments, 
+        TrainerStatus,
+        
+        EpochResults,
+        StepResults
 )
 
 from .pydantic_types import (
+        NpScalarType,
+        NpTorchType,
         DatasetType,
         DataLoaderType,
         LossType,

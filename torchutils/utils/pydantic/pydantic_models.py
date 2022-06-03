@@ -9,6 +9,8 @@ from torch.optim.lr_scheduler import _LRScheduler
 from typing import Optional, Dict, Union
 import torch.optim as optimizers
 from .pydantic_types import (
+        NpScalarType,
+        NpTorchType,
         ModuleType, 
         LossType, 
         OptimizerType, 
@@ -75,6 +77,9 @@ class TrainerModel(pydantic.BaseModel):
                             attribute.", RuntimeWarning)
         return checkpoint
 
+    def summary(self):
+        ...
+
     def training_step(self, batch, batch_idx: int):
         ...
 
@@ -97,7 +102,7 @@ class TrainerArguments(pydantic.BaseModel):
     num_epochs_per_validation: int
 
 
-class TrainerDataLoaderArguments(pydantic.BaseModel):
+class TrainerDataLoader(pydantic.BaseModel):
     class Config:
         allow_mutation = False
     dataloader: DataLoaderType
@@ -115,11 +120,36 @@ class TrainerDataLoaderArguments(pydantic.BaseModel):
         return self.dataloader.__len__()
 
 
-class TrainerCallbackArguments(pydantic.BaseModel):
-    train_dl: TrainerDataLoaderArguments
-    valid_dl: TrainerDataLoaderArguments
-    test_dl: TrainerDataLoaderArguments
+class TrainerStatus(pydantic.BaseModel):
+    class Config:
+        allow_mutation = False
+    current_epoch: int
+
+
+class StepResults(pydantic.BaseModel):
+    class Config:
+        allow_mutation = False
+    x: NpTorchType
+    y_true: NpTorchType
+    y_pred: NpTorchType
+
+
+class EpochResults(pydantic.BaseModel):
+    class Config:
+        allow_mutation = False
+    x: NpTorchType
+    y_true: NpTorchType
+    y_pred: NpTorchType
+
+
+class HandlerArguments(pydantic.BaseModel):
+    class Config:
+        allow_mutation = False
+    train_dl: TrainerDataLoader
+    valid_dl: TrainerDataLoader
+    test_dl: TrainerDataLoader
     args: TrainerArguments
     model: TrainerModel
+    status: TrainerStatus
 
 
