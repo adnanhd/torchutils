@@ -2,6 +2,8 @@
 
 ## Bug Reports
 
+- [ ] Compile project using Cython
+
 ## Handler TODOs
 - [ ] Create a base Handler class having add remove clear and hook functionalities
     -	hooker mechanism can be implemented here
