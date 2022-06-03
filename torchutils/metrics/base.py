@@ -35,7 +35,6 @@ class TrainerMetric(ABC):
         self.set_scores(x, y, y_pred)
         return self.get_scores(self.score_names)
 
-
 class MetricHandler(object):
     _scores: Dict[Str, TrainerMetric] = OrderedDict()
     _metrics: Dict[Str, TrainerMetric] = OrderedDict()
