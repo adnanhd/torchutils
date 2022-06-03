@@ -1,5 +1,4 @@
-from typing import overload
-from torchutils.logging.handler import TrainerLogger
+from torchutils.logging import TrainerLogger
 from tqdm import tqdm
 import time
 import os

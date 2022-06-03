@@ -1,5 +1,4 @@
-from typing import overload
-from .handler import TrainerLogger
+from torchutils.logging import TrainerLogger
 import logging
 
 class PrintWriter(TrainerLogger):

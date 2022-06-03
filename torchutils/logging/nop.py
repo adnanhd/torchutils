@@ -1,4 +1,4 @@
-from .handler import TrainerLogger
+from torchutils.logging import TrainerLogger
 
 
 class NoneLogger(TrainerLogger):

@@ -6,27 +6,37 @@ class TrainerLogger(ABC):
     """
     A callback which visualises the state of each training and evaluation epoch using a progress bar
     """
-
-    def __init__(self):
-        super(TrainerLogger, self).__init__()
-
-    @overload
     @abstractmethod
-    def open(self, *args, **kwargs):
+    def open(self):
         ...
 
-    @overload
     @abstractmethod
-    def log(self, *args, **kwargs):
+    def log(self, **kwargs):
         ...
 
-    @overload
     @abstractmethod
-    def update(self, *args, **kwargs):
+    def _flush(self):
         ...
 
-    @overload
     @abstractmethod
-    def close(self, *args, **kwargs):
+    def close(self):
         ...
+
+
+class LoggingHandler(ABC):
+    def init(self):
+        ...
+
+    def log(self):
+        ...
+
+    def step(self):
+        ...
+
+    def close(self):
+        ...
+
+
+
+
 
