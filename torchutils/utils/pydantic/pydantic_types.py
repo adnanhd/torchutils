@@ -26,7 +26,19 @@ class NpTorchType(ABC):
     """
     @classmethod  
     def __get_validators__(cls):  
-        yield validate_np_array or validate_torch_tensor
+        yield cls.validate_np_torch
+
+    @classmethod
+    def validate_np_torch(cls, field_type):
+        try:
+            return validate_torch_tensor(field_type)
+        except ValueError:
+            pass
+
+        try:
+            return validate_np_array(field_type)
+        except ValueError:
+            pass
 
 
 from .pydantic_validators import validate_torch_dataset

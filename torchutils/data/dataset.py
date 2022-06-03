@@ -51,6 +51,10 @@ class Dataset(torch.utils.data.dataset.Dataset):
 
     def save(self, path: str):
         ...
+    
+    def to(self, xtype=None, ytype=None):
+        if xtype is not None: self.features = self.features.astype(xtype)
+        if ytype is not None: self.labels = self.labels.astype(ytype)
 
     #def __hash__(self):
     #    return self.features.__hash__() ^ \
@@ -81,4 +85,7 @@ class Dataset(torch.utils.data.dataset.Dataset):
     def dataloader(self, batch_size: int = None, train: bool = True, **kwargs):
         if batch_size is None:
             batch_size = self.__len__()
-        return torch.utils.data.DataLoader(self, **kwargs, shuffle=train, batch_size=batch_size)
+        kwargs['shuffle'] = train
+        return torch.utils.data.DataLoader(self, **kwargs, batch_size=batch_size)
+
+

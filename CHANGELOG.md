@@ -2,6 +2,11 @@
 
 ## Bug Reports
 
+## Handler TODOs
+- [ ] Create a base Handler class having add remove clear and hook functionalities
+    -	hooker mechanism can be implemented here
+- some arguments must be moved back to where it was belong to, instead of under utils/pydantic
+
 ## Callback TODOs
 - [x] Use TrainerCallbackArguments and its variants for parameter passing
 - [ ] `callbacks/progress_bar.py:ProgressBar` instead of incrementing one-by-one from 0 to **STEP_SIZE**, increment by **BATCH_SIZE** from 0 to len(DATASET)

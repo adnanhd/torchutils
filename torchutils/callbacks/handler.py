@@ -19,6 +19,16 @@ from torchutils.utils.pydantic import (
         EpochResults,
         StepResults
 )
+def _foreach_callback_(method):
+    def wrapped_method(self, *args, **kwargs):
+        for callback in self.callbacks:
+            self._callback = callback
+            try:
+                method(*args, **kwargs)
+            except CallbackMethodNotImplementedError:
+                continue
+        self._callback = None
+    return wrapped_method
 
 class CallbackHandler:
     """
@@ -89,95 +99,63 @@ class CallbackHandler:
     def __repr__(self):
         return self.callback_list
    
-    def run_begin(self, args: HandlerArguments):
-        pass
-
-    def epoch_begin(self, stat: TrainerStatus):
-        pass
-
-    def step_begin(self, stat: TrainerStatus):
-        pass
-
-    def step_end(self, batch: StepResults):
-        pass
-
-    def epoch_end(self, epoch: EpochResults):
-        pass
-
-    def run_end(self, stat: TrainerStatus):
-        pass
-
-
-def foreach_callback(cls, method):
-    def wrapped_method(self, *args, **kwargs):
-        for callback in self.callbacks:
-            self._callback = callback
-            try:
-                method(*args, **kwargs)
-            except CallbackMethodNotImplementedError:
-                continue
-        self._callback = None
-    return wrapped_method
-
-
-class Train_CallbackHandler(CallbackHandler):
-    @foreach_callback
-    def run_begin(self, args: HandlerArguments):
+    @_foreach_callback_
+    def on_training_begin(self, args: HandlerArguments):
         self._callback.on_training_begin(args)
 
-    @foreach_callback
-    def epoch_begin(self, stat: TrainerStatus):
+    @_foreach_callback_
+    def on_training_epoch_begin(self, stat: TrainerStatus):
         self._callback.on_training_epoch_begin(stat)
 
-    @foreach_callback
-    def step_begin(self, stat: TrainerStatus):
+    @_foreach_callback_
+    def on_training_step_begin(self, stat: TrainerStatus):
         self._callback.on_training_step_begin(stat)
 
-    @foreach_callback
-    def step_end(self, batch: StepResults):
+    @_foreach_callback_
+    def on_training_step_end(self, batch: StepResults):
         self._callback.on_training_step_end(batch)
 
-    @foreach_callback
-    def epoch_end(self, epoch: EpochResults):
+    @_foreach_callback_
+    def on_training_epoch_end(self, epoch: EpochResults):
         self._callback.on_training_epoch_end(epoch)
 
-    @foreach_callback
-    def run_end(self, stat: TrainerStatus):
+    @_foreach_callback_
+    def on_training_end(self, stat: TrainerStatus):
         self._callback.on_training_end(stat)
 
-
-class Valid_CallbackHandler(CallbackHandler):
-    @foreach_callback
-    def epoch_begin(self, stat: TrainerStatus):
+    @_foreach_callback_
+    def on_validation_run_begin(self, stat: TrainerStatus):
         self._callback.on_validation_run_begin(stat)
 
-    @foreach_callback
-    def step_begin(self, stat: TrainerStatus):
+    @_foreach_callback_
+    def on_validation_step_begin(self, stat: TrainerStatus):
         self._callback.on_validation_step_begin(stat)
 
-    @foreach_callback
-    def step_end(self, batch: StepResults):
+    @_foreach_callback_
+    def on_validation_step_end(self, batch: StepResults):
         self._callback.on_validation_step_end(batch)
 
-    @foreach_callback
-    def epoch_end(self, epoch: EpochResults):
+    @_foreach_callback_
+    def on_validation_run_end(self, epoch: EpochResults):
         self._callback.on_validation_run_end(epoch)
 
-
-class Eval_CallbackHandler(CallbackHandler):
-    @foreach_callback
-    def run_begin(self, args: HandlerArguments):
+    @_foreach_callback_
+    def on_evaluation_run_begin(self, stat: TrainerStatus):
         self._callback.on_evaluation_run_begin(stat)
 
-    @foreach_callback
-    def step_begin(self, stat: TrainerStatus):
+    @_foreach_callback_
+    def on_evaluation_step_begin(self, stat: TrainerStatus):
         self._callback.on_evaluation_step_begin(stat)
 
-    @foreach_callback
-    def step_end(self, batch: StepResults):
+    @_foreach_callback_
+    def on_evaluation_step_end(self, batch: StepResults):
         self._callback.on_evaluation_step_end(batch)
 
-    @foreach_callback
-    def run_end(self, epoch: EpochResults):
-        self._callback.on_evaluation_step_end(epoch)
+    @_foreach_callback_
+    def on_evaluation_run_end(self, epoch: EpochResults):
+        self._callback.on_evaluation_run_end(epoch)
+
+    @_foreach_callback_
+    def on_stop_training_error(self, stat: TrainerStatus):
+        self._callback.on_stop_training_error(stat)
 
