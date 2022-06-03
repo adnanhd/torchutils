@@ -1,6 +1,5 @@
 # Example use
 ```python
-from typing import overload, Iterable, Callable
 from torchutils.metrics import TrainerMetric, register_to_metric_handler
 
 # Equally 
