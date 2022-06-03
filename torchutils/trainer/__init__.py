@@ -1,2 +1,2 @@
 from .engine import Trainer
-from .pydantic_models import TrainerArguments, TrainerModel
+from torchutils.utils.pydantic import TrainerArguments, TrainerModel

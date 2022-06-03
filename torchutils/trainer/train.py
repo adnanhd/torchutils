@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import torch
-from .valid import _run_validating
+from .valid2 import _run_validating
+from torchutils.trainer.engine2 import Trainer
+from torchutils.callbacks import StopTrainingError
+from torchutils.utils.pydantic import TrainerArguments, HandlerArguments
 from torchutils.utils import profile
 from typing import (
     List,
@@ -14,91 +17,55 @@ from typing import (
     Iterable
 )
 
-from ..callbacks import StopTrainingError
-
-
-def _add_prefix(prefix: str, kwargs: Mapping[str, Any]):
-    return {f'{prefix}_{key}': value for key, value in kwargs.items()}
-
 
 @profile
 def _run_training(
-    trainer,
-    num_epochs: int,
+    trainer: Trainer,
+    trainer_arguments: TrainerArguments,
     train_loader: torch.utils.data.DataLoader,
     valid_loader: Optional[torch.utils.data.DataLoader] = None,
-    **kwargs,
 ):
     _UNROLLING_N = 8
-    trainer.__handle__(
-        "on_training_begin",
-        num_epochs=num_epochs,
-        batch_size=train_loader.batch_size,
-        step_size=train_loader.__len__()
-    )
+    trainer._handler.on_training_begin()
 
     try:
-        for epoch in range(0, num_epochs - _UNROLLING_N + 1, _UNROLLING_N):
-            _run_training_epoch(
-                trainer, epoch+0, train_loader, valid_loader, **kwargs)
-            _run_training_epoch(
-                trainer, epoch+1, train_loader, valid_loader, **kwargs)
-            _run_training_epoch(
-                trainer, epoch+2, train_loader, valid_loader, **kwargs)
-            _run_training_epoch(
-                trainer, epoch+3, train_loader, valid_loader, **kwargs)
-            _run_training_epoch(
-                trainer, epoch+4, train_loader, valid_loader, **kwargs)
-            _run_training_epoch(
-                trainer, epoch+5, train_loader, valid_loader, **kwargs)
-            _run_training_epoch(
-                trainer, epoch+6, train_loader, valid_loader, **kwargs)
-            _run_training_epoch(
-                trainer, epoch+7, train_loader, valid_loader, **kwargs)
+        for epoch in range(0, trainer_arguments.num_epochs - _UNROLLING_N + 1, _UNROLLING_N):
+            _run_training_epoch(trainer, train_loader, valid_loader)
+            _run_training_epoch(trainer, train_loader, valid_loader)
+            _run_training_epoch(trainer, train_loader, valid_loader)
+            _run_training_epoch(trainer, train_loader, valid_loader)
+            _run_training_epoch(trainer, train_loader, valid_loader)
+            _run_training_epoch(trainer, train_loader, valid_loader)
+            _run_training_epoch(trainer, train_loader, valid_loader)
+            _run_training_epoch(trainer, train_loader, valid_loader)
 
-        for epoch in range((num_epochs // _UNROLLING_N) * _UNROLLING_N, num_epochs):
-            _run_training_epoch(trainer, epoch, train_loader,
-                                valid_loader, **kwargs)
+        for epoch in range((trainer_arguments.num_epochs // _UNROLLING_N) * _UNROLLING_N, trainer_arguments.num_epochs):
+            _run_training_epoch(epoch, train_loader, valid_loader)
     except StopTrainingError:
-        trainer.__handle__("on_stop_training_error")
+        trainer.on_stop_training_error()
 
-    trainer.__handle__("on_training_end", last_epoch=num_epochs)
-
+    trainer._handler.on_training_end()
 
 @profile
 def _run_training_epoch(
-    trainer,
-    epoch: int,
+    trainer: Trainer,
     train_loader: torch.utils.data.DataLoader,
     valid_loader: Optional[torch.utils.data.DataLoader] = None,
-    **kwargs,
 ) -> torch.Tensor:
-    trainer.metrics.init(
-        epoch=epoch,
-        batch_size=train_loader.batch_size,
-        step_size=train_loader.__len__()
-    )
-    
-    trainer.__handle__("on_training_epoch_begin", epoch=epoch)
 
-    trainer.model.train()
-    train_loss = 0
+    trainer._handler.on_training_epoch_begin()
+    trainer._model.train()
+    trainer._handler.reset()
+    
     for batch, (features, y_truth) in enumerate(train_loader):
-        if not torch.is_tensor(features):
-            features = torch.cat(features, dim=-1)
-        if not torch.is_tensor(y_truth):
-            y_truth = torch.cat(y_truth, dim=-1)
-        train_loss += _run_training_step(
-            trainer=trainer, epoch=epoch, batch_idx=batch, **kwargs,
+        if not torch.is_tensor(features): features = torch.cat(features, dim=-1)
+        if not torch.is_tensor(y_truth):  y_truth = torch.cat(y_truth, dim=-1)
+        _run_training_step(trainer=trainer,
             x=features.to(device=trainer.device, dtype=trainer.xtype),
             y=y_truth.to(device=trainer.device, dtype=trainer.ytype),
         )
-    train_loss /= len(train_loader)
 
-    trainer.metrics.update(epoch)
-    results = trainer.metrics.updated_values(epoch)
-    results.setdefault('loss', train_loss)
-    trainer.__handle__("on_training_epoch_end", epoch=epoch, **results)
+    trainer._handler.on_training_epoch_end()
 
     if valid_loader is not None:
         val_results = _run_validating(
@@ -107,42 +74,16 @@ def _run_training_epoch(
             **kwargs,
         )
 
-        results.update(_add_prefix('val', val_results))
-
-    trainer.__handle__("on_training_valid_end", epoch=epoch, **results)
-
 
 def _run_training_step(
     trainer,
-    epoch: int,
-    batch_idx: int,
     x: torch.Tensor,
     y: torch.Tensor,
-    **kwargs,
 ) -> torch.Tensor:
-    trainer.__handle__("on_training_step_begin",
-                       epoch=epoch,
-                       batch=batch_idx)
+    trainer._handler.on_training_step_begin()
 
-    trainer.optimizer.zero_grad()
+    y_pred, loss = trainer._model.attached_step(batch=x, batch_idx=0)
+    trainer._handler.update(batch_loss=loss.detach())
 
-    y_pred = trainer.model(x)
-    loss = trainer.criterion(y_pred, y)
-
-    loss.backward()
-    trainer.optimizer.step()
-
-    trainer.metrics.step(
-        batch_idx=batch_idx,
-        y_true=y.detach(),
-        y_pred=y_pred.detach(),
-    )
-
-    trainer.__handle__("on_training_step_end",
-                       epoch=epoch,
-                       batch=batch_idx,
-                       loss=loss.detach(),
-                       batch_output=y_pred.detach(),
-                       **trainer.metrics.stepped_values(batch_idx))
-
-    return loss.detach()
+    with torch.no_grad():
+        trainer._handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
