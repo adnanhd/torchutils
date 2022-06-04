@@ -109,6 +109,9 @@ class TrainerModel(pydantic.BaseModel):
     def model_fn(self, batch, batch_idx: int):
         return self.model(batch)
 
+    def __call__(self, input):
+        return self.model(input)
+
     def validating_step(self, batch, batch_idx: int):
         return self.model(batch.detach()).detach()
 
