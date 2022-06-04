@@ -114,7 +114,7 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_evaluation_run_begin(self, args: HandlerArguments):
+    def on_evaluation_run_begin(self, stat: TrainerStatus):
         """
         Event called at the start of an evaluation run.
         """
@@ -144,6 +144,9 @@ class TrainerCallback(ABC):
         """
         Event called when a stop training error is raised
         """
+        raise CallbackMethodNotImplementedError
+
+    def on_termination(self, stat: TrainerStatus):
         raise CallbackMethodNotImplementedError
 
     #def __getattr__(self, item):

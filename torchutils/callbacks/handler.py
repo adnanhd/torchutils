@@ -98,10 +98,14 @@ class CallbackHandler:
 
     def __repr__(self):
         return self.callback_list
+
+    @_foreach_callback_
+    def on_initialization(self, args: HandlerArguments):
+        self._callback.on_initialization(args)
    
     @_foreach_callback_
-    def on_training_begin(self, args: HandlerArguments):
-        self._callback.on_training_begin(args)
+    def on_training_begin(self, stat: TrainerStatus):
+        self._callback.on_training_begin(stat)
 
     @_foreach_callback_
     def on_training_epoch_begin(self, stat: TrainerStatus):
@@ -158,4 +162,8 @@ class CallbackHandler:
     @_foreach_callback_
     def on_stop_training_error(self, stat: TrainerStatus):
         self._callback.on_stop_training_error(stat)
+
+    @_foreach_callback_
+    def on_termination(self, stat: TrainerStatus):
+        self._callback.on_termination(stat)
 

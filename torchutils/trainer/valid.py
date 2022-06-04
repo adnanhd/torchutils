@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import torch
+#from .engine import Trainer
 from torchutils.utils import profile
 from typing import (
     List,
@@ -16,6 +17,7 @@ from typing import (
 @profile
 def _run_validating(
     trainer: "Trainer",
+    #trainer_arguments: TrainingArguments,
     valid_loader: Optional[torch.utils.data.DataLoader],
 ) -> torch.Tensor:
 

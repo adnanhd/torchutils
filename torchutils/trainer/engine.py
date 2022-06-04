@@ -17,7 +17,8 @@ from .handler import TrainerHandler
 from torchutils.utils import Version
 from torchutils.utils.pydantic import (
         TrainerModel, 
-        TrainerArguments, 
+        TrainingArguments, 
+        EvaluatingArguments,
         TrainerStatus
 )
 
@@ -134,20 +135,26 @@ class Trainer:
                 batch_size=kwargs.setdefault('valid_dl_batch_size', -1))
             kwargs['valid_dl_batch_size'] = valid_dl.batch_size
 
-        args = TrainerArguments(num_epochs=num_epochs, 
+        args = TrainingArguments(num_epochs=num_epochs, 
                 learning_rate=learning_rate, **kwargs,
                 train_dl_batch_size=train_dl.batch_size)
 
         self._handler = TrainerHandler(train_dl=train_dl, status=self._status,
                 valid_dl=valid_dl, args=args, model=self._model)
+        self._handler.on_initialization()
 
-        return self._run_training(args, train_dl, valid_dl)
+        try:
+            return self._run_training(args, train_dl, valid_dl)
+        except StopTrainingError:
+            self._handler.on_stop_training_error()
+        finally:
+            self._handler.on_termination()
         
     def evaluate(
         self,
         dataset,
         dataloader_kwargs={},
-        **kwargs,
+        **kwargs
     ):
         eval_dl = self.create_dataloader(
             dataset=dataset,
@@ -155,8 +162,21 @@ class Trainer:
             batch_size=dataset.__len__(),
             **dataloader_kwargs,
         )
+        
+        args = EvaluatingArguments(**kwargs,
+                eval_dl_batch_size=eval_dl.batch_size)
+        
+        self._handler = TrainerHandler(eval_dl=eval_dl, 
+                status=self._status, args=args, model=self._model)
+        
+        self._handler.on_initialization()
 
-        return self._run_evaluating(self, eval_dl, **kwargs)
+        try:
+            return self._run_evaluating(eval_dl)
+        except StopTrainingError:
+            self._handler.on_stop_training_error()
+        finally:
+            self._handler.on_termination()
 
     from .train import _run_training
     from .valid import _run_validating

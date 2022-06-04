@@ -1,6 +1,7 @@
 from .pydantic_models import (
 
-        TrainerArguments, 
+        TrainingArguments, 
+        EvaluatingArguments,
         
         TrainerModel,
         TrainerDataLoader, 

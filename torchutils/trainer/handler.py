@@ -17,7 +17,7 @@ from torchutils.utils.pydantic import (
     StepResults,
     EpochResults,
     TrainerModel,
-    TrainerArguments
+    TrainingArguments
 )
 
 
@@ -26,13 +26,13 @@ class TrainerHandler():
     # train_dl: TrainerDataLoaderArguments
     # valid_dl: TrainerDataLoaderArguments
     # test_dl: TrainerDataLoaderArguments
-    # args: TrainerArguments
+    # args: TrainingArguments
     # model: TrainerModel
     __slots__ = ['_loggers', '_metrics', '_callbacks',
             '_arguments', '_status', '_tracker']
 
     def __init__(self, 
-            args: TrainerArguments,
+            args: TrainingArguments,
             model: TrainerModel,
             status: TrainerStatus,
             **kwargs
@@ -79,8 +79,11 @@ class TrainerHandler():
         self._callbacks.clear_callbacks()
         self._metrics.clear_scores()
 
-    def on_training_begin(self, args: HandlerArguments=None):
-        self._callbacks.on_training_begin(args)
+    def on_initialization(self):
+        self._callbacks.on_initialization(self._arguments)
+
+    def on_training_begin(self):
+        self._callbacks.on_training_begin(self._status)
 
     def on_training_epoch_begin(self):
         self._callbacks.on_training_epoch_begin(self._status)
@@ -121,10 +124,16 @@ class TrainerHandler():
         self._callbacks.on_evaluation_step_begin(self._status)
 
     def on_evaluation_step_end(self, x, y, y_pred):
-        batch = StepResults(x=x, y=y, y_pred=y_pred)
+        batch = StepResults(x=x, y_true=y, y_pred=y_pred)
         self._callbacks.on_evaluation_step_end(batch)
 
     def on_evaluation_run_end(self):
         epoch = EpochResults()
         self._callbacks.on_evaluation_run_end(epoch)
+
+    def on_stop_training_error(self):
+        self._callbacks.on_stop_training_error(self._status)
+
+    def on_termination(self):
+        self._callbacks.on_termination(self._status)
 

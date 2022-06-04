@@ -23,20 +23,21 @@ import torchsummary
 class TrainerModel(pydantic.BaseModel):
     model: ModuleType
     criterion: LossType
-    optimizer: OptimizerType #Union[OptimizerType, str]
+    optimizer: Optional[OptimizerType] #Union[OptimizerType, str]
     scheduler: Optional[SchedulerType]
     device: Any = None
+    
+    @property
+    def device(self):
+        return next(self.model.parameters()).device
 
-    #@property
-    #def device(self):
-    #    return next(self.model.parameters()).device
-
-    @pydantic.validator('device')
-    def set_device(cls, field_type):
-        if isinstance(field_type, torch.device):
-            self.model = self.model.to(device=device)
-            return field_type
-        raise ValueError()
+    def __setattr__(self, key, value):
+        if key == 'device':
+            if isinstance(key, str):
+                value = torch.device(value)
+            self.model = self.model.to(device=value)            
+            return object.__setattr__(self.model, 'device', value)
+        return super().__setattr__(key, value)
 
     @classmethod
     def _get_attr_names(cls):
@@ -81,7 +82,7 @@ class TrainerModel(pydantic.BaseModel):
         self.model.eval()
 
     def configure_optimizers(self, lr: float, **kwargs):
-        return optimizers.Adam(self.model.parameters(), lr=lr, **kwargs)
+        self.optimizer = optimizers.Adam(self.model.parameters(), lr=lr, **kwargs)
 
     def compile(self, 
             model: Module=None, optim: Union[str, Optimizer]=None,
@@ -117,13 +118,13 @@ class TrainerModel(pydantic.BaseModel):
         self.optimizer_step()
         return y_pred, loss
 
-    def detached_step(self, x, y, idx):
-        y_pred = self.model_fn(batch=x, batch_idx=idx)
-        loss = self.loss_fn(batch=y_pred, batch_true=y)
+    def detached_step(self, x, y, batch_idx):
+        y_pred = self.model_fn(batch=x, batch_idx=batch_idx)
+        loss = self.loss_fn(batch=y_pred, batch_true=y, batch_idx=batch_idx)
         return y_pred, loss
 
 
-class TrainerArguments(pydantic.BaseModel):
+class TrainingArguments(pydantic.BaseModel):
     class Config:
         allow_mutation = False
 
@@ -132,8 +133,13 @@ class TrainerArguments(pydantic.BaseModel):
     resume_epochs: int = 0
     train_dl_batch_size: int
     valid_dl_batch_size: int = -1 # All elements at a batch
-    test_dl_batch_size: int = 1 # One element per patch
     num_epochs_per_validation: int = 1
+
+class EvaluatingArguments(pydantic.BaseModel):
+    class Config:
+        allow_mutation = False
+    test_dl_batch_size: int = 1 # One element per patch
+
 
 
 class TrainerDataLoader(pydantic.BaseModel):
@@ -156,7 +162,7 @@ class TrainerDataLoader(pydantic.BaseModel):
 
 class TrainerStatus(pydantic.BaseModel):
     class Config:
-        allow_mutation = False
+        allow_mutation = True
     current_epoch: int = None
     current_batch: int = None
     
@@ -168,11 +174,11 @@ class TrainerStatus(pydantic.BaseModel):
             return unlock
         raise LookupError(f"HandlerArguments has been locked already.")
 
-    def step(self, n=1):
-        self.current_batch += n
+    def step(self, batch):
+        self.current_batch = batch
 
-    def epoch(self):
-        self.current_epoch += 1
+    def epoch(self, epoch):
+        self.current_epoch = epoch
 
     def update(self, batch=None, epoch=None):
         if batch is not None: self.current_batch = batch
@@ -207,7 +213,7 @@ class EpochResults(pydantic.BaseModel):
 
 
 class HandlerArguments(pydantic.BaseModel):
-    args: TrainerArguments
+    args: Union[TrainingArguments, EvaluatingArguments]
     model: TrainerModel
     status: TrainerStatus
     train_dl: Optional[TrainerDataLoader] = None

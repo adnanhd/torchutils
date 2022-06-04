@@ -1,9 +1,7 @@
 # Copyright © 2022 Adnan Harun Dogan
+import numpy as np
 from .base import TrainerCallback, StopTrainingError
-import gym
-
-class Environment(gym.Env):
-    pass
+from torchutils.utils.pydantic import TrainerStatus
 
 
 class EarlyStopping(TrainerCallback):
@@ -35,7 +33,7 @@ class EarlyStopping(TrainerCallback):
         self.delta = delta
         self.trace_func = trace_func
 
-    def on_training_valid_end(self, trainer, epoch=None, **kwargs):
+    def on_training_epoch_end(self, stat: TrainerStatus, **kwargs):
         score = -kwargs[self.monitor]
 
         if self.best_score is None:
@@ -43,10 +41,8 @@ class EarlyStopping(TrainerCallback):
         elif score < self.best_score + self.delta:
             self.counter += 1
             if self.verbose:
-                self.trace_func(
-                    f"BOK YE AMK EarlyStopping counter: {self.counter} out of {self.patience}"
-                    f"Best value: {self.best} Epoch-end value: {score}"
-                )
+                self.trace_func(f"Stopping counter: {self.counter} out of {self.patience}")
+                self.trace_func(f"Best value: {self.best_score} Epoch-end value: {score}")
             if self.counter >= self.patience:
                 self.early_stop = True
                 raise StopTrainingError(f'EarlyStop stopped the model')

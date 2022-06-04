@@ -2,7 +2,7 @@
 import torch
 from .valid import _run_validating
 from torchutils.callbacks import StopTrainingError
-from torchutils.utils.pydantic import TrainerArguments, HandlerArguments
+from torchutils.utils.pydantic import TrainingArguments, HandlerArguments
 from torchutils.utils import profile
 Trainer = "Trainer"
 from typing import (
@@ -17,38 +17,25 @@ from typing import (
     Iterable
 )
 
-
 @profile
 def _run_training(
     trainer: Trainer,
-    trainer_arguments: TrainerArguments,
+    trainer_arguments: TrainingArguments,
     train_loader: torch.utils.data.DataLoader,
     valid_loader: Optional[torch.utils.data.DataLoader] = None,
 ):
-    _UNROLLING_N = 8
     trainer._handler.on_training_begin()
 
-    try:
-        for epoch in range(0, trainer_arguments.num_epochs - _UNROLLING_N + 1, _UNROLLING_N):
-            _run_training_epoch(trainer, train_loader, valid_loader)
-            _run_training_epoch(trainer, train_loader, valid_loader)
-            _run_training_epoch(trainer, train_loader, valid_loader)
-            _run_training_epoch(trainer, train_loader, valid_loader)
-            _run_training_epoch(trainer, train_loader, valid_loader)
-            _run_training_epoch(trainer, train_loader, valid_loader)
-            _run_training_epoch(trainer, train_loader, valid_loader)
-            _run_training_epoch(trainer, train_loader, valid_loader)
-
-        for epoch in range((trainer_arguments.num_epochs // _UNROLLING_N) * _UNROLLING_N, trainer_arguments.num_epochs):
-            _run_training_epoch(trainer, train_loader, valid_loader)
-    except StopTrainingError:
-        trainer.on_stop_training_error()
+    for epoch in range(trainer_arguments.num_epochs):
+        _run_training_epoch(trainer, trainer_arguments, train_loader, valid_loader)
+        trainer._status.epoch(epoch)
 
     trainer._handler.on_training_end()
 
 @profile
 def _run_training_epoch(
     trainer: Trainer,
+    trainer_arguments: TrainingArguments,
     train_loader: torch.utils.data.DataLoader,
     valid_loader: Optional[torch.utils.data.DataLoader] = None,
 ) -> torch.Tensor:
@@ -64,10 +51,12 @@ def _run_training_epoch(
             x=features.to(device=trainer.device, dtype=trainer.xtype),
             y=y_truth.to(device=trainer.device, dtype=trainer.ytype),
         )
+        trainer._status.step(batch)
 
     trainer._handler.on_training_epoch_end()
 
-    if valid_loader is not None:
+    if valid_loader is not None and (trainer._status.current_epoch \
+            + 1) % trainer_arguments.num_epochs_per_validation == 0:
         val_results = _run_validating(trainer, valid_loader)
 
 
