@@ -10,9 +10,11 @@ class ProgressBarLogger(TrainerLogger):
     def __init__(self, **kwargs):
         self._logs = OrderedDict()
         self._args = kwargs.copy()
+        self._pbar = None
 
     def open(self, total: int, args: HandlerArguments = None):
-        self._pbar = tqdm(total=total, **self._args)
+        if self._pbar is None:
+            self._pbar = tqdm(total=total, **self._args)
 
     def log_score(self, **kwargs):
         self._logs.update(kwargs)
@@ -23,6 +25,7 @@ class ProgressBarLogger(TrainerLogger):
 
     def close(self):
         self._pbar.close()
+        self._pbar = None
 
 
 class EpochProgressBar(ProgressBarLogger):

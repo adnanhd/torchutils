@@ -1,7 +1,7 @@
 # torchutils
 
 ## Bug Reports
-- [ ] Compile project using Cython
+- [ ] Compile project using Cython or numba
 
 ## Handler TODOs
 - [ ] Create a base Handler class having add remove clear and hook functionalities
@@ -10,7 +10,6 @@
 
 ## Callback TODOs
 - [ ] `callbacks/progress_bar.py:ProgressBar` instead of incrementing one-by-one from 0 to **STEP_SIZE**, increment by **BATCH_SIZE** from 0 to len(DATASET)
-    - Almost same on CPU, but 10-15% torch mapped to GPU is faster than numpy. 
 - [ ] create a registrar mechanism for callbacks
 
 ## Trainer TODOs
@@ -26,6 +25,7 @@
     - Create TrainerMetric class calculating related and depended scores in one shot
     - Create MetricHandler class registering and feeding and monitoring desired scores
     - [x] **TEST**: `torchutils/data/dataset.py:Dataset.__getitem__` test if np.ndarray or torch.Tensor is faster on return
+	- Almost same on CPU, but 10-15% torch mapped to GPU is faster than numpy. 
     - [x] Use TrainerCallbackArguments and its variants for parameter passing
 
 - **v1.2 Update**:

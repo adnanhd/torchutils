@@ -5,7 +5,7 @@ import numpy as np
 from .utils import hybridmethod
 from sklearn.model_selection import train_test_split
 from typing import Callable
-
+from typing import Union, Tuple
 
 __version__ = '2.0.a'
 # TODO: keep in mind that Dataset might be shuffled
@@ -62,10 +62,10 @@ class Dataset(torch.utils.data.dataset.Dataset):
     #        self.metadata.__hash__() ^ \
     #        self.__version__.__hash__()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.features)
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> Tuple[np.ndarray]:
         feature = self.features[index]
         label = self.labels[index]
         return feature, label
