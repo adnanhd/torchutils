@@ -1,4 +1,6 @@
-# Example use
+# Examples
+
+## An Example with TrainerMetric inheritance
 ```python
 from torchutils.metrics import TrainerMetric, register_to_metric_handler
 
@@ -23,4 +25,21 @@ class MyMetric(TrainerMetric):
     def y_score(self):
         return self._my_score2
 ```
-	
+
+## An Example with MetricHandler use
+```py
+from torchutils.metrics import MetricHandler
+
+dataloader = load_from_somewhere()
+model = build_my_model()
+mh = MetricHandler('x_score', 'y_score')
+
+for epoch_idx in range(10):
+    for x, y in dataloader:
+	y_pred = model(x)
+        mh.set_scores_values(x, y, y_pred)
+	print(mh.get_score_values())
+```
+
+
+
