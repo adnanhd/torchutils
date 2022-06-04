@@ -43,7 +43,7 @@ class LoggingHandler(ABC):
 
     def add_loggers(self, loggers: List[TrainerLogger]):
         for logger in loggers:
-            self._loggers.add_logger(loggers)
+            self.add_logger(loggers)
 
     def clear_loggers(self):
         self._loggers.clear()
