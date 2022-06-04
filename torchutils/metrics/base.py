@@ -45,7 +45,7 @@ class MetricHandler(object):
         # TODO: why it is here? all_score_names = self.__class__._scores.copy()
         self.add_scores(score_names)
     
-    def add_scores(self, *score_names: Str):
+    def add_scores(self, score_names: List[str]):
         for score_name in score_names:
             if score_name not in self.__class__._scores.keys():
                 warnings.warn(f"Score {score_name} is not registered", 
@@ -55,7 +55,7 @@ class MetricHandler(object):
             self._scores[score_name] = trainer_metric 
             self._metrics[trainer_metric.__class__.__name__] = trainer_metric
 
-    def remove_scores(self, *score_names: Str):
+    def remove_scores(self, score_names: List[str]):
         for score_name in score_names:
             if score_name not in self.__class__._scores.keys():
                 warnings.warn(f"Score {score_name} is not registered", 

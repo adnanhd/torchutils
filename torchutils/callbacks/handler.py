@@ -24,11 +24,36 @@ def _foreach_callback_(method):
         for callback in self.callbacks:
             self._callback = callback
             try:
-                method(*args, **kwargs)
+                method(self, *args, **kwargs)
             except CallbackMethodNotImplementedError:
                 continue
         self._callback = None
     return wrapped_method
+
+
+def _foreach_callback_require_stat_(method):
+    def wrapped_method(self, stat: TrainerStatus, **kwargs):
+        for callback in self.callbacks:
+            self._callback = callback
+            try:
+                method(self, stat, **kwargs)
+            except CallbackMethodNotImplementedError:
+                continue
+        self._callback = None
+    return wrapped_method
+
+
+def _foreach_callback_require_args_(method):
+    def wrapped_method(self, args: HandlerArguments, **kwargs):
+        for callback in self.callbacks:
+            self._callback = callback
+            try:
+                method(self, args, **kwargs)
+            except CallbackMethodNotImplementedError:
+                continue
+        self._callback = None
+    return wrapped_method
+
 
 class CallbackHandler:
     """
@@ -99,71 +124,71 @@ class CallbackHandler:
     def __repr__(self):
         return self.callback_list
 
-    @_foreach_callback_
+    @_foreach_callback_require_args_
     def on_initialization(self, args: HandlerArguments):
-        self._callback.on_initialization(args)
+        self._callback.on_initialization(args=args)
    
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_training_begin(self, stat: TrainerStatus):
         self._callback.on_training_begin(stat)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_training_epoch_begin(self, stat: TrainerStatus):
         self._callback.on_training_epoch_begin(stat)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_training_step_begin(self, stat: TrainerStatus):
         self._callback.on_training_step_begin(stat)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_training_step_end(self, batch: StepResults):
-        self._callback.on_training_step_end(batch)
+        self._callback.on_training_step_end(batch=batch)
 
     @_foreach_callback_
     def on_training_epoch_end(self, epoch: EpochResults):
-        self._callback.on_training_epoch_end(epoch)
+        self._callback.on_training_epoch_end(epoch=epoch)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_training_end(self, stat: TrainerStatus):
         self._callback.on_training_end(stat)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_validation_run_begin(self, stat: TrainerStatus):
         self._callback.on_validation_run_begin(stat)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_validation_step_begin(self, stat: TrainerStatus):
         self._callback.on_validation_step_begin(stat)
 
     @_foreach_callback_
     def on_validation_step_end(self, batch: StepResults):
-        self._callback.on_validation_step_end(batch)
+        self._callback.on_validation_step_end(batch=batch)
 
     @_foreach_callback_
     def on_validation_run_end(self, epoch: EpochResults):
-        self._callback.on_validation_run_end(epoch)
+        self._callback.on_validation_run_end(epoch=epoch)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_evaluation_run_begin(self, stat: TrainerStatus):
         self._callback.on_evaluation_run_begin(stat)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_evaluation_step_begin(self, stat: TrainerStatus):
         self._callback.on_evaluation_step_begin(stat)
 
     @_foreach_callback_
     def on_evaluation_step_end(self, batch: StepResults):
-        self._callback.on_evaluation_step_end(batch)
+        self._callback.on_evaluation_step_end(batch=batch)
 
     @_foreach_callback_
     def on_evaluation_run_end(self, epoch: EpochResults):
-        self._callback.on_evaluation_run_end(epoch)
+        self._callback.on_evaluation_run_end(epoch=epoch)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_stop_training_error(self, stat: TrainerStatus):
         self._callback.on_stop_training_error(stat)
 
-    @_foreach_callback_
+    @_foreach_callback_require_stat_
     def on_termination(self, stat: TrainerStatus):
         self._callback.on_termination(stat)
 

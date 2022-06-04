@@ -30,7 +30,7 @@ class MyMetric(TrainerMetric):
 ```py
 from torchutils.metrics import MetricHandler
 
-dataloader = load_from_somewhere()
+dataloader = load_my_dataloader()
 model = build_my_model()
 mh = MetricHandler('x_score', 'y_score')
 

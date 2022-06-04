@@ -6,7 +6,7 @@ import warnings
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from typing import Optional, Dict, Union, Any
+from typing import Optional, Dict, Union, Any, List
 import torch.optim as optimizers
 from .pydantic_types import (
         NpScalarType,
@@ -26,6 +26,10 @@ class TrainerModel(pydantic.BaseModel):
     optimizer: Optional[OptimizerType] #Union[OptimizerType, str]
     scheduler: Optional[SchedulerType]
     device: Any = None
+
+    @property
+    def dtype(self):
+        return next(self.model.parameters()).dtype
     
     @property
     def device(self):
@@ -33,10 +37,11 @@ class TrainerModel(pydantic.BaseModel):
 
     def __setattr__(self, key, value):
         if key == 'device':
-            if isinstance(key, str):
-                value = torch.device(value)
             self.model = self.model.to(device=value)            
             return object.__setattr__(self.model, 'device', value)
+        if key == 'dtype':
+            self.model = self.model.to(dtype=value)            
+            return object.__setattr__(self.model, 'dtype', value)
         return super().__setattr__(key, value)
 
     @classmethod
@@ -138,7 +143,7 @@ class TrainingArguments(pydantic.BaseModel):
 class EvaluatingArguments(pydantic.BaseModel):
     class Config:
         allow_mutation = False
-    test_dl_batch_size: int = 1 # One element per patch
+    eval_dl_batch_size: int = 1 # One element per patch
 
 
 
@@ -174,20 +179,6 @@ class TrainerStatus(pydantic.BaseModel):
             return unlock
         raise LookupError(f"HandlerArguments has been locked already.")
 
-    def step(self, batch):
-        self.current_batch = batch
-
-    def epoch(self, epoch):
-        self.current_epoch = epoch
-
-    def update(self, batch=None, epoch=None):
-        if batch is not None: self.current_batch = batch
-        if epoch is not None: self.current_epoch = epoch
-
-    def reset(self):
-        self.current_epoch = None
-        self.current_batch = None
-
 
 class StepResults(pydantic.BaseModel):
     x: NpTorchType
@@ -195,12 +186,6 @@ class StepResults(pydantic.BaseModel):
     y_pred: NpTorchType
     class Config:
         allow_mutation = False
-
-    #@pydantic.validator('x', 'y_true', 'y_pred')
-    #def validate_all(cls, field_type):
-    #    for validator in NpTorchType.__get_validators__():
-    #        if validator(field_type):
-    #            pass
 
 
 class EpochResults(pydantic.BaseModel):
@@ -213,32 +198,62 @@ class EpochResults(pydantic.BaseModel):
 
 
 class HandlerArguments(pydantic.BaseModel):
-    args: Union[TrainingArguments, EvaluatingArguments]
+    args: Union[TrainingArguments, EvaluatingArguments] = None
     model: TrainerModel
-    status: TrainerStatus
+    status_ptr: List[TrainerStatus]
     train_dl: Optional[TrainerDataLoader] = None
     valid_dl: Optional[TrainerDataLoader] = None
-    test_dl: Optional[TrainerDataLoader] = None
+    eval_dl: Optional[TrainerDataLoader] = None
+
+    @property
+    def status(self):
+        return self.status_ptr[0]
+
+    def update_status(self, batch=None, epoch=None):
+        if batch is not None: self.status_ptr[0].current_batch = batch
+        if epoch is not None: self.status_ptr[0].current_epoch = epoch
+
+    def reset_status(self):
+        self.status_ptr[0].current_epoch = None
+        self.status_ptr[0].current_batch = None
 
     class Config:
         allow_mutation = True
 
-    def lock(self):
+    def set_arguments(self):
         if self.__config__.allow_mutation:
             self.__config__.allow_mutation = False
-            def unlock(self):
+            def arguments_setter_callback(
+                    new_args: Union[TrainingArguments, EvaluatingArguments],
+                    dataloaders: Dict[str, Optional[TrainerDataLoader]] = dict()):
                 self.__config__.allow_mutation = True
-            return unlock
+                self.args = new_args
+                for dl_name in ('train_dl', 'valid_dl', 'eval_dl'):
+                    dl = dataloaders.setdefault(dl_name, None)
+                    if dl is not None:
+                        dl = TrainerDataLoader(dataloader=dl)
+                        self.__setattr__(dl_name, dl)
+                self.__config__.allow_mutation = False
+            return arguments_setter_callback
         raise LookupError(f"HandlerArguments has been locked already.")
 
-    @pydantic.validator('train_dl', 'valid_dl', 'test_dl')
-    def validate_dataloaders(cls, field_type, **kwargs):
+    @pydantic.validator('train_dl', 'valid_dl', 'eval_dl')
+    def validate_dataloaders(cls, field_type):
         if isinstance(field_type, TrainerDataLoader):
             return field_type
         elif isinstance(field_type, torch.utils.data.DataLoader):
             return TrainerDataLoader(dataloader=field_type)
         else:
             raise ValueError(f'Not possible to accept a type of {type(field_type)}')
+
+    @property
+    def is_train(self):
+        if isinstance(self.args, TrainerDataLoader):
+            return True
+        elif isinstance(self.args, EvaluatingArguments):
+            return False
+        else:
+            return None
 
 
 
