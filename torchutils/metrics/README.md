@@ -6,7 +6,7 @@ from torchutils.metrics import TrainerMetric, register_to_metric_handler
 
 # Equally 
 # from torchutils.metrics import MetricHandler
-# @MetricHandler.register_metric
+# MetricHandler.register_metric(MyMetric())
 @register_to_metric_handler
 class MyMetric(TrainerMetric):
     def set_scores(self, x, y, y_pred) -> None:
