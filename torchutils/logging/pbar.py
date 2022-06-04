@@ -24,7 +24,8 @@ class ProgressBarLogger(TrainerLogger):
         self._pbar.update(n=n)
 
     def close(self):
-        self._pbar.close()
+        if self._pbar is not None: 
+            self._pbar.close()
         self._pbar = None
 
 
@@ -73,8 +74,12 @@ class SampleProgressBar(ProgressBarLogger):
         kwargs.setdefault("colour", "GREEN")
         super().__init__(**kwargs)
 
-    def open(self, args: HandlerArguments):
-        super().open(total=args.eval_dl.num_steps)
+    def open(self, args: HandlerArguments, valid: bool = True):
+        if valid:
+            total = args.valid_dl.num_steps
+        else:
+            total = args.test_dl.num_steps
+        super().open(total=total)
 
     def _flush_step(self):
         self.update(1)

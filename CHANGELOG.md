@@ -1,7 +1,12 @@
 # torchutils
 
 ## Bug Reports
-- [ ] Compile project using Cython or numba
+- 1: trainer.status.current\_epoch returns None, instead. trainer.\_handler.arguments.status.current\_epoch gives the information
+    - solution might be, instead of putting each element into array, the whole TrainerStatus() class might be stored as an array in the HandlerArguments class
+
+- 2: in eval.py train.py and valid.py from .engine import Trainer gives compilation error
+
+
 
 ## Handler TODOs
 - [ ] Create a base Handler class having add remove clear and hook functionalities
@@ -13,12 +18,15 @@
 - [ ] create a registrar mechanism for callbacks
 
 ## Trainer TODOs
-- [ ] add Accelerator
 
 ## Loggers TODOs
 - [ ] create a LoggerBaseCallback to control all loggings
     - [ ] update arguments of callback methods
 	- [ ] create CallbackArguments (data)class containing all dataloader size etc. information and to be passed at anytime
+
+## Backlog
+- [ ] Compile project using Cython or numba
+- [ ] add Accelerator
 
 ## Changelog
 - **v1.1 Update**:
