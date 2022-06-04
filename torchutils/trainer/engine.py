@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 from torchutils.data.dataset import Dataset
-from ..metrics import TrainerMetric
+from torchutils.metrics import TrainerMetric
 import torch
 import numpy as np
 from torchutils.callbacks import (
@@ -38,10 +38,11 @@ from typing import (
 version = Version('1.2.0')
 
 class Trainer:
-    __slots__ = ['xtype', 'ytype', '_model', '_handler', '_status']
+    __slots__ = ['ytype', '_model', '_handler', 'status']
     def __init__(
         self,
-        model: TrainerModel,
+        model: Union[TrainerModel, torch.nn.Module],
+        loss: Optional[Union[torch.autograd.Function, torch.nn.Module]] = None,
         device=None,  # todo: remove
         xtype: Union[torch.dtype, np.dtype, type] = torch.float32,
         ytype: Union[torch.dtype, np.dtype, type] = torch.float32,
@@ -49,14 +50,22 @@ class Trainer:
         metrics: Union[Set[str], List[str], Tuple[str]] = set(),
         **kwargs,
     ):
-        self.xtype = xtype
-        self.ytype = ytype
+        assert isinstance(model, TrainerModel) or loss is not None
+        if not isinstance(model, TrainerModel):
+            model = TrainerModel(model=model, criterion=loss)
 
         self._model = model
         self._model.device = device
 
-        self._handler: TrainerHandler = None
-        self._status = TrainerStatus()
+        self._model.dtype = xtype
+        self.ytype = ytype
+
+        self.status = TrainerStatus()
+        self._handler = TrainerHandler(model=self._model, status_ptr=[self.status])
+
+    @property
+    def xtype(self):
+        return self._model.dtype
 
     @property
     def device(self) -> torch.dtype:
@@ -102,9 +111,9 @@ class Trainer:
         loss=None,
         optim=None,
         sched=None,
-        metrics=None,
-        loggers=None,
-        callbacks=None,
+        metrics=list(),
+        loggers=list(),
+        callbacks=list(),
         **parameters # trainer parameters
     ) -> None:
         if device is not None: self._model.device = device
@@ -115,13 +124,15 @@ class Trainer:
         self,
         num_epochs: int,
         batch_size: int,
-        learning_rate: float,
         train_dataset: torch.utils.data.Dataset,
+        learning_rate: float = None,
         valid_dataset: Optional[torch.utils.data.Dataset] = None,
         train_dataloader_kwargs: Optional[Mapping] = {},
         valid_dataloader_kwargs: Optional[Mapping] = {},
         **kwargs
     ):
+        if learning_rate is not None:
+            self._model.configure_optimizers(lr=learning_rate)
 
         train_dl = self.create_dataloader(
             dataset=train_dataset, train_mode=True,
@@ -139,8 +150,8 @@ class Trainer:
                 learning_rate=learning_rate, **kwargs,
                 train_dl_batch_size=train_dl.batch_size)
 
-        self._handler = TrainerHandler(train_dl=train_dl, status=self._status,
-                valid_dl=valid_dl, args=args, model=self._model)
+        self._handler.set_arguments(args, 
+                train_dl=train_dl, valid_dl=valid_dl)
         self._handler.on_initialization()
 
         try:
@@ -166,9 +177,7 @@ class Trainer:
         args = EvaluatingArguments(**kwargs,
                 eval_dl_batch_size=eval_dl.batch_size)
         
-        self._handler = TrainerHandler(eval_dl=eval_dl, 
-                status=self._status, args=args, model=self._model)
-        
+        self._handler.set_arguments(args, eval_dl=eval_dl)
         self._handler.on_initialization()
 
         try:

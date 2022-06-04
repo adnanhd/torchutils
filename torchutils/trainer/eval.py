@@ -13,7 +13,7 @@ from typing import (
     Iterable
 )
 
-@profile
+#profile
 def _run_evaluating(
     trainer: "Trainer",
     #trainer_arguments: TrainingArguments,
@@ -43,7 +43,7 @@ def _run_evaluating_step(
 ) -> torch.Tensor:
     trainer._handler.on_evaluation_step_begin()
 
-    y_pred, loss = trainer._model.detached_step(x=x, y=y, batch_idx=trainer._status.current_batch)
+    y_pred, loss = trainer._model.detached_step(x=x, y=y, batch_idx=trainer.status.current_batch)
     trainer._handler.update(batch_loss=loss.detach())
 
     trainer._handler.on_evaluation_step_end(x=x, y=y, y_pred=y_pred)

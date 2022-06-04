@@ -14,7 +14,7 @@ from typing import (
     Iterable
 )
 
-@profile
+#profile
 def _run_validating(
     trainer: "Trainer",
     #trainer_arguments: TrainingArguments,
