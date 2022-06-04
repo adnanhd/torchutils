@@ -130,7 +130,7 @@ class TrainerHandler():
         self._callbacks.on_validation_step_begin(self.status)
 
     def on_validation_step_end(self, x, y, y_pred):
-        batch = StepResults(x=x, y=y, y_pred=y_pred)
+        batch = StepResults(x=x, y_true=y, y_pred=y_pred)
         self._metrics.set_scores_values(x=x, y=y, y_pred=y_pred)
         self._callbacks.on_validation_step_end(batch)
 

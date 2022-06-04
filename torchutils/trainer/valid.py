@@ -14,9 +14,11 @@ from typing import (
     Iterable
 )
 
+Trainer = "Trainer"
+
 #profile
 def _run_validating(
-    trainer: "Trainer",
+    trainer: Trainer,
     #trainer_arguments: TrainingArguments,
     valid_loader: Optional[torch.utils.data.DataLoader],
 ) -> torch.Tensor:
@@ -36,15 +38,14 @@ def _run_validating(
 
     trainer._handler.on_validation_run_end()
 
-
 def _run_validating_step(
-    trainer,
+    trainer: Trainer,
     x: torch.Tensor,
     y: torch.Tensor,
 ) -> torch.Tensor:
     trainer._handler.on_validation_step_begin()
 
-    y_pred, loss = trainer._model.detached_step(batch=x, batch_idx=0)
+    y_pred, loss = trainer._model.detached_step(x=x, y=y, batch_idx=trainer.status.current_batch)
     trainer._handler.update(batch_loss=loss.detach())
 
     trainer._handler.on_validation_step_end(x=x, y=y, y_pred=y_pred)

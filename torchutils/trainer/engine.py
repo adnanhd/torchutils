@@ -38,7 +38,7 @@ from typing import (
 version = Version('1.2.0')
 
 class Trainer:
-    __slots__ = ['ytype', '_model', '_handler', 'status']
+    __slots__ = ['ytype', '_model', '_handler']
     def __init__(
         self,
         model: Union[TrainerModel, torch.nn.Module],
@@ -60,15 +60,19 @@ class Trainer:
         self._model.dtype = xtype
         self.ytype = ytype
 
-        self.status = TrainerStatus()
-        self._handler = TrainerHandler(model=self._model, status_ptr=[self.status])
+        status = TrainerStatus()
+        self._handler = TrainerHandler(model=self._model, status_ptr=[TrainerStatus()])
 
     @property
-    def xtype(self):
+    def status(self) -> TrainerStatus:
+        return self._handler.arguments.status
+
+    @property
+    def xtype(self) -> torch.dtype:
         return self._model.dtype
 
     @property
-    def device(self) -> torch.dtype:
+    def device(self) -> torch.device:
         return self._model.device
 
     def create_dataloader(
