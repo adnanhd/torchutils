@@ -1,5 +1,6 @@
 from .base import LoggingHandler
 from .base import TrainerLogger
+from .wandb import WandBLogger
 from .tty import PrintWriter
 from .pbar import ProgressBarLogger
 from .nop import NoneLogger

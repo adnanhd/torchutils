@@ -1,72 +1,78 @@
+from torchutils.utils.pydantic import HandlerArguments
 from torchutils.logging import TrainerLogger
+from collections import OrderedDict
 from tqdm import tqdm
 import time
 import os
 
-
 class ProgressBarLogger(TrainerLogger):
-    """
-    A callback which visualises the state of each training and evaluation epoch using a progress bar
-    """
+    __slots__ = ['_pbar', '_logs', '_args']
+    def __init__(self, **kwargs):
+        self._logs = OrderedDict()
+        self._args = kwargs.copy()
 
-    def __init__(self, total=None, delay=0.0):
-        super(ProgressBarLogger, self).__init__()
-        self.pbar = None
-        self._total = total
-        self._delay = delay
-        self._logs = dict()
+    def open(self, total: int, args: HandlerArguments = None):
+        self._pbar = tqdm(total=total, **self._args)
 
-    def open(self, total, **kwargs):
-            self.pbar = tqdm(total=total, **kwargs)
-
-    def log(self, trainer=None, **kwargs):
+    def log_score(self, **kwargs):
         self._logs.update(kwargs)
-        self.pbar.set_postfix(self._logs)
 
-    def update(self, n=1):
-        self.pbar.update(n)
+    def update(self, n=0):
+        self._pbar.set_postfix(self._logs)
+        self._pbar.update(n=n)
 
     def close(self):
-        self.pbar.close()
-        if self._delay > 0.0:
-            time.sleep(self._delay)
+        self._pbar.close()
+
+
+class EpochProgressBar(ProgressBarLogger):
+    def __init__(self, **kwargs):
+        kwargs.setdefault("unit", "epoch")
+        kwargs.setdefault("initial", 0)
+        kwargs.setdefault("file", os.sys.stdout)
+        kwargs.setdefault("dynamic_ncols", True)
+        kwargs.setdefault("desc", "Training")
+        kwargs.setdefault("ascii", True)
+        kwargs.setdefault("colour", "GREEN")
+        super().__init__(**kwargs)
+
+    def open(self, args: HandlerArguments):
+        super().open(total=args.args.num_epochs)
+
+    def _flush_epoch(self):
+        self.update(1)
+
+class StepProgressBar(ProgressBarLogger):
+    def __init__(self, **kwargs):
+        kwargs.setdefault("unit", "batch")
+        kwargs.setdefault("initial", 0)
+        kwargs.setdefault("file", os.sys.stdout)
+        kwargs.setdefault("dynamic_ncols", True)
+        kwargs.setdefault("colour", "CYAN")
+        super().__init__(**kwargs)
     
-    def __call__(self,n=1, **kwargs):
-        self.log(**kwargs)
-        self.update(n=n)
+    def open(self, args: HandlerArguments):
+        epochs = args.status.current_epoch
+        self._args["desc"] = f"Epoch {epochs}"
+        super().open(total=args.train_dl.num_steps)
 
-class EpochProgressBarLogger(ProgressBarLogger):
-    def open(self):
-        super().open(
-            total=self._total,
-            unit="epoch",
-            initial=0,
-            file=os.sys.stdout,
-            dynamic_ncols=True,
-            desc=f"Training",
-            ascii=True,
-            colour="GREEN",
-        )
+    def _flush_step(self):
+        self.update(1)
 
-class StepProgressBarLogger(ProgressBarLogger):
-    def open(self, epoch):
-        super().open(
-            total=self._total,
-            unit=f"batch",
-            file=os.sys.stdout,
-            dynamic_ncols=True,
-            desc=f"Epoch {epoch}",
-            colour="GREEN",
-        )
 
-class TestProgressBarLogger(ProgressBarLogger):
-    def open(self):
-        super().open(
-            total=self._total,
-            unit="sample",
-            file=os.sys.stdout,
-            dynamic_ncols=True,
-            desc=f"Testing",
-            colour="GREEN",
-        )
-        
+class SampleProgressBar(ProgressBarLogger):
+    def __init__(self, **kwargs):
+        kwargs.setdefault("unit", "sample")
+        kwargs.setdefault("initial", 0)
+        kwargs.setdefault("file", os.sys.stdout)
+        kwargs.setdefault("dynamic_ncols", True)
+        kwargs.setdefault("desc", f"Evaluating")
+        kwargs.setdefault("colour", "GREEN")
+        super().__init__(**kwargs)
+
+    def open(self, args: HandlerArguments):
+        super().open(total=args.eval_dl.num_steps)
+
+    def _flush_step(self):
+        self.update(1)
+

@@ -1,5 +1,6 @@
-from typing import overload, List
+from typing import overload, List, Dict
 from abc import ABC, abstractmethod
+from torchutils.utils.pydantic import HandlerArguments, EpochResults, StepResults, TrainerModel
 
 
 class TrainerLogger(ABC):
@@ -14,20 +15,13 @@ class TrainerLogger(ABC):
     def log_score(self, **kwargs):
         ...
 
-    @abstractmethod
     def log_info(self, msg):
         ...
     
-    @abstractmethod
     def log_error(self, msg):
         ...
 
-    @abstractmethod
-    def _flush_step(self):
-        ...
-
-    @abstractmethod
-    def _flush_epoch(self):
+    def log_model(self, model):
         ...
 
     @abstractmethod
@@ -41,7 +35,7 @@ class LoggingHandler(ABC):
         self.add_loggers(loggers)
 
     def add_logger(self, logger):
-        if isinstance(logger, trainerlogger):
+        if isinstance(logger, TrainerLogger):
             self._loggers.append(logger)
 
     def remove_logger(self, logger):
@@ -49,25 +43,26 @@ class LoggingHandler(ABC):
 
     def add_loggers(self, loggers: List[TrainerLogger]):
         for logger in loggers:
-            if isinstance(logger, trainerlogger):
-                self._loggers.extend(loggers)
+            self._loggers.add_logger(loggers)
 
     def clear_loggers(self):
         self._loggers.clear()
 
-    def init(self):
+    def initialize(self, args: HandlerArguments):
         for logger in self._loggers:
-            logger.open()
+            logger.open(args)
 
-    def step(self):
+    def model(self, model: TrainerModel):
         for logger in self._loggers:
-            logger._flush_step()
+            logger.log_model(model)
 
-    def epoch(self):
+    def score(self, **scores):
         for logger in self._loggers:
-            logger._flush_epoch()
+            logger.log_score(**scores)
 
-    def end(self):
+    def figure(self, msg):
+        pass
+
+    def terminate(self):
         for logger in self._loggers:
             logger.close()
-
