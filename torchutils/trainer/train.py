@@ -55,8 +55,12 @@ def _run_training_epoch(
 
     trainer._handler.on_training_epoch_end()
 
-    if valid_loader is not None and (trainer.status.current_epoch \
-            + 1) % trainer_arguments.num_epochs_per_validation == 0:
+    #TODO: trainer.status.current_epoch returns None here
+    # This works: trainer._handler.arguments.status.current_batch
+    # This fails: trainer.status.current_batch
+    current_epoch = trainer._handler.arguments.status.current_epoch
+    if valid_loader is not None and (current_epoch + 1) % \
+            trainer_arguments.num_epochs_per_validation == 0:
         val_results = _run_validating(trainer, valid_loader)
 
 
