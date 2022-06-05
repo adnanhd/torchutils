@@ -114,7 +114,9 @@ class TrainerHandler():
         batch = StepResults(x=x, y_true=y, y_pred=y_pred)
         self._metrics.set_scores_values(x=x, y=y, y_pred=y_pred)
         self._callbacks.on_training_step_end(batch)
-        self._loggers.score(**self._metrics.get_score_values())
+        metrics = self._metrics.get_score_values()
+        metrics['loss'] = self.tracker.average
+        self._loggers.score(**metrics)
 
     def on_training_epoch_end(self):
         epoch = EpochResults()
@@ -137,6 +139,9 @@ class TrainerHandler():
     def on_validation_run_end(self):
         epoch = EpochResults()
         self._callbacks.on_validation_run_end(epoch)
+        metrics = self._metrics.get_score_values()
+        metrics['val_loss'] = self.tracker.average
+        self._loggers.score(**metrics)
 
     def on_evaluation_run_begin(self):
         self._callbacks.on_evaluation_run_begin(self.status)
@@ -152,6 +157,8 @@ class TrainerHandler():
     def on_evaluation_run_end(self):
         epoch = EpochResults()
         self._callbacks.on_evaluation_run_end(epoch)
+        metrics = self._metrics.get_score_values()
+        self._loggers.score(**metrics)
 
     def on_stop_training_error(self):
         self._callbacks.on_stop_training_error(self.status)
