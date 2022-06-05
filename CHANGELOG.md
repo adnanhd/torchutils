@@ -18,6 +18,14 @@
 - [ ] create a registrar mechanism for callbacks
 
 ## Trainer TODOs
+- [ ] Return a LossHistory class on return of train method
+- [ ] Return predictions on predict/test method
+
+## Dataset TODOs
+- [ ] make it fully compatible with torchvision.datasets
+ 
+## Modes TODOs
+- [ ] make it compatible with torchvision.datasets
 
 ## Loggers TODOs
 - [ ] create a LoggerBaseCallback to control all loggings
