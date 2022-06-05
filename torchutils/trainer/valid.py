@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import torch
+#from .engine import Trainer
 from torchutils.utils import profile
 from typing import (
     List,
@@ -13,66 +14,38 @@ from typing import (
     Iterable
 )
 
+Trainer = "Trainer"
 
-@profile
+#profile
 def _run_validating(
-    trainer,
-    loader: torch.utils.data.DataLoader,
-    *args,
-    **kwargs,
+    trainer: Trainer,
+    #trainer_arguments: TrainingArguments,
+    valid_loader: Optional[torch.utils.data.DataLoader],
 ) -> torch.Tensor:
-    trainer.metrics.init(batch_size=loader.batch_size, step_size=loader.__len__())
-    trainer.metrics.reset()
-    trainer.__handle__(
-        "on_validation_run_begin",
-        batch_size=loader.batch_size,
-        step_size=loader.__len__()
-    )
 
-    trainer.model.eval()
+    trainer._handler.on_validation_run_begin()
+    trainer._model.eval()
+    trainer._handler.reset()
+    
     with torch.no_grad():
-        val_loss = 0.0
-        for batch, (features, y_true) in enumerate(loader):
-            val_loss += _run_validating_step(
-                trainer=trainer, batch_idx=batch, *args, **kwargs,
+        for batch, (features, y_truth) in enumerate(valid_loader):
+            if not torch.is_tensor(features): features = torch.cat(features, dim=-1)
+            if not torch.is_tensor(y_truth):  y_truth = torch.cat(y_truth, dim=-1)
+            _run_validating_step(trainer=trainer,
                 x=features.to(device=trainer.device, dtype=trainer.xtype),
-                y=y_true.to(device=trainer.device, dtype=trainer.ytype),
+                y=y_truth.to(device=trainer.device, dtype=trainer.ytype),
             )
-        val_loss /= len(loader)
 
-    trainer.metrics.update()
-    results = trainer.metrics.updated_values()
-    results.setdefault('loss', val_loss)
-    trainer.__handle__(
-        "on_validation_run_end",
-        last_batch=batch,
-        **results
-    )
-    return results
-
+    trainer._handler.on_validation_run_end()
 
 def _run_validating_step(
-    trainer,
-    batch_idx: int,
+    trainer: Trainer,
     x: torch.Tensor,
     y: torch.Tensor,
-    **kwargs,
-):
-    trainer.__handle__("on_validation_step_begin", step=batch_idx)
+) -> torch.Tensor:
+    trainer._handler.on_validation_step_begin()
 
-    y_pred = trainer.model(x)
-    loss = trainer.criterion(y_pred, y)
+    y_pred, loss = trainer._model.detached_step(x=x, y=y, batch_idx=trainer.status.current_batch)
+    trainer._handler.update(batch_loss=loss.detach())
 
-    trainer.metrics.step(
-        batch_idx=batch_idx,
-        y_true=y.detach(),
-        y_pred=y_pred.detach(),
-    )
-
-    trainer.__handle__("on_validation_step_end",
-                       batch=batch_idx,
-                       loss=loss.detach(),
-                       batch_output=y_pred.detach(),
-                       **trainer.metrics.stepped_values(batch_idx))
-
-    return loss.detach()
+    trainer._handler.on_validation_step_end(x=x, y=y, y_pred=y_pred)

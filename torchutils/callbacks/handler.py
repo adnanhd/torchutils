@@ -9,8 +9,50 @@ import numpy as np
 import torch
 from torch import nn
 from tqdm import tqdm
+from typing import List, Optional
 
-from .base import CallbackMethodNotImplementedError
+from abc import abstractmethod
+from .base import CallbackMethodNotImplementedError, TrainerCallback
+from torchutils.utils.pydantic import (
+        HandlerArguments,
+        TrainerStatus,
+        EpochResults,
+        StepResults
+)
+def _foreach_callback_(method):
+    def wrapped_method(self, *args, **kwargs):
+        for callback in self.callbacks:
+            self._callback = callback
+            try:
+                method(self, *args, **kwargs)
+            except CallbackMethodNotImplementedError:
+                continue
+        self._callback = None
+    return wrapped_method
+
+
+def _foreach_callback_require_stat_(method):
+    def wrapped_method(self, stat: TrainerStatus, **kwargs):
+        for callback in self.callbacks:
+            self._callback = callback
+            try:
+                method(self, stat, **kwargs)
+            except CallbackMethodNotImplementedError:
+                continue
+        self._callback = None
+    return wrapped_method
+
+
+def _foreach_callback_require_args_(method):
+    def wrapped_method(self, args: HandlerArguments, **kwargs):
+        for callback in self.callbacks:
+            self._callback = callback
+            try:
+                method(self, args, **kwargs)
+            except CallbackMethodNotImplementedError:
+                continue
+        self._callback = None
+    return wrapped_method
 
 
 class CallbackHandler:
@@ -21,7 +63,8 @@ class CallbackHandler:
     slots = ['callbacks']
 
     def __init__(self, callbacks = None):
-        self.callbacks = []
+        self.callbacks: List[TrainerCallback] = []
+        self._callback: Optional[TrainerCallback] = None
         if callbacks is not None:
             self.add_callbacks(callbacks)
     
@@ -81,19 +124,71 @@ class CallbackHandler:
     def __repr__(self):
         return self.callback_list
 
-    def call_event(self, trainer, event, *args, **kwargs):
-        """
-        For each callback which has been registered, sequentially call the method corresponding to the
-        given event.
-        :param event: The event corresponding to the method to call on each callback
-        :param args: a list of arguments to be passed to each callback
-        :param kwargs: a list of keyword arguments to be passed to each callback
-        """
-        for callback in self.callbacks:
-            try:
-                callback.__getattribute__(event)(trainer=trainer, *args, **kwargs)
-            except CallbackMethodNotImplementedError as e:
-                continue
+    @_foreach_callback_require_args_
+    def on_initialization(self, args: HandlerArguments):
+        self._callback.on_initialization(args=args)
+   
+    @_foreach_callback_require_stat_
+    def on_training_begin(self, stat: TrainerStatus):
+        self._callback.on_training_begin(stat)
 
+    @_foreach_callback_require_stat_
+    def on_training_epoch_begin(self, stat: TrainerStatus):
+        self._callback.on_training_epoch_begin(stat)
 
+    @_foreach_callback_require_stat_
+    def on_training_step_begin(self, stat: TrainerStatus):
+        self._callback.on_training_step_begin(stat)
+
+    @_foreach_callback_require_stat_
+    def on_training_step_end(self, batch: StepResults):
+        self._callback.on_training_step_end(batch=batch)
+
+    @_foreach_callback_
+    def on_training_epoch_end(self, epoch: EpochResults):
+        self._callback.on_training_epoch_end(epoch=epoch)
+
+    @_foreach_callback_require_stat_
+    def on_training_end(self, stat: TrainerStatus):
+        self._callback.on_training_end(stat)
+
+    @_foreach_callback_require_stat_
+    def on_validation_run_begin(self, stat: TrainerStatus):
+        self._callback.on_validation_run_begin(stat)
+
+    @_foreach_callback_require_stat_
+    def on_validation_step_begin(self, stat: TrainerStatus):
+        self._callback.on_validation_step_begin(stat)
+
+    @_foreach_callback_
+    def on_validation_step_end(self, batch: StepResults):
+        self._callback.on_validation_step_end(batch=batch)
+
+    @_foreach_callback_
+    def on_validation_run_end(self, epoch: EpochResults):
+        self._callback.on_validation_run_end(epoch=epoch)
+
+    @_foreach_callback_require_stat_
+    def on_evaluation_run_begin(self, stat: TrainerStatus):
+        self._callback.on_evaluation_run_begin(stat)
+
+    @_foreach_callback_require_stat_
+    def on_evaluation_step_begin(self, stat: TrainerStatus):
+        self._callback.on_evaluation_step_begin(stat)
+
+    @_foreach_callback_
+    def on_evaluation_step_end(self, batch: StepResults):
+        self._callback.on_evaluation_step_end(batch=batch)
+
+    @_foreach_callback_
+    def on_evaluation_run_end(self, epoch: EpochResults):
+        self._callback.on_evaluation_run_end(epoch=epoch)
+
+    @_foreach_callback_require_stat_
+    def on_stop_training_error(self, stat: TrainerStatus):
+        self._callback.on_stop_training_error(stat)
+
+    @_foreach_callback_require_stat_
+    def on_termination(self, stat: TrainerStatus):
+        self._callback.on_termination(stat)
 

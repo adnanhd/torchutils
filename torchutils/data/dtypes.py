@@ -1,45 +1,10 @@
 import torch
 import numpy as np
+from abc import ABC, ABCMeta
 from typing import Union, Optional
 from pydantic import BaseModel, validator
 from torchutils.utils import string_to_types, Hashable, hybridmethod
-from abc import ABC, ABCMeta
-
-
-class NpScalarType(ABC):
-    """
-    A generic array/tensor type that returns true for every 
-    f. call isinstance() with any torch.tensor and np.ndarray
-    """
-    @classmethod  
-    def __get_validators__(cls):  
-        yield cls.validate_np_scalar
-
-    @classmethod
-    def validate_np_scalar(cls, dtype) -> np.generic:
-        if isinstance(dtype, np.generic): return dtype
-        else: raise ValueError('invalid datatype')
-
-
-class NpTorchType(ABC):
-    """
-    A generic array/tensor type that returns true for every 
-    f. call isinstance() with any torch.tensor and np.ndarray
-    """
-    @classmethod  
-    def __get_validators__(cls):  
-        yield cls.validate_np_array
-        yield cls.validate_torch_array
-
-    @classmethod
-    def validate_np_array(cls, arr) -> np.ndarray:
-        if isinstance(arr, np.ndarray): return arr
-        else: raise ValueError('invalid datatype')
-
-    @classmethod
-    def validate_torch_array(cls, arr) -> torch.Tensor:
-        if isinstance(arr, torch.Tensor): return arr
-        else: raise ValueError('invalid datatype')
+from torchutils.utils.pydantic import NpScalarType, NpTorchType
 
 
 class DType(BaseModel, Hashable):

@@ -5,7 +5,7 @@ import numpy as np
 from .utils import hybridmethod
 from sklearn.model_selection import train_test_split
 from typing import Callable
-
+from typing import Union, Tuple
 
 __version__ = '2.0.a'
 # TODO: keep in mind that Dataset might be shuffled
@@ -51,6 +51,10 @@ class Dataset(torch.utils.data.dataset.Dataset):
 
     def save(self, path: str):
         ...
+    
+    def to(self, xtype=None, ytype=None):
+        if xtype is not None: self.features = self.features.astype(xtype)
+        if ytype is not None: self.labels = self.labels.astype(ytype)
 
     #def __hash__(self):
     #    return self.features.__hash__() ^ \
@@ -58,10 +62,10 @@ class Dataset(torch.utils.data.dataset.Dataset):
     #        self.metadata.__hash__() ^ \
     #        self.__version__.__hash__()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.features)
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> Tuple[np.ndarray]:
         feature = self.features[index]
         label = self.labels[index]
         return feature, label
@@ -81,4 +85,7 @@ class Dataset(torch.utils.data.dataset.Dataset):
     def dataloader(self, batch_size: int = None, train: bool = True, **kwargs):
         if batch_size is None:
             batch_size = self.__len__()
-        return torch.utils.data.DataLoader(self, **kwargs, shuffle=train, batch_size=batch_size)
+        kwargs['shuffle'] = train
+        return torch.utils.data.DataLoader(self, **kwargs, batch_size=batch_size)
+
+

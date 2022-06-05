@@ -10,6 +10,7 @@ import torch
 from torch import nn
 from tqdm import tqdm
 from .base import TrainerCallback
+from torchutils.utils.pydantic import TrainerStatus
 
 
 class ModelCheckpoint(TrainerCallback):
@@ -18,6 +19,7 @@ class ModelCheckpoint(TrainerCallback):
     def __init__(self, 
             monitor="val_loss", 
             save_path='best_model.ckpt', 
+            trace_func=print,
             verbose=False, 
             this_max=False, 
             load_back=False, 
@@ -28,26 +30,27 @@ class ModelCheckpoint(TrainerCallback):
         self.max = this_max
         self.save_path = save_path
         self.load_back = load_back
+        self.trace_func = trace_func
         self.save_best = save_best_only
         self.best = float("-inf") if this_max else float("inf")
 
     def _is_value_better(self, metric_value):
         return self.max and metric_value > self.best or metric_value < self.best
 
-    def on_training_valid_end(self, trainer, **kwargs):
+    def on_training_epoch_end(self, stat: TrainerStatus, **kwargs):
         metric_value = kwargs[self.monitor]
 
         if self._is_value_better(metric_value):
             self.best = metric_value
             self.best_weights = trainer.model.state_dict()
             if self.verbose:
-                print("model weight is saved into...")
+                self.trace_func("model weight is saved into...")
         elif self.load_back and self.best_weights is not None:
             trainer.model.load_state_dict(self.best_weights)
             if self.verbose:
-                print("model weight is loaded back...")
+                self.trace_func("model weight is loaded back...")
 
-    def on_training_end(self, trainer, **kwargs):
+    def on_training_end(self, stat: TrainerStatus):
         if self.best_weights is not None:
             trainer.model.load_state_dict(self.best_weights)
             try:
