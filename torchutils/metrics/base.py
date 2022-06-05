@@ -25,7 +25,14 @@ class TrainerMetric(ABC):
     def score_names(self) -> Union[Set, List, Tuple]:
         ...
 
-    def get_scores(self, *score_names) -> Union[Mapping, Dict]:
+    def get_score(self, score_name: str):
+        if hasattr(self, score_name):
+            return getattr(self, score_name)
+        else:
+            raise AttributeError(f"{score_name} is not a valid score "
+                                 f"name in {self.__class__.__name__}")
+
+    def get_scores(self, score_names) -> Union[Mapping, Dict]:
         if len(score_names) == 0:
             score_names = self.score_names
         return { metric_name: getattr(self, metric_name) 
@@ -33,7 +40,7 @@ class TrainerMetric(ABC):
 
     def __call__(self, x, y, y_pred) -> Union[Mapping, Dict]:
         self.set_scores(x, y, y_pred)
-        return self.get_scores(self.score_names)
+        return self.get_scores(*self.score_names)
 
 class MetricHandler(object):
     _scores: Dict[Str, TrainerMetric] = OrderedDict()
@@ -89,7 +96,7 @@ class MetricHandler(object):
     def get_score_values(self, *score_names) -> Mapping[Str, Any]:
         if len(score_names) == 0: score_names = self.get_score_names()
         return { score_name: self._scores[score_name] \
-            .get_scores(score_name) for score_name in score_names }
+            .get_score(score_name) for score_name in score_names }
 
     def set_scores_values(self, x, y, y_pred):
         for metric_name in self.get_metric_names():
