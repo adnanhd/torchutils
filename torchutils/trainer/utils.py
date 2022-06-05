@@ -19,5 +19,5 @@ class LossTracker:
         self._average = self.total_loss / self.running_count
 
     @property
-    def average(self):
-        return self._average
+    def average(self) -> float:
+        return float(self._average)
