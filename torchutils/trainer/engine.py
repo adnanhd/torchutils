@@ -137,6 +137,8 @@ class Trainer:
     ):
         if learning_rate is not None:
             self._model.configure_optimizers(lr=learning_rate)
+        else:
+            learning_rate = self._model.learning_rate
 
         train_dl = self.create_dataloader(
             dataset=train_dataset, train_mode=True,

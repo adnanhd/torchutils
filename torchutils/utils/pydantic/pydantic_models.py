@@ -35,6 +35,11 @@ class TrainerModel(pydantic.BaseModel):
     def device(self):
         return next(self.model.parameters()).device
 
+    @property
+    def learning_rate(self):
+        return self.optimizer.param_groups[0]['lr']
+
+
     def __setattr__(self, key, value):
         if key == 'device':
             self.model = self.model.to(device=value)            
