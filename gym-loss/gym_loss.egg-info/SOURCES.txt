@@ -1,5 +1,0 @@
-gym_loss.egg-info/PKG-INFO
-gym_loss.egg-info/SOURCES.txt
-gym_loss.egg-info/dependency_links.txt
-gym_loss.egg-info/requires.txt
-gym_loss.egg-info/top_level.txt
