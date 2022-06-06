@@ -20,6 +20,8 @@
 ## Trainer TODOs
 - [ ] Return a LossHistory class on return of train method
 - [ ] Return predictions on predict/test method
+- [ ] Rename TrainerStatus -> TrainerProxy
+- [ ] Bypass TrainerHandler class if you like
 
 ## Dataset TODOs
 - [ ] make it fully compatible with torchvision.datasets

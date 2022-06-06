@@ -17,4 +17,3 @@ setup(
     author_email=__email__,
     install_requires=required_packages,
 )
-
