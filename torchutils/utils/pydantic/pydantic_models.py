@@ -267,16 +267,22 @@ class CurrentIterationStatus(pydantic.BaseModel):
                 score_name, score_tracker.average)
             score_tracker.reset()
 
-    def _get_current_scores(self, score_names: Iterable[str]):
+    def _get_current_scores(self,
+                            score_names: Iterable[str]
+                            ) -> Dict[str, float]:
         return self._metric_handler.get_score_values(*score_names)
 
-    def _get_averaged_scores(self, score_names: Iterable[str]):
+    def _get_averaged_scores(self,
+                             score_names: Iterable[str]
+                             ) -> Dict[str, float]:
         if len(score_names) == 0:
             score_names = self.get_score_names()
         return {score_name: self._score_history.get_latest_score(score_name)
                 for score_name in score_names}
 
-    def get_latest_scores(self, *score_names: str):
+    def get_latest_scores(self,
+                          *score_names: str
+                          ) -> Dict[str, float]:
         if self._at_epoch_end:
             return self._get_averaged_scores(score_names)
         else:
