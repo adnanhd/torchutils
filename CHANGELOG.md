@@ -62,3 +62,7 @@
     - Refactoring logger classes to make compatible with v1.2
     - Craeted TrainerModel class having training\_step etc. functionalities
 	- [x] `_training_step` etc. must be a method of Trainer class and different models like GCN must have GCNTrainer having overloaded methods
+
+- **v1.3.0**: Update CurrentIterationStatus -- i.e. IterationProxy
+	- Replace StepResults and EpochResults with CurrentIterationStatus
+	- Added getting (for end-user) and setting (for engine) metric API

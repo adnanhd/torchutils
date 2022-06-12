@@ -8,12 +8,12 @@ from torchutils.metrics import MetricHandler
 from torchutils.logging import LoggingHandler
 from torchutils.callbacks import CallbackHandler
 
-from .utils import LossTracker
+from .utils import ScoreTrackerHandler
 from typing import Union, Optional, List
 
 # Import Arguments
 from torchutils.utils.pydantic import (
-    HandlerArguments, 
+    HandlerArguments,
     TrainerStatus,
     StepResults,
     EpochResults,
@@ -24,40 +24,41 @@ from torchutils.utils.pydantic import (
 )
 
 
-#class HandlerArguments:
+# class HandlerArguments:
 class TrainerHandler():
     # train_dl: TrainerDataLoaderArguments
     # valid_dl: TrainerDataLoaderArguments
     # eval_dl: TrainerDataLoaderArguments
     # args: TrainingArguments
     # model: TrainerModel
-    __slots__ = ['arguments', 'tracker',
-            '_loggers', '_metrics', '_callbacks', '__args_setter__']
+    __slots__ = ['arguments', '_tracker',
+                 '_loggers', '_metrics',
+                 '_callbacks', '__args_setter__']
 
-    def __init__(self, 
-            model: TrainerModel,
-            status_ptr: List[TrainerStatus],
-            **kwargs
-        ):
+    def __init__(self,
+                 model: TrainerModel,
+                 status_ptr: List[TrainerStatus],
+                 **kwargs
+                 ):
         for key in ('train_dl', 'valid_dl', 'eval_dl'):
-            if kwargs.setdefault(key, None) is None: 
+            if kwargs.setdefault(key, None) is None:
                 kwargs.pop(key)
         self._loggers = LoggingHandler()
         self._metrics = MetricHandler()
         self._callbacks = CallbackHandler()
-        self.tracker = LossTracker()
         self.arguments = HandlerArguments(model=model, status_ptr=status_ptr)
         self.__args_setter__ = self.arguments.set_arguments()
 
-    def set_arguments(self, 
-            args: Union[TrainingArguments, EvaluatingArguments],
-            eval_dl: Optional[TrainerDataLoader] = None,
-            train_dl: Optional[TrainerDataLoader] = None,
-            valid_dl: Optional[TrainerDataLoader] = None,
-            ):
-        dataloaders = {'train_dl': train_dl, 'valid_dl': valid_dl, 'eval_dl': eval_dl}
-        dataloaders = {key: dataloader for key, dataloader \
-                in dataloaders.items() if dataloader is not None}
+    def set_arguments(self,
+                      args: Union[TrainingArguments, EvaluatingArguments],
+                      eval_dl: Optional[TrainerDataLoader] = None,
+                      train_dl: Optional[TrainerDataLoader] = None,
+                      valid_dl: Optional[TrainerDataLoader] = None,
+                      ):
+        dataloaders = {'train_dl': train_dl,
+                       'valid_dl': valid_dl, 'eval_dl': eval_dl}
+        dataloaders = {key: dataloader for key, dataloader
+                       in dataloaders.items() if dataloader is not None}
         self.__args_setter__(args, dataloaders)
 
     @property
@@ -73,20 +74,20 @@ class TrainerHandler():
 
     def compile(
             self,
-            loggers = list(),
-            metrics = list(),
-            callbacks = list(),
-            ):
+            loggers=list(),
+            metrics=list(),
+            callbacks=list(),
+    ):
         self._loggers.add_loggers(loggers)
         self._metrics.add_scores(metrics)
         self._callbacks.add_callbacks(callbacks)
 
     def decompile(
             self,
-            loggers = list(), 
-            metrics = list(), 
-            callbacks = list(),
-            ):
+            loggers=list(),
+            metrics=list(),
+            callbacks=list(),
+    ):
         self._loggers.remove_logger(loggers)
         self._metrics.remove_scores(metrics)
         self._callbacks.remove_callbacks(callbacks)
@@ -166,4 +167,3 @@ class TrainerHandler():
     def on_termination(self):
         self._callbacks.on_termination(self.status)
         self._loggers.terminate()
-

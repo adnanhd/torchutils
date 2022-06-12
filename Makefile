@@ -10,6 +10,6 @@ ${install_path}: ${utils_files}
 
 tests: ${install_path}
 	#cd tests/ && python3 -c 'import torchutils'
-	@python3 -m pytest tests/
+	python3 -m pytest ./tests/
 
-.PHONY:
+.PHONY: tests
