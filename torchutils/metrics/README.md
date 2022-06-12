@@ -11,7 +11,7 @@ from torchutils.metrics import TrainerMetric, register_to_metric_handler
 class MyMetric(TrainerMetric):
     def set_scores(self, x, y, y_pred) -> None:
         self._my_score = ((y_pred - y).square()).mean(0).sum()
-	self._my_score2 = x * y
+		self._my_score2 = x * y
 
     @property
     def score_names(self):
@@ -37,7 +37,7 @@ mh = MetricHandler('x_score', 'y_score')
 for epoch_idx in range(10):
     for x, y in dataloader:
 	y_pred = model(x)
-        mh.set_scores_values(x, y, y_pred)
+    mh.set_scores_values(x, y, y_pred)
 	print(mh.get_score_values())
 ```
 
