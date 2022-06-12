@@ -18,6 +18,16 @@
 - [ ] create a registrar mechanism for callbacks
 
 ## Trainer TODOs
+- [ ] Return a LossHistory class on return of train method
+- [ ] Return predictions on predict/test method
+- [ ] Rename TrainerStatus -> TrainerProxy
+- [ ] Bypass TrainerHandler class if you like
+
+## Dataset TODOs
+- [ ] make it fully compatible with torchvision.datasets
+ 
+## Modes TODOs
+- [ ] make it compatible with torchvision.datasets
 
 ## Loggers TODOs
 - [ ] create a LoggerBaseCallback to control all loggings
@@ -52,3 +62,7 @@
     - Refactoring logger classes to make compatible with v1.2
     - Craeted TrainerModel class having training\_step etc. functionalities
 	- [x] `_training_step` etc. must be a method of Trainer class and different models like GCN must have GCNTrainer having overloaded methods
+
+- **v1.3.0**: Update CurrentIterationStatus -- i.e. IterationProxy
+	- Replace StepResults and EpochResults with CurrentIterationStatus
+	- Added getting (for end-user) and setting (for engine) metric API

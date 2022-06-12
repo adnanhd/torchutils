@@ -1,24 +1,13 @@
 # Copyright © 2021 Chris Hughes
-import inspect
-import logging
-import sys, os
-import time
-from abc import ABC
-
-import numpy as np
-import torch
-from torch import nn
-from tqdm import tqdm
 from typing import List, Optional
-
-from abc import abstractmethod
 from .base import CallbackMethodNotImplementedError, TrainerCallback
 from torchutils.utils.pydantic import (
-        HandlerArguments,
-        TrainerStatus,
-        EpochResults,
-        StepResults
+    HandlerArguments,
+    TrainerStatus,
+    CurrentIterationStatus
 )
+
+
 def _foreach_callback_(method):
     def wrapped_method(self, *args, **kwargs):
         for callback in self.callbacks:
@@ -62,12 +51,12 @@ class CallbackHandler:
     """
     slots = ['callbacks']
 
-    def __init__(self, callbacks = None):
+    def __init__(self, callbacks=None):
         self.callbacks: List[TrainerCallback] = []
         self._callback: Optional[TrainerCallback] = None
         if callbacks is not None:
             self.add_callbacks(callbacks)
-    
+
     def remove_callbacks(self, callbacks):
         """
         Add a list of callbacks to the callback handler
@@ -81,7 +70,8 @@ class CallbackHandler:
         Add a callbacks to the callback handler
         :param callback: an instance of a subclass of :class:`TrainerCallback`
         """
-        cb_class = callback if isinstance(callback, type) else callback.__class__
+        cb_class = callback if isinstance(
+            callback, type) else callback.__class__
         if cb_class not in {c.__class__ for c in self.callbacks}:
             raise ValueError(
                 f"You attempted to remove absensces of the callback {cb_class} to a single Trainer"
@@ -103,7 +93,8 @@ class CallbackHandler:
         :param callback: an instance of a subclass of :class:`TrainerCallback`
         """
         cb = callback() if isinstance(callback, type) else callback
-        cb_class = callback if isinstance(callback, type) else callback.__class__
+        cb_class = callback if isinstance(
+            callback, type) else callback.__class__
         if cb_class in {c.__class__ for c in self.callbacks}:
             raise ValueError(
                 f"You attempted to add multiple instances of the callback {cb_class} to a single Trainer"
@@ -127,7 +118,7 @@ class CallbackHandler:
     @_foreach_callback_require_args_
     def on_initialization(self, args: HandlerArguments):
         self._callback.on_initialization(args=args)
-   
+
     @_foreach_callback_require_stat_
     def on_training_begin(self, stat: TrainerStatus):
         self._callback.on_training_begin(stat)
@@ -141,11 +132,11 @@ class CallbackHandler:
         self._callback.on_training_step_begin(stat)
 
     @_foreach_callback_require_stat_
-    def on_training_step_end(self, batch: StepResults):
+    def on_training_step_end(self, batch: CurrentIterationStatus):
         self._callback.on_training_step_end(batch=batch)
 
     @_foreach_callback_
-    def on_training_epoch_end(self, epoch: EpochResults):
+    def on_training_epoch_end(self, epoch: CurrentIterationStatus):
         self._callback.on_training_epoch_end(epoch=epoch)
 
     @_foreach_callback_require_stat_
@@ -161,11 +152,11 @@ class CallbackHandler:
         self._callback.on_validation_step_begin(stat)
 
     @_foreach_callback_
-    def on_validation_step_end(self, batch: StepResults):
+    def on_validation_step_end(self, batch: CurrentIterationStatus):
         self._callback.on_validation_step_end(batch=batch)
 
     @_foreach_callback_
-    def on_validation_run_end(self, epoch: EpochResults):
+    def on_validation_run_end(self, epoch: CurrentIterationStatus):
         self._callback.on_validation_run_end(epoch=epoch)
 
     @_foreach_callback_require_stat_
@@ -177,11 +168,11 @@ class CallbackHandler:
         self._callback.on_evaluation_step_begin(stat)
 
     @_foreach_callback_
-    def on_evaluation_step_end(self, batch: StepResults):
+    def on_evaluation_step_end(self, batch: CurrentIterationStatus):
         self._callback.on_evaluation_step_end(batch=batch)
 
     @_foreach_callback_
-    def on_evaluation_run_end(self, epoch: EpochResults):
+    def on_evaluation_run_end(self, epoch: CurrentIterationStatus):
         self._callback.on_evaluation_run_end(epoch=epoch)
 
     @_foreach_callback_require_stat_
@@ -191,4 +182,3 @@ class CallbackHandler:
     @_foreach_callback_require_stat_
     def on_termination(self, stat: TrainerStatus):
         self._callback.on_termination(stat)
-

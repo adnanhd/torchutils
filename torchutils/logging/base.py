@@ -1,11 +1,15 @@
-from typing import overload, List, Dict
+from typing import List
 from abc import ABC, abstractmethod
-from torchutils.utils.pydantic import HandlerArguments, EpochResults, StepResults, TrainerModel
+from torchutils.utils.pydantic import (
+    HandlerArguments,
+    TrainerModel
+)
 
 
 class TrainerLogger(ABC):
     """
-    A callback which visualises the state of each training and evaluation epoch using a progress bar
+    A callback which visualises the state of each training
+    and evaluation epoch using a progress bar
     """
     @abstractmethod
     def open(self):
@@ -17,7 +21,7 @@ class TrainerLogger(ABC):
 
     def log_info(self, msg):
         ...
-    
+
     def log_error(self, msg):
         ...
 
