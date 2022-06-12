@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, Dict, Set
 
 
 class RunHistory(ABC):
@@ -38,7 +38,7 @@ class RunHistory(ABC):
         pass
 
     @abstractmethod
-    def update_score(self, score_name, score_value):
+    def set_latest_score(self, score_name, score_value):
         """
         Record the value for the given score.
         :param score_name: the name of the score being tracked
@@ -63,7 +63,7 @@ class RunHistory(ABC):
         pass
 
     @abstractmethod
-    def reset(self):
+    def reset_scores(self):
         """
         Reset the state of the :class:`RunHistory`
         """
@@ -79,7 +79,7 @@ class InMemoryRunHistory(RunHistory):
         self._current_epoch = current_epoch
         self._scores = defaultdict(list).fromkeys(score_names)
 
-    def get_score_names(self):
+    def get_score_names(self) -> Set:
         return set(self._scores.keys())
 
     def get_score_values(self, score_name):
@@ -93,7 +93,7 @@ class InMemoryRunHistory(RunHistory):
                 f"No values have been recorded for the score {score_name}"
             )
 
-    def update_score(self, score_name, score_value):
+    def set_latest_score(self, score_name, score_value):
         self._scores[score_name].append(score_value)
 
     @property
@@ -103,7 +103,7 @@ class InMemoryRunHistory(RunHistory):
     def _increment_epoch(self, n=1):
         self._current_epoch += n
 
-    def reset(self, new_epoch=1):
+    def reset_scores(self, new_epoch=1):
         self._current_epoch = new_epoch
         self._scores = defaultdict(list)
 
@@ -112,13 +112,18 @@ class DataFrameRunHistory(RunHistory):
     """
     An implementation of :class:`RunHistory` which stores all recorded values in memory.
     """
+    __slots__ = ['_current_epoch', '_scores', '_has_latest_row']
 
-    def __init__(self, *score_names, current_epoch=1):
-        self._current_epoch = current_epoch
-        self._scores = pd.DataFrame(columns=score_names,
-                                    index=[current_epoch])
+    def __init__(self, current_epoch: int = 1):
+        self._current_epoch: int = current_epoch
+        self._scores: pd.DataFrame = None
+        self._has_latest_row = False
 
-    def get_score_names(self):
+    def set_score_names(self, score_names):
+        self._scores = pd.DataFrame(columns=score_names)
+        self._has_latest_row = False
+
+    def get_score_names(self) -> Set:
         return set(self._scores.columns)
 
     def get_score_values(self, score_name):
@@ -126,39 +131,48 @@ class DataFrameRunHistory(RunHistory):
 
     def get_latest_score(self, score_name):
         if score_name in self._scores.columns:
-            return self._scores[score_name].iloc[-1]
+            if self._scores[score_name].__len__() != 0:
+                return self._scores[score_name].iloc[-1]
+            else:
+                raise IndexError(
+                    f"No value has been set previously for the score {score_name}"
+                )
         else:
             raise ValueError(
-                f"No values have been recorded for the score {score_name}"
+                f"The score {score_name} is not valid for RunHistory"
             )
 
-    def update_score(self, score_name, score_value):
+    def set_latest_score(self, score_name, score_value):
+        if not self._has_latest_row:
+            self._append_epoch_row()
         self._scores[score_name].loc[self._current_epoch] = score_value
-        # index = self._scores.index.get_loc(self._current_epoch)
-        # self._scores[score_name].iloc[index] = score_value
 
     @property
     def current_epoch(self):
         return self._current_epoch
 
+    def _append_epoch_row(self):
+        self._scores.loc[self._current_epoch] = np.nan
+        self._has_latest_row = True
+
     def _increment_epoch(self, n=1):
         self._current_epoch += n
+        self._has_latest_row = False
 
-    def reset(self, new_epoch=1):
+    def reset_scores(self, new_epoch=1):
         self._current_epoch = new_epoch
         self._scores.drop(self._scores.index, inplace=True)
+        self._has_latest_row = False
 
 
 class SingleScoreTracker:
     def __init__(self):
         self.score_value = 0
-        self._average = 0
         self.total_score = 0
         self.running_count = 0
 
     def reset(self):
         self.score_value = 0
-        self._average = 0
         self.total_score = 0
         self.running_count = 0
 
@@ -166,28 +180,42 @@ class SingleScoreTracker:
         self.score_value = score_batch_value
         self.total_score += score_batch_value * batch_size
         self.running_count += batch_size
-        self._average = self.total_score / self.running_count
 
     @property
     def average(self):
         if self.running_count == 0:
             return np.nan
-        return self._average
+        return self.total_score / self.running_count
 
 
 class ScoreTracker():
-    def __init__(self, *scores: str):
-        self._trackers = {score: SingleScoreTracker() for score in scores}
-        self._runhists = DataFrameRunHistory(*scores)
+    def __init__(self):
+        self._trackers = dict()
+        self._runhists = DataFrameRunHistory()
 
-    def step(self, score_name, score_value, batch_size=1):
-        self._trackers[score_name].update(score_value, batch_size=batch_size)
+    def set_score_names(self, score_names: Iterable):
+        self._trackers = {score: SingleScoreTracker() for score in score_names}
+        self._runhists.set_score_names(score_names)
 
-    def epoch(self, n=1):
+    def get_score_names(self) -> Set:
+        return set(self._trackers.keys())
+
+    def set_current_scores(self, scores: Dict, batch_size=1):
+        for score_name, score_value in scores.items():
+            self._trackers[score_name].update(
+                score_value, batch_size=batch_size)
+
+    def set_averaged_scores(self, n=1):
         for score_name, score_tracker in self._trackers.items():
-            self._runhists.update_score(score_name, score_tracker.average)
+            self._runhists.set_latest_score(score_name, score_tracker.average)
             score_tracker.reset()
         self._runhists._increment_epoch(n)
 
-    def reset(self, start_index=1):
-        self._runhists.reset(start_index)
+    def get_averaged_scores(self, scores: Iterable, batch_size=1):
+        if len(scores) == 0:
+            scores = iter(self._trackers.keys())
+        print(scores)
+        return dict(map(self._runhists.get_latest_score, scores))
+
+    def reset_scores(self, start_index=1):
+        self._runhists.reset_scores(start_index)

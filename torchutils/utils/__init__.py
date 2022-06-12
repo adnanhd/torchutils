@@ -6,6 +6,7 @@ from .mthdutils import hybridmethod
 from .decorators import verbose, profile
 from .config import INIObject
 from .hash import Hashable
+from .tracker import ScoreTracker
 
 
 import torchutils.utils.config
@@ -19,7 +20,7 @@ string_to_types = {
     'integer': int, 'int': int,
     'boolean': bool, 'bool': bool,
     'float': float,
-    'torch.float16': torch.float16, 
+    'torch.float16': torch.float16,
     'torch.float32': torch.float32,
     'torch.float64': torch.float64,
     'torch.int8': torch.int8,
@@ -27,8 +28,8 @@ string_to_types = {
     'torch.int16': torch.int16,
     'torch.int32': torch.int32,
     'torch.int64': torch.int64,
-    'np.float16': np.float16, 
-    'np.float32': np.float32, 
+    'np.float16': np.float16,
+    'np.float32': np.float32,
     'np.float64': np.float64,
     'np.float128': np.float128,
     'np.int8':  np.int8,

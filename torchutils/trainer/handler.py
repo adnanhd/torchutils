@@ -1,22 +1,15 @@
-# Import Handlees
-from torchutils.metrics import TrainerMetric
-from torchutils.logging import TrainerLogger
-from torchutils.callbacks import TrainerCallback
-
 # Import Handlers
 from torchutils.metrics import MetricHandler
 from torchutils.logging import LoggingHandler
 from torchutils.callbacks import CallbackHandler
 
-from .utils import ScoreTrackerHandler
 from typing import Union, Optional, List
 
 # Import Arguments
 from torchutils.utils.pydantic import (
     HandlerArguments,
     TrainerStatus,
-    StepResults,
-    EpochResults,
+    CurrentIterationStatus,
     TrainerModel,
     TrainingArguments,
     EvaluatingArguments,
@@ -31,9 +24,10 @@ class TrainerHandler():
     # eval_dl: TrainerDataLoaderArguments
     # args: TrainingArguments
     # model: TrainerModel
-    __slots__ = ['arguments', '_tracker',
-                 '_loggers', '_metrics',
-                 '_callbacks', '__args_setter__']
+    __slots__ = ['iter_status',
+                 'arguments', '_loggers',
+                 '_metrics', '_callbacks',
+                 '__args_setter__']
 
     def __init__(self,
                  model: TrainerModel,
@@ -47,6 +41,8 @@ class TrainerHandler():
         self._metrics = MetricHandler()
         self._callbacks = CallbackHandler()
         self.arguments = HandlerArguments(model=model, status_ptr=status_ptr)
+        self.iter_status = CurrentIterationStatus(handler=self._metrics)
+        # TODO: explain well
         self.__args_setter__ = self.arguments.set_arguments()
 
     def set_arguments(self,
@@ -56,7 +52,8 @@ class TrainerHandler():
                       valid_dl: Optional[TrainerDataLoader] = None,
                       ):
         dataloaders = {'train_dl': train_dl,
-                       'valid_dl': valid_dl, 'eval_dl': eval_dl}
+                       'valid_dl': valid_dl,
+                       'eval_dl': eval_dl}
         dataloaders = {key: dataloader for key, dataloader
                        in dataloaders.items() if dataloader is not None}
         self.__args_setter__(args, dataloaders)
@@ -65,13 +62,6 @@ class TrainerHandler():
     def status(self):
         return self.arguments.status
 
-    # Tracker manipulation functions
-    def update(self, batch_loss, num_batchs=1):
-        self.tracker.update(loss_batch_value=batch_loss, batch_size=num_batchs)
-
-    def reset(self):
-        self.tracker.reset()
-
     def compile(
             self,
             loggers=list(),
@@ -79,8 +69,11 @@ class TrainerHandler():
             callbacks=list(),
     ):
         self._loggers.add_loggers(loggers)
-        self._metrics.add_scores(metrics)
+        self._metrics._add_scores(metrics)
         self._callbacks.add_callbacks(callbacks)
+        score_names = self._metrics.get_score_names()
+        self.iter_status.set_score_names(*score_names)
+        # self._valid_res.set_score_names(*score_names)
 
     def decompile(
             self,
@@ -89,17 +82,24 @@ class TrainerHandler():
             callbacks=list(),
     ):
         self._loggers.remove_logger(loggers)
-        self._metrics.remove_scores(metrics)
+        self._metrics._remove_scores(metrics)
         self._callbacks.remove_callbacks(callbacks)
+        score_names = self._metrics.get_score_names()
+        # TODO: remove *sign
+        self.iter_status.set_score_names(*score_names)
+        # self._valid_res.set_score_names(*score_names)
 
     def clear(self):
         self._loggers.clear_loggers()
         self._callbacks.clear_callbacks()
         self._metrics.clear_scores()
+        self.iter_status.set_score_names()
 
     def on_initialization(self):
         self._loggers.initialize(self.arguments)
         self._callbacks.on_initialization(self.arguments)
+        self.iter_status.reset_score_values()
+        # self._valid_res.reset_score_values()
 
     def on_training_begin(self):
         self._loggers.model(self.arguments.model)
@@ -112,16 +112,15 @@ class TrainerHandler():
         self._callbacks.on_training_step_begin(self.status)
 
     def on_training_step_end(self, x, y, y_pred):
-        batch = StepResults(x=x, y_true=y, y_pred=y_pred)
-        self._metrics.set_scores_values(x=x, y=y, y_pred=y_pred)
-        self._callbacks.on_training_step_end(batch)
-        metrics = self._metrics.get_score_values()
-        metrics['loss'] = self.tracker.average
-        self._loggers.score(**metrics)
+        self.iter_status.set_current_scores(x, y_true=y, y_pred=y_pred)
+        scores = self._metrics.get_score_values()
+        self._callbacks.on_training_step_end(self.iter_status)
+        # TODO: remove this, apply it via callbacks
+        self._loggers.score(**scores)
 
     def on_training_epoch_end(self):
-        epoch = EpochResults()
-        self._callbacks.on_training_epoch_end(epoch)
+        self.iter_status.average_scores()
+        self._callbacks.on_training_epoch_end(self.iter_status)
 
     def on_training_end(self):
         self._callbacks.on_training_end(self.status)
@@ -133,16 +132,12 @@ class TrainerHandler():
         self._callbacks.on_validation_step_begin(self.status)
 
     def on_validation_step_end(self, x, y, y_pred):
-        batch = StepResults(x=x, y_true=y, y_pred=y_pred)
-        self._metrics.set_scores_values(x=x, y=y, y_pred=y_pred)
-        self._callbacks.on_validation_step_end(batch)
+        self.iter_status.set_current_scores(x=x, y_true=y, y_pred=y_pred)
+        self._callbacks.on_validation_step_end(self.iter_status)
 
     def on_validation_run_end(self):
-        epoch = EpochResults()
-        self._callbacks.on_validation_run_end(epoch)
-        metrics = self._metrics.get_score_values()
-        metrics['val_loss'] = self.tracker.average
-        self._loggers.score(**metrics)
+        self.iter_status.average_scores()
+        self._callbacks.on_validation_run_end(self.iter_status)
 
     def on_evaluation_run_begin(self):
         self._callbacks.on_evaluation_run_begin(self.status)
@@ -151,15 +146,12 @@ class TrainerHandler():
         self._callbacks.on_evaluation_step_begin(self.status)
 
     def on_evaluation_step_end(self, x, y, y_pred):
-        batch = StepResults(x=x, y_true=y, y_pred=y_pred)
-        self._metrics.set_scores_values(x=x, y=y, y_pred=y_pred)
-        self._callbacks.on_evaluation_step_end(batch)
+        self.iter_status.set_current_scores(x=x, y_true=y, y_pred=y_pred)
+        self._callbacks.on_evaluation_step_end(self.iter_status)
 
     def on_evaluation_run_end(self):
-        epoch = EpochResults()
-        self._callbacks.on_evaluation_run_end(epoch)
-        metrics = self._metrics.get_score_values()
-        self._loggers.score(**metrics)
+        self.iter_status.average_scores()
+        self._callbacks.on_evaluation_run_end(self.iter_status)
 
     def on_stop_training_error(self):
         self._callbacks.on_stop_training_error(self.status)
