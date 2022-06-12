@@ -35,11 +35,20 @@ model = build_my_model()
 mh = MetricHandler('x_score', 'y_score')
 
 for epoch_idx in range(10):
-    for x, y in dataloader:
-	y_pred = model(x)
-    mh.set_scores_values(x, y, y_pred)
-	print(mh.get_score_values())
+  for x, y in dataloader:
+      y_pred = model(x)
+      mh.set_scores_values(x, y, y_pred)
+      print(mh.get_score_values())
 ```
+
+after creating a custom TraierMetric, add one line to use it with torchutils.trainer API
+```diff
+
+trainer = Trainer(model=model, loss=loss, ...)
++ trainer.compile(metrics=['x_score', 'y_score'])
+trainer.train(...)
+```
+
 
 
 
