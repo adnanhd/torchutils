@@ -1,6 +1,6 @@
 ## torchutils
 
-### A Quict Example
+### A Quick Example
 ```python
 from torchutils.trainer import Trainer, TrainerModel
 from torchutils.data import Dataset
