@@ -5,8 +5,10 @@ from tqdm import tqdm
 import time
 import os
 
+
 class ProgressBarLogger(TrainerLogger):
     __slots__ = ['_pbar', '_logs', '_args']
+
     def __init__(self, **kwargs):
         self._logs = OrderedDict()
         self._args = kwargs.copy()
@@ -24,7 +26,7 @@ class ProgressBarLogger(TrainerLogger):
         self._pbar.update(n=n)
 
     def close(self):
-        if self._pbar is not None: 
+        if self._pbar is not None:
             self._pbar.close()
         self._pbar = None
 
@@ -33,6 +35,8 @@ class EpochProgressBar(ProgressBarLogger):
     def __init__(self, **kwargs):
         kwargs.setdefault("unit", "epoch")
         kwargs.setdefault("initial", 0)
+        kwargs.setdefault("position", 1)
+        kwargs.setdefault('leave', False)
         kwargs.setdefault("file", os.sys.stdout)
         kwargs.setdefault("dynamic_ncols", True)
         kwargs.setdefault("desc", "Training")
@@ -46,15 +50,18 @@ class EpochProgressBar(ProgressBarLogger):
     def _flush_epoch(self):
         self.update(1)
 
+
 class StepProgressBar(ProgressBarLogger):
     def __init__(self, **kwargs):
         kwargs.setdefault("unit", "batch")
         kwargs.setdefault("initial", 0)
+        kwargs.setdefault("position", 0)
+        kwargs.setdefault('leave', True)
         kwargs.setdefault("file", os.sys.stdout)
         kwargs.setdefault("dynamic_ncols", True)
         kwargs.setdefault("colour", "CYAN")
         super().__init__(**kwargs)
-    
+
     def open(self, args: HandlerArguments):
         epochs = args.status.current_epoch
         self._args["desc"] = f"Epoch {epochs}"
@@ -68,9 +75,11 @@ class SampleProgressBar(ProgressBarLogger):
     def __init__(self, **kwargs):
         kwargs.setdefault("unit", "sample")
         kwargs.setdefault("initial", 0)
+        kwargs.setdefault("position", 1)
+        kwargs.setdefault('leave', True)
         kwargs.setdefault("file", os.sys.stdout)
         kwargs.setdefault("dynamic_ncols", True)
-        kwargs.setdefault("desc", f"Evaluating")
+        kwargs.setdefault("desc", "Evaluating")
         kwargs.setdefault("colour", "GREEN")
         super().__init__(**kwargs)
 
@@ -83,4 +92,3 @@ class SampleProgressBar(ProgressBarLogger):
 
     def _flush_step(self):
         self.update(1)
-

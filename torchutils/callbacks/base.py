@@ -1,20 +1,9 @@
 # Copyright © 2021 Chris Hughes
-import inspect
-import logging
-import sys, os
-import time
 from abc import ABC
-
-import numpy as np
-import torch
-from torch import nn
-from tqdm import tqdm
-import dataclasses
 from torchutils.utils.pydantic import (
-        HandlerArguments,
-        TrainerStatus,
-        EpochResults,
-        StepResults
+    HandlerArguments,
+    TrainerStatus,
+    CurrentIterationStatus
 )
 
 
@@ -62,7 +51,7 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_step_end(self, batch: StepResults):
+    def on_training_step_end(self, batch: CurrentIterationStatus):
         """
         Event called at the end of a training step.
         :param batch: the current batch of training data
@@ -70,7 +59,7 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_epoch_end(self, epoch: EpochResults):
+    def on_training_epoch_end(self, epoch: CurrentIterationStatus):
         """
         Event called at the end of a training epoch.
         """
@@ -94,15 +83,15 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_validation_step_end(self, batch: StepResults):
+    def on_validation_step_end(self, batch: CurrentIterationStatus):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data
         :param batch_output: the outputs returned by :meth:`pytorch_accelerated.trainer.Trainer.calculate_eval_batch_loss`
         """
         raise CallbackMethodNotImplementedError
-    
-    def on_validation_run_end(self, epoch: EpochResults):
+
+    def on_validation_run_end(self, epoch: CurrentIterationStatus):
         """
         Event called at the start of an evaluation run.
         """
@@ -126,7 +115,7 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_evaluation_step_end(self, batch: StepResults):
+    def on_evaluation_step_end(self, batch: CurrentIterationStatus):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data
@@ -134,7 +123,7 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_evaluation_run_end(self, epoch: EpochResults):
+    def on_evaluation_run_end(self, epoch: CurrentIterationStatus):
         """
         Event called at the end of an evaluation run.
         """
@@ -149,9 +138,8 @@ class TrainerCallback(ABC):
     def on_termination(self, stat: TrainerStatus):
         raise CallbackMethodNotImplementedError
 
-    #def __getattr__(self, item):
+    # def __getattr__(self, item):
     #    try:
     #        return super().__getattr__(item)
     #    except AttributeError:
     #        raise CallbackMethodNotImplementedError
-
