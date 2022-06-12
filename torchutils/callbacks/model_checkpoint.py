@@ -18,12 +18,12 @@ class ModelCheckpoint(TrainerCallback):
                  monitor="loss",
                  maximize_score: bool = False,
                  delta: float = 0.0,
-                 save_path='best_model.ckpt',
+                 save_path='model_checkpoint.ckpt',
                  trainer_model: TrainerModel = None,
-                 trace_func: Callable[str, None] = print,
+                 trace_func: Callable[[str], None] = print,
                  verbose: bool = False,
                  load_back: int = None,
-                 load_before_train: bool = True,
+                 load_before_train: bool = False,
                  load_before_evaluate: bool = True,
                  save_best_only: bool = False):
         self.monitor: str = monitor
@@ -33,7 +33,7 @@ class ModelCheckpoint(TrainerCallback):
         self.maximize: bool = maximize_score
         self.save_path: str = save_path
         self.load_back: int = load_back
-        self.trace_func: Callable[str, None] = trace_func
+        self.trace_func: Callable[[str], None] = trace_func
         self.save_best: bool = save_best_only
         self.model: TrainerModel = trainer_model
         self.train_best: bool = load_before_train
@@ -82,13 +82,13 @@ class ModelCheckpoint(TrainerCallback):
 
             if save_model:
                 save_kwargs = {self.monitor: self.best}
-                self.model.save_checkpoint(self.save_path,
-                                           **save_kwargs)
+                self.model.save_into_checkpoint(self.save_path,
+                                                **save_kwargs)
 
     def on_training_begin(self, stat: TrainerStatus):
         if self.train_best and os.path.isfile(self.save_path):
-            self.model.load_checkpoint(path=self.save_path)
+            self.model.load_from_checkpoint(path=self.save_path)
 
     def on_evaluation_begin(self, stat: TrainerStatus):
         if self.eval_best and os.path.isfile(self.save_path):
-            self.model.load_checkpoint(path=self.save_path)
+            self.model.load_from_checkpoint(path=self.save_path)
