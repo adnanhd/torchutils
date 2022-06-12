@@ -19,11 +19,11 @@ def random_iteration_arrays():
     return x, y_true, y_pred
 
 
-def random_step(num_epochs):
+def random_step(num_batches):
     assert proxy._score_history.get_score_values('loss') == []
 
     total_loss = 0
-    for _ in range(num_epochs):
+    for _ in range(num_batches):
         x, y, y_pred = random_iteration_arrays()
         loss_tracker._loss = np.square(y_pred).sum().item()
         proxy.set_current_scores(x, y, y_pred)
@@ -35,7 +35,7 @@ def random_step(num_epochs):
 
     proxy.average_scores()
     assert abs(proxy.get_latest_scores('loss')[
-               'loss'] - total_loss / num_epochs) < epsilon
+               'loss'] - total_loss / num_batches) < epsilon
     proxy.reset_score_values()
 
 

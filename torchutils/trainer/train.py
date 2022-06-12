@@ -25,9 +25,11 @@ def _run_training(
 
     trainer._handler.on_training_end()
     trainer._handler.arguments.reset_status()
-
+    return trainer._handler.iter_status.get_score_history()
 
 # profile
+
+
 def _run_training_epoch(
     trainer: Trainer,
     trainer_arguments: TrainingArguments,

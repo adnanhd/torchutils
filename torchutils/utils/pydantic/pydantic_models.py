@@ -56,8 +56,9 @@ class TrainerModel(pydantic.BaseModel):
         return ('model', 'optimizer', 'scheduler', 'criterion')
 
     def save_into_checkpoint(self, path, **state):
-        if os.path.split(path)[0] != '':
-            os.makedirs(path, exist_ok=True)
+        dirpath = os.path.split(path)[0]
+        if dirpath != '':
+            os.makedirs(dirpath, exist_ok=True)
         for key in self._get_attr_names():
             module = self.__getattribute__(key)
             if module is not None:
@@ -65,7 +66,8 @@ class TrainerModel(pydantic.BaseModel):
                     state[key] = module.state_dict()
                 else:
                     warnings.warn(
-                        f"{key} has no state_dict() attribute.", RuntimeWarning)
+                        f"{key} has no state_dict() attribute.", RuntimeWarning
+                    )
         # TODO: add version stamping before here
         torch.save(state, path)
 
@@ -266,6 +268,7 @@ class CurrentIterationStatus(pydantic.BaseModel):
             self._score_history.set_latest_score(
                 score_name, score_tracker.average)
             score_tracker.reset()
+        self._score_history._increment_epoch()
 
     def _get_current_scores(self,
                             score_names: Iterable[str]
@@ -287,6 +290,14 @@ class CurrentIterationStatus(pydantic.BaseModel):
             return self._get_averaged_scores(score_names)
         else:
             return self._get_current_scores(score_names)
+
+    def get_score_history(self, *score_names):
+        if len(score_names) == 0:
+            score_names = self.get_score_names()
+        return {
+            score_name: self._score_history.get_score_values(score_name)
+            for score_name in score_names
+        }
 
 
 class HandlerArguments(pydantic.BaseModel):
