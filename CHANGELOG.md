@@ -7,7 +7,6 @@
 - 2: in eval.py train.py and valid.py from .engine import Trainer gives compilation error
 
 
-
 ## Handler TODOs
 - [ ] Create a base Handler class having add remove clear and hook functionalities
     -	hooker mechanism can be implemented here
@@ -24,10 +23,13 @@
 - [ ] Bypass TrainerHandler class if you like
 
 ## Dataset TODOs
-- [ ] make it fully compatible with torchvision.datasets
+- [ ] make it compatible with torchvision.datasets
  
 ## Modes TODOs
 - [ ] make it compatible with torchvision.datasets
+
+## Metrics TODOs
+- [ ] make it compatible with torchmetrics
 
 ## Loggers TODOs
 - [ ] create a LoggerBaseCallback to control all loggings
