@@ -5,6 +5,7 @@ from .pydantic_models import (
 
     TrainerModel,
     TrainerDataLoader,
+    TrainerModelBuilder,
 
     HandlerArguments,
     TrainerStatus,

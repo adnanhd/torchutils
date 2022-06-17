@@ -74,9 +74,15 @@
 	- Added AverageMeter -- which will be renamed as TrainerScore
 	- Added RunHistory to MetrciHandler -- instead of ScoreTracker
 	- Remove ScoreTracker and SingleScoreTracker
-	- [x] Return a RunHistory class on return of train method
-	- [x] Return predictions on predict/test method
+	- Return a RunHistory class on return of train method
+	- Return predictions on predict/test method
+
+- **v1.3.1a**: TrainerModel
+	- change TrainerModel api and method names
+	- Add string\_to\_{criterion,scheduler,optimizer}\_class dictionaries in `trainer/utils/mappings.py`
+	- Create TrainerModelBuilder from TrainerModel allowing saving and loading hyperparameters as well as fetching from mappings.py
 
 ## Planned TODOs
 - [ ] Update `torchutils/trainer/handler.py:TrainerHandler` compile and decompile parameters
 - [ ] Fix logging bugs in `torchutils/callbacks/progress_bar.py:ProgressBar` 
+- [ ] Migrate classes in `torchutils/utils/pydantic/pydantic_models.py` to `torchutils/models`, `torchutils/data`, etc.

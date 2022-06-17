@@ -6,6 +6,7 @@ from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchutils.metrics import MetricHandler, AverageMeter
+import torchsummary
 from collections import defaultdict
 from typing import Optional, Dict, Union, Any, List, Iterable
 import typing
@@ -20,15 +21,106 @@ from .pydantic_types import (
     DataLoaderType,
     # DatasetType
 )
-import torchsummary
+from torchutils.utils import (
+    string_to_criterion_class,
+    string_to_optimizer_class,
+    string_to_scheduler_class,
+    string_to_functionals
+)
+
+
+class TrainerModelBuilder(pydantic.BaseModel):
+    model: ModuleType
+    critr: str
+    optim: str
+    sched: Optional[str]
+    _criterion_kwargs: Optional[typing.Dict] = pydantic.PrivateAttr({})
+    _optimizer_kwargs: Optional[typing.Dict] = pydantic.PrivateAttr({})
+    _scheduler_kwargs: Optional[typing.Dict] = pydantic.PrivateAttr({})
+
+    @pydantic.validator('critr')
+    @classmethod
+    def validate_criterion(cls, criterion) -> str:
+        if criterion not in string_to_criterion_class \
+                and criterion not in string_to_functionals:
+            raise ValueError(
+                f"{criterion} is not valid criterion class name"
+            )
+        else:
+            return criterion
+
+    @pydantic.validator('optim')
+    @classmethod
+    def validate_optimizer(cls, optimizer) -> str:
+        if optimizer not in string_to_optimizer_class:
+            raise ValueError(f"{optimizer} is not valid optimizer class name")
+        else:
+            return optimizer
+
+    @pydantic.validator('sched')
+    @classmethod
+    def validate_scheduler(cls, scheduler) -> str:
+        if scheduler not in string_to_scheduler_class:
+            raise ValueError(f"{scheduler} is not valid scheduler class name")
+        else:
+            return scheduler
+
+    def configure_optimizer(self, lr: float, **kwargs) -> Optimizer:
+        optimizer_class = string_to_optimizer_class[self.optim]
+        return optimizer_class(self.model.parameters(), lr=lr, **kwargs)
+
+    def configure_scheduler(self, **kwargs) -> Optional[_LRScheduler]:
+        if self.sched is not None:
+            scheduler_class = string_to_scheduler_class[self.sched]
+            return scheduler_class(self._optimizer, **kwargs)
+        else:
+            return None
+
+    def configure_criterion(self, **kwargs) -> Module:
+        criterion_class = string_to_criterion_class[self.critr]
+        return criterion_class(**kwargs)
+
+    def set_criterion_arguments(self, **kwargs):
+        self._criterion_kwargs.update(kwargs)
+
+    def set_optimizer_arguments(self, **kwargs):
+        self._optimizer_kwargs.update(kwargs)
+
+    def set_scheduler_arguments(self, **kwargs):
+        self._scheduler_kwargs.update(kwargs)
+
+    def reset_criterion_arguments(self):
+        self._criterion_kwargs.clear()
+
+    def reset_optimizer_arguments(self):
+        self._optimizer_kwargs.clear()
+
+    def reset_scheduler_arguments(self):
+        self._scheduler_kwargs.clear()
+
+    def compile(self, lr: float):
+        return TrainerModel(
+            model=self.model,
+            criterion=self.configure_criterion(**self._criterion_kwargs),
+            optimizer=self.configure_optimizer(lr, **self._optimizer_kwargs),
+            scheduler=self.configure_scheduler(**self._scheduler_kwargs)
+        )
 
 
 class TrainerModel(pydantic.BaseModel):
     model: ModuleType
-    criterion: LossType
-    optimizer: Optional[OptimizerType]  # Union[OptimizerType, str]
-    scheduler: Optional[SchedulerType]
-    device: Any = None
+    criterion: Union[ModuleType, typing.Callable]
+    optimizer = OptimizerType
+    scheduler = Optional[SchedulerType]
+
+    def __setattr__(self, key, value):
+        if key == 'device':
+            self.model = self.model.to(device=value)
+            return object.__setattr__(self.model, 'device', value)
+        if key == 'dtype':
+            self.model = self.model.to(dtype=value)
+            return object.__setattr__(self.model, 'dtype', value)
+        return super().__setattr__(key, value)
 
     @property
     def dtype(self):
@@ -42,18 +134,11 @@ class TrainerModel(pydantic.BaseModel):
     def learning_rate(self):
         return self.optimizer.param_groups[0]['lr']
 
-    def __setattr__(self, key, value):
-        if key == 'device':
-            self.model = self.model.to(device=value)
-            return object.__setattr__(self.model, 'device', value)
-        if key == 'dtype':
-            self.model = self.model.to(dtype=value)
-            return object.__setattr__(self.model, 'dtype', value)
-        return super().__setattr__(key, value)
-
-    @classmethod
-    def _get_attr_names(cls):
-        return ('model', 'optimizer', 'scheduler', 'criterion')
+    def _get_attr_names(self) -> typing.Set[str]:
+        if isinstance(self.criterion, Module):
+            return {'model', 'optimizer', 'scheduler', 'criterion'}
+        else:
+            return {'model', 'optimizer', 'scheduler'}
 
     def save_into_checkpoint(self, path, **state):
         dirpath = os.path.split(path)[0]
@@ -61,13 +146,14 @@ class TrainerModel(pydantic.BaseModel):
             os.makedirs(dirpath, exist_ok=True)
         for key in self._get_attr_names():
             module = self.__getattribute__(key)
-            if module is not None:
-                if hasattr(module, 'state_dict'):
-                    state[key] = module.state_dict()
-                else:
-                    warnings.warn(
-                        f"{key} has no state_dict() attribute.", RuntimeWarning
-                    )
+            if module is None:
+                continue
+            elif hasattr(module, 'state_dict'):
+                state[key] = module.state_dict()
+            else:
+                warnings.warn(
+                    f"{key} has no state_dict() attribute.", RuntimeWarning
+                )
         # TODO: add version stamping before here
         torch.save(state, path)
 
@@ -75,78 +161,48 @@ class TrainerModel(pydantic.BaseModel):
         checkpoint = torch.load(path, map_location=self.device)
         for key in self._get_attr_names():
             module = getattr(self, key)
-            if module is not None and key in checkpoint:
-                if hasattr(module, 'load_state_dict'):
-                    module.load_state_dict(checkpoint.pop(key))
-                else:
-                    warnings.warn(f"{key} exits in the checkpoint but that \
-                            of {self.__qualname__} has no load_state_dict() \
-                            attribute.", RuntimeWarning)
+            if module is None or key not in checkpoint:
+                continue
+            elif hasattr(module, 'load_state_dict'):
+                module.load_state_dict(checkpoint.pop(key))
+            else:
+                warnings.warn(
+                    f"{key} exits in the checkpoint but that "
+                    f"of {self.__qualname__} has no load_state_dict()"
+                    "attribute.", RuntimeWarning
+                )
         return checkpoint
 
-    def summary(self, input_size, batch_size=-1):
+    def summary(self, input_size, batch_size=-1) -> None:
         torchsummary.summary(
             self.model, input_size,
             batch_size=batch_size,
             device=self.device)
 
-    def train(self):
+    def train(self) -> None:
         self.model.train()
+        self.criterion.train()
 
-    def eval(self):
+    def eval(self) -> None:
         self.model.eval()
-
-    def configure_optimizers(self, lr: float, **kwargs):
-        self.optimizer = optimizers.Adam(
-            self.model.parameters(), lr=lr, **kwargs)
-
-    def compile(self,
-                model: Module = None, optim: Union[str, Optimizer] = None,
-                loss: Module = None,  sched: Union[str, _LRScheduler] = None):
-        if model is not None:
-            self.model = model
-        if loss is not None:
-            self.criterion = loss
-        if optim is not None:
-            self.optimizer = optim
-        if sched is not None:
-            self.scheduler = sched
+        self.criterion.eval()
 
     def optimizer_step(self):
-        if self.optimizer is not None:
-            self.optimizer.step()
+        self.optimizer.step()
 
     def optimizer_zero_grad(self):
-        if self.optimizer is not None:
-            self.optimizer.zero_grad()
+        self.optimizer.zero_grad()
 
     def scheduler_step(self):
         if self.scheduler is not None:
             self.scheduler.step()
 
-    def model_fn(self, batch, batch_idx: int):
-        return self.model(batch)
-
     def __call__(self, input):
         return self.model(input)
 
-    def validating_step(self, batch, batch_idx: int):
-        return self.model(batch.detach()).detach()
-
-    def loss_fn(self, batch, batch_true, batch_idx: int):
-        return self.criterion(input=batch, target=batch_true)
-
-    def attached_step(self, x, y, batch_idx):
-        self.optimizer_zero_grad()
-        y_pred = self.model_fn(batch=x, batch_idx=batch_idx)
-        loss = self.loss_fn(batch=y_pred, batch_true=y, batch_idx=batch_idx)
-        loss.backward()
-        self.optimizer_step()
-        return y_pred, loss
-
-    def detached_step(self, x, y, batch_idx):
-        y_pred = self.model_fn(batch=x, batch_idx=batch_idx)
-        loss = self.loss_fn(batch=y_pred, batch_true=y, batch_idx=batch_idx)
+    def forward_pass(self, x, y, batch_idx=None):
+        y_pred = self.model(x)
+        loss = self.criterion(y_pred, y)
         return y_pred, loss
 
 
