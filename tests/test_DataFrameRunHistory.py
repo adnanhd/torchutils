@@ -1,5 +1,5 @@
-from torchutils.utils.tracker import DataFrameRunHistory
-from numpy import nan as NaN
+from torchutils.metrics.history import DataFrameRunHistory
+import numpy as np
 
 
 run = DataFrameRunHistory()
@@ -24,4 +24,4 @@ def test_get_score_values_mse():
 
 
 def test_get_score_values_loss():
-    assert run.get_score_values('loss') == [1e-2, NaN]
+    assert run.get_score_values('loss') == [1e-2, np.nan]
