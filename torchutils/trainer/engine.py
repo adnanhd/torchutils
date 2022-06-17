@@ -230,6 +230,7 @@ class Trainer:
                 y=y_truth.to(device=self.device, dtype=self.ytype),
             )
 
+        self._model.scheduler_step()
         self._handler.on_training_epoch_end()
         # TODO: self.status.current_epoch returns None here
         # This works: self._handler.arguments.status.current_batch
@@ -246,9 +247,12 @@ class Trainer:
     ) -> torch.Tensor:
         self._handler.on_training_step_begin()
 
-        y_pred, loss = self._model.attached_step(
+        self._model.optimizer_zero_grad()
+        y_pred, loss = self._model.forward_pass(
             x=x, y=y, batch_idx=self.status.current_batch)
         self._loss_tracker.update(loss.detach().item())
+        loss.backward()
+        self._model.optimizer_step()
 
         with torch.no_grad():
             self._handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
@@ -283,7 +287,7 @@ class Trainer:
     ) -> torch.Tensor:
         self._handler.on_evaluation_step_begin()
 
-        y_pred, loss = self._model.detached_step(
+        y_pred, loss = self._model.forward_pass(
             x=x, y=y, batch_idx=self.status.current_batch
         )
         self._loss_tracker.update(loss.detach().item())
@@ -317,7 +321,7 @@ class Trainer:
     ) -> torch.Tensor:
         self._handler.on_validation_step_begin()
 
-        y_pred, loss = self._model.detached_step(
+        y_pred, loss = self._model.forward_pass(
             x=x, y=y, batch_idx=self.status.current_batch
         )
         self._loss_tracker.update(loss.detach().item())

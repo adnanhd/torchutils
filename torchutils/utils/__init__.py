@@ -1,20 +1,35 @@
 #!/usr/bin/env python
 
+import numpy as np
+import torch
 from .version_v2 import Version
 from .fnctutils import overload
 from .mthdutils import hybridmethod
 from .decorators import verbose, profile
 from .config import INIObject
 from .hash import Hashable
+from .mappings import (
+    string_to_criterion_class,
+    string_to_optimizer_class,
+    string_to_scheduler_class,
+    string_to_functionals,
+    string_to_types,
+)
 
 
-import torchutils.utils.config
-# import torchutils.data.utils.preprocessing
-import numpy as np
-import torch
-# from torchutils.data.dtypes import NpScalarType, NpTorchType
+def reverse_dict(dictionary: dict):
+    def reverse_item(item: tuple): return (item[1], item[0])
+    return dict(map(reverse_item, dictionary.items()))
 
-string_to_types = {
+
+types_to_string = reverse_dict(string_to_types)
+criterion_class_to_string = reverse_dict(string_to_criterion_class)
+optimizer_class_to_string = reverse_dict(string_to_optimizer_class)
+scheduler_class_to_string = reverse_dict(string_to_scheduler_class)
+functionals_to_string = reverse_dict(string_to_functionals)
+
+
+_str2types = {
     'string': str, 'str': str,
     'integer': int, 'int': int,
     'boolean': bool, 'bool': bool,
@@ -41,8 +56,4 @@ string_to_types = {
     'np.uint64': np.uint64,
 }
 
-types_to_string = {t: s for s, t in string_to_types.items()}
-
-# TODO: remove this old api
-_str2types = string_to_types
-_types2str = types_to_string
+_types2str = reverse_dict(_str2types)
