@@ -1,0 +1,5 @@
+torch
+torchvision
+torchsummary
+torchinfo
+git+https://github.com/adnanhd/torchutils.git@v1.2
