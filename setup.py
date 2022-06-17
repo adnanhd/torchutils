@@ -11,7 +11,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='torchutils',
-    version='1.3.0',
+    version='1.3.1',
     description=long_description,
     author=__author__,
     author_email=__email__,
