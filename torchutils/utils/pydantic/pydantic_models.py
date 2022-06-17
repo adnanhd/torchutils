@@ -5,10 +5,10 @@ import warnings
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from torchutils.metrics import MetricHandler
-from torchutils.utils.tracker import SingleScoreTracker, DataFrameRunHistory
+from torchutils.metrics import MetricHandler, AverageMeter
 from collections import defaultdict
 from typing import Optional, Dict, Union, Any, List, Iterable
+import typing
 import torch.optim as optimizers
 from .pydantic_types import (
     # NpScalarType,
@@ -203,10 +203,6 @@ class TrainerStatus(pydantic.BaseModel):
 
 
 class CurrentIterationStatus(pydantic.BaseModel):
-    _score_history: DataFrameRunHistory = pydantic.PrivateAttr(
-        default_factory=DataFrameRunHistory)
-    _score_tracker: Dict[str, SingleScoreTracker] = pydantic.PrivateAttr(
-        default=defaultdict(SingleScoreTracker))
     _metric_handler: MetricHandler = pydantic.PrivateAttr()
     _x: Optional[NpTorchType] = pydantic.PrivateAttr(None)
     _y_true: Optional[NpTorchType] = pydantic.PrivateAttr(None)
@@ -216,8 +212,6 @@ class CurrentIterationStatus(pydantic.BaseModel):
     def __init__(self, handler: MetricHandler):
         super().__init__()
         self._metric_handler = handler
-        self._score_tracker: Dict[str, SingleScoreTracker]
-        self._score_history: DataFrameRunHistory
 
     @property
     def x(self):
@@ -231,73 +225,44 @@ class CurrentIterationStatus(pydantic.BaseModel):
     def y_true(self):
         return self._y_true
 
-    def set_score_names(self, *score_names: str):
-        self._score_history.set_score_names(score_names)
-        self._score_tracker.clear()
-        for score_name in score_names:
-            self._score_tracker[score_name].reset()
-
-    def reset_score_values(self):
-        self._score_history.reset_scores()
-        for score_tracker in self._score_tracker.values():
-            score_tracker.reset()
-
     def get_score_names(self):
         return self._metric_handler.get_score_names()
 
-    # on step end
     def set_current_scores(self, x, y_true, y_pred):
-        # set current iteration input and outputs
+        """ Sets the current step input and outputs and calls score groups """
         self._x = x
         self._y_true = y_true
         self._y_pred = y_pred
         self._at_epoch_end = False
+        self._metric_handler.run_score_groups(x, y_true, y_pred)
 
-        # set and get current the score values of the current iteration
-        self._metric_handler.set_scores_values(x, y_true, y_pred)
-        current_scores = self._metric_handler.get_score_values()
-
-        # load current scores to score tracker
-        for score_name, score_value in current_scores.items():
-            self._score_tracker[score_name].update(score_value)
-
-    # on epoch end
-    def average_scores(self):
+    def average_current_scores(self):
+        """ Pushes the scores values of the current epoch to the history
+        in the metric handler and clears the score values of the all steps
+        in the latest epoch in the metric handler """
         self._at_epoch_end = True
-        for score_name, score_tracker in self._score_tracker.items():
-            self._score_history.set_latest_score(
-                score_name, score_tracker.average)
-            score_tracker.reset()
-        self._score_history._increment_epoch()
+        self._metric_handler.push_score_values()
+        self._metric_handler.reset_score_values()
 
-    def _get_current_scores(self,
-                            score_names: Iterable[str]
-                            ) -> Dict[str, float]:
-        return self._metric_handler.get_score_values(*score_names)
-
-    def _get_averaged_scores(self,
-                             score_names: Iterable[str]
-                             ) -> Dict[str, float]:
+    def get_current_scores(self, *score_names: str
+                           ) -> Dict[str, float]:
+        """ Returns the latest step or epoch values, depending on
+        whether it has finished itereting over the current epoch or not """
         if len(score_names) == 0:
-            score_names = self.get_score_names()
-        return {score_name: self._score_history.get_latest_score(score_name)
-                for score_name in score_names}
-
-    def get_latest_scores(self,
-                          *score_names: str
-                          ) -> Dict[str, float]:
+            score_names = self._metric_handler.get_score_names()
         if self._at_epoch_end:
-            return self._get_averaged_scores(score_names)
+            return self._metric_handler.seek_score_history(*score_names)
         else:
-            return self._get_current_scores(score_names)
+            return self._metric_handler.get_score_values(*score_names)
 
-    def get_score_history(self, *score_names):
+    def get_score_history(
+            self,
+            *score_names: str
+    ) -> typing.Dict[str, typing.List[float]]:
+        """ Returns the all epoch values with given score names """
         if len(score_names) == 0:
             score_names = self.get_score_names()
-        return {
-            score_name: self._score_history.get_score_values(score_name)
-            for score_name in score_names
-        }
+        return self._metric_handler.get_score_history(*score_names)
 
 
 class HandlerArguments(pydantic.BaseModel):

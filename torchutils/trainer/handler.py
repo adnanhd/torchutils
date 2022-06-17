@@ -1,9 +1,10 @@
 # Import Handlers
-from torchutils.metrics import MetricHandler
-from torchutils.logging import LoggingHandler
-from torchutils.callbacks import CallbackHandler
+from torchutils.metrics import MetricHandler, AverageMeter
+from torchutils.logging import LoggingHandler, TrainerLogger
+from torchutils.callbacks import CallbackHandler, TrainerCallback
 
 from typing import Union, Optional, List
+import typing
 
 # Import Arguments
 from torchutils.utils.pydantic import (
@@ -64,42 +65,41 @@ class TrainerHandler():
 
     def compile(
             self,
-            loggers=list(),
-            metrics=list(),
-            callbacks=list(),
+            loggers: typing.Iterable[TrainerLogger] = list(),
+            metrics: typing.Iterable[AverageMeter] = list(),
+            callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
         self._loggers.add_loggers(loggers)
-        self._metrics._add_scores(metrics)
+        self._metrics.add_score_meters(*metrics)
         self._callbacks.add_callbacks(callbacks)
-        score_names = self._metrics.get_score_names()
-        self.iter_status.set_score_names(*score_names)
-        # self._valid_res.set_score_names(*score_names)
+        # score_names = self._metrics.get_score_names()
+        # self.iter_status.set_score_names(*score_names)
 
     def decompile(
             self,
-            loggers=list(),
-            metrics=list(),
-            callbacks=list(),
+            loggers: typing.Iterable[TrainerLogger] = list(),
+            metrics: typing.Iterable[AverageMeter] = list(),
+            callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
         self._loggers.remove_logger(loggers)
-        self._metrics._remove_scores(metrics)
+        self._metrics.remove_score_meters(*metrics)
         self._callbacks.remove_callbacks(callbacks)
         score_names = self._metrics.get_score_names()
         # TODO: remove *sign
         self.iter_status.set_score_names(*score_names)
-        # self._valid_res.set_score_names(*score_names)
 
     def clear(self):
         self._loggers.clear_loggers()
         self._callbacks.clear_callbacks()
-        self._metrics.clear_scores()
+        score_names = self._metrics.get_score_names()
+        self._metrics.remove_score_meters(*score_names)
         self.iter_status.set_score_names()
 
     def on_initialization(self):
         self._loggers.initialize(self.arguments)
         self._callbacks.on_initialization(self.arguments)
-        self.iter_status.reset_score_values()
-        # self._valid_res.reset_score_values()
+        self._metrics.init_score_history()
+        self._metrics.reset_score_values()
 
     def on_training_begin(self):
         self._loggers.model(self.arguments.model)
@@ -113,14 +113,13 @@ class TrainerHandler():
 
     def on_training_step_end(self, x, y, y_pred):
         self.iter_status.set_current_scores(x, y_true=y, y_pred=y_pred)
-        scores = self._metrics.get_score_values()
         self._callbacks.on_training_step_end(self.iter_status)
-        # TODO: remove this, apply it via callbacks
-        self._loggers.score(**scores)
+        self._loggers.score(**self._metrics.get_score_values())
 
     def on_training_epoch_end(self):
-        self.iter_status.average_scores()
+        self.iter_status.average_current_scores()
         self._callbacks.on_training_epoch_end(self.iter_status)
+        self._loggers.score(**self._metrics.seek_score_history())
 
     def on_training_end(self):
         self._callbacks.on_training_end(self.status)
@@ -134,10 +133,12 @@ class TrainerHandler():
     def on_validation_step_end(self, x, y, y_pred):
         self.iter_status.set_current_scores(x=x, y_true=y, y_pred=y_pred)
         self._callbacks.on_validation_step_end(self.iter_status)
+        self._loggers.score(**self._metrics.get_score_values())
 
     def on_validation_run_end(self):
-        self.iter_status.average_scores()
+        self.iter_status.average_current_scores()
         self._callbacks.on_validation_run_end(self.iter_status)
+        self._loggers.score(**self._metrics.seek_score_history())
 
     def on_evaluation_run_begin(self):
         self._callbacks.on_evaluation_run_begin(self.status)
@@ -148,10 +149,12 @@ class TrainerHandler():
     def on_evaluation_step_end(self, x, y, y_pred):
         self.iter_status.set_current_scores(x=x, y_true=y, y_pred=y_pred)
         self._callbacks.on_evaluation_step_end(self.iter_status)
+        self._loggers.score(**self._metrics.get_score_values())
 
     def on_evaluation_run_end(self):
-        self.iter_status.average_scores()
+        self.iter_status.average_current_scores()
         self._callbacks.on_evaluation_run_end(self.iter_status)
+        self._loggers.score(**self._metrics.seek_score_history())
 
     def on_stop_training_error(self):
         self._callbacks.on_stop_training_error(self.status)

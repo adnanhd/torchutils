@@ -10,8 +10,7 @@ from torchutils.callbacks import (
 
 import warnings
 from .handler import TrainerHandler
-from torchutils.metrics import MetricHandler
-from .loss import LossTracker
+from torchutils.metrics import MetricHandler, AverageMeter
 from torchutils.utils import Version
 from torchutils.utils.pydantic import (
     TrainerModel,
@@ -58,8 +57,9 @@ class Trainer:
 
         self._handler = TrainerHandler(
             model=self._model, status_ptr=[TrainerStatus()])
-        self._loss_tracker: LossTracker = MetricHandler \
-            .get_metric_instance('LossTracker')
+
+        self._loss_tracker = AverageMeter('Loss')
+        self._handler._metrics.add_score_meters(self._loss_tracker)
 
     @property
     def status(self) -> TrainerStatus:
@@ -196,6 +196,132 @@ class Trainer:
         finally:
             self._handler.on_termination()
 
-    from .train import _run_training
-    from .valid import _run_validating
-    from .eval import _run_evaluating
+    def _run_training(
+        self,
+        trainer_arguments: TrainingArguments,
+        train_loader: torch.utils.data.DataLoader,
+        valid_loader: Optional[torch.utils.data.DataLoader] = None,
+    ):
+        self._handler.on_training_begin()
+
+        for epoch in range(trainer_arguments.resume_epochs,
+                           trainer_arguments.num_epochs):
+            self._handler.arguments.update_status(epoch=epoch)
+            self._run_training_epoch(trainer_arguments,
+                                     train_loader, valid_loader)
+
+        self._handler.on_training_end()
+        self._handler.arguments.reset_status()
+        return self._handler.iter_status.get_score_history()
+
+    def _run_training_epoch(
+        self,
+        trainer_arguments: TrainingArguments,
+        train_loader: torch.utils.data.DataLoader,
+        valid_loader: Optional[torch.utils.data.DataLoader] = None,
+    ) -> torch.Tensor:
+        self._handler.on_training_epoch_begin()
+        self._model.train()
+
+        for batch, (features, y_truth) in enumerate(train_loader):
+            self._handler.arguments.update_status(batch=batch)
+            self._run_training_step(
+                x=features.to(device=self.device, dtype=self.xtype),
+                y=y_truth.to(device=self.device, dtype=self.ytype),
+            )
+
+        self._handler.on_training_epoch_end()
+        # TODO: self.status.current_epoch returns None here
+        # This works: self._handler.arguments.status.current_batch
+        # This fails: self.status.current_batch
+        current_epoch = self._handler.arguments.status.current_epoch
+        if valid_loader is not None and (current_epoch + 1) % \
+                trainer_arguments.num_epochs_per_validation == 0:
+            self._run_validating(valid_loader)
+
+    def _run_training_step(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+    ) -> torch.Tensor:
+        self._handler.on_training_step_begin()
+
+        y_pred, loss = self._model.attached_step(
+            x=x, y=y, batch_idx=self.status.current_batch)
+        self._loss_tracker.update(loss.detach().item())
+
+        with torch.no_grad():
+            self._handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
+
+        return y_pred.detach()
+
+    def _run_evaluating(
+        self,
+        # trainer_arguments: TrainingArguments,
+        eval_loader: Optional[torch.utils.data.DataLoader],
+    ) -> torch.Tensor:
+
+        self._handler.on_evaluation_run_begin()
+        self._model.eval()
+
+        preds = []
+        with torch.no_grad():
+            for batch, (features, y_truth) in enumerate(eval_loader):
+                pred = self._run_evaluating_step(
+                    x=features.to(device=self.device, dtype=self.xtype),
+                    y=y_truth.to(device=self.device, dtype=self.ytype),
+                )
+                preds.extend(pred)
+
+        self._handler.on_evaluation_run_end()
+        return preds
+
+    def _run_evaluating_step(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+    ) -> torch.Tensor:
+        self._handler.on_evaluation_step_begin()
+
+        y_pred, loss = self._model.detached_step(
+            x=x, y=y, batch_idx=self.status.current_batch
+        )
+        self._loss_tracker.update(loss.detach().item())
+
+        self._handler.on_evaluation_step_end(x=x, y=y, y_pred=y_pred)
+
+        return y_pred.detach()
+
+    def _run_validating(
+        self,
+        # trainer_arguments: TrainingArguments,
+        valid_loader: Optional[torch.utils.data.DataLoader],
+    ) -> torch.Tensor:
+
+        self._handler.on_validation_run_begin()
+        self._model.eval()
+
+        with torch.no_grad():
+            for batch, (features, y_truth) in enumerate(valid_loader):
+                self._run_validating_step(
+                    x=features.to(device=self.device, dtype=self.xtype),
+                    y=y_truth.to(device=self.device, dtype=self.ytype),
+                )
+
+        self._handler.on_validation_run_end()
+
+    def _run_validating_step(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+    ) -> torch.Tensor:
+        self._handler.on_validation_step_begin()
+
+        y_pred, loss = self._model.detached_step(
+            x=x, y=y, batch_idx=self.status.current_batch
+        )
+        self._loss_tracker.update(loss.detach().item())
+
+        self._handler.on_validation_step_end(x=x, y=y, y_pred=y_pred)
+
+        return y_pred.detach()

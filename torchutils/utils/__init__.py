@@ -6,14 +6,13 @@ from .mthdutils import hybridmethod
 from .decorators import verbose, profile
 from .config import INIObject
 from .hash import Hashable
-from .tracker import ScoreTracker
 
 
 import torchutils.utils.config
-#import torchutils.data.utils.preprocessing
+# import torchutils.data.utils.preprocessing
 import numpy as np
 import torch
-#from torchutils.data.dtypes import NpScalarType, NpTorchType
+# from torchutils.data.dtypes import NpScalarType, NpTorchType
 
 string_to_types = {
     'string': str, 'str': str,
@@ -44,5 +43,6 @@ string_to_types = {
 
 types_to_string = {t: s for s, t in string_to_types.items()}
 
+# TODO: remove this old api
 _str2types = string_to_types
 _types2str = types_to_string
