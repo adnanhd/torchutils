@@ -124,7 +124,7 @@ class Trainer:
     ) -> None:
         if device is not None:
             self._model.device = device
-        self._model.compile(model, optim, loss, sched)
+        self._model.compile(model, loss, optim, sched)
         self._handler.compile(loggers, metrics, callbacks)
 
     def train(
@@ -249,7 +249,9 @@ class Trainer:
 
         self._model.optimizer_zero_grad()
         y_pred, loss = self._model.forward_pass(
-            x=x, y=y, batch_idx=self.status.current_batch)
+            x=x, y=y,
+            batch_idx=self.status.current_batch
+        )
         self._loss_tracker.update(loss.detach().item())
         loss.backward()
         self._model.optimizer_step()
