@@ -8,7 +8,6 @@ from torch.optim.lr_scheduler import _LRScheduler
 from torchutils.metrics import MetricHandler, AverageMeter
 import torchsummary
 from collections import defaultdict
-from typing import Optional, Dict, Union, Any, List, Iterable
 import typing
 import torch.optim as optimizers
 from .pydantic_types import (
@@ -19,6 +18,7 @@ from .pydantic_types import (
     OptimizerType,
     SchedulerType,
     DataLoaderType,
+    FunctionType,
     # DatasetType
 )
 from torchutils.utils import (
@@ -31,17 +31,21 @@ from torchutils.utils import (
 
 class TrainerModelBuilder(pydantic.BaseModel):
     model: ModuleType
-    critr: str
-    optim: str
-    sched: Optional[str]
-    _criterion_kwargs: Optional[typing.Dict] = pydantic.PrivateAttr({})
-    _optimizer_kwargs: Optional[typing.Dict] = pydantic.PrivateAttr({})
-    _scheduler_kwargs: Optional[typing.Dict] = pydantic.PrivateAttr({})
+    critr: typing.Union[str, ModuleType, FunctionType]
+    optim: typing.Union[str, OptimizerType]
+    sched: typing.Optional[typing.Union[str, SchedulerType]]
+    _criterion_kwargs: typing.Optional[typing.Dict] = pydantic.PrivateAttr({})
+    _optimizer_kwargs: typing.Optional[typing.Dict] = pydantic.PrivateAttr({})
+    _scheduler_kwargs: typing.Optional[typing.Dict] = pydantic.PrivateAttr({})
 
     @pydantic.validator('critr')
     @classmethod
-    def validate_criterion(cls, criterion) -> str:
-        if criterion not in string_to_criterion_class \
+    def validate_criterion(
+        cls, criterion: typing.Any
+    ) -> typing.Union[str, Module, callable]:
+        if isinstance(criterion, Module) or callable(criterion):
+            return criterion
+        elif criterion not in string_to_criterion_class \
                 and criterion not in string_to_functionals:
             raise ValueError(
                 f"{criterion} is not valid criterion class name"
@@ -51,34 +55,48 @@ class TrainerModelBuilder(pydantic.BaseModel):
 
     @pydantic.validator('optim')
     @classmethod
-    def validate_optimizer(cls, optimizer) -> str:
-        if optimizer not in string_to_optimizer_class:
+    def validate_optimizer(
+        cls, optimizer: typing.Any
+    ) -> typing.Union[str, Optimizer]:
+        if isinstance(optimizer, Optimizer):
+            return optimizer
+        elif optimizer not in string_to_optimizer_class:
             raise ValueError(f"{optimizer} is not valid optimizer class name")
         else:
             return optimizer
 
     @pydantic.validator('sched')
     @classmethod
-    def validate_scheduler(cls, scheduler) -> str:
-        if scheduler not in string_to_scheduler_class:
+    def validate_scheduler(
+            cls, scheduler: typing.Any
+    ) -> typing.Union[str, _LRScheduler]:
+        if isinstance(scheduler, _LRScheduler):
+            return scheduler
+        elif scheduler not in string_to_scheduler_class:
             raise ValueError(f"{scheduler} is not valid scheduler class name")
         else:
             return scheduler
 
     def configure_optimizer(self, lr: float, **kwargs) -> Optimizer:
-        optimizer_class = string_to_optimizer_class[self.optim]
-        return optimizer_class(self.model.parameters(), lr=lr, **kwargs)
+        if isinstance(self.optim, str):
+            optimizer_class = string_to_optimizer_class[self.optim]
+            return optimizer_class(self.model.parameters(), lr=lr, **kwargs)
+        else:
+            return self.optim
 
-    def configure_scheduler(self, **kwargs) -> Optional[_LRScheduler]:
-        if self.sched is not None:
+    def configure_scheduler(self, **kwargs) -> typing.Optional[_LRScheduler]:
+        if isinstance(self.sched, str):
             scheduler_class = string_to_scheduler_class[self.sched]
             return scheduler_class(self._optimizer, **kwargs)
         else:
-            return None
+            return self.sched
 
     def configure_criterion(self, **kwargs) -> Module:
-        criterion_class = string_to_criterion_class[self.critr]
-        return criterion_class(**kwargs)
+        if isinstance(self.critr, str):
+            criterion_class = string_to_criterion_class[self.critr]
+            return criterion_class(**kwargs)
+        else:
+            return self.critr
 
     def set_criterion_arguments(self, **kwargs):
         self._criterion_kwargs.update(kwargs)
@@ -109,9 +127,9 @@ class TrainerModelBuilder(pydantic.BaseModel):
 
 class TrainerModel(pydantic.BaseModel):
     model: ModuleType
-    criterion: Union[ModuleType, typing.Callable]
-    optimizer = OptimizerType
-    scheduler = Optional[SchedulerType]
+    criterion: typing.Union[ModuleType, FunctionType]
+    optimizer: OptimizerType
+    scheduler: typing.Optional[SchedulerType]
 
     def __setattr__(self, key, value):
         if key == 'device':
@@ -140,7 +158,10 @@ class TrainerModel(pydantic.BaseModel):
         else:
             return {'model', 'optimizer', 'scheduler'}
 
-    def save_into_checkpoint(self, path, **state):
+    def save_into_checkpoint(self,
+                             path: str,
+                             halt_condition: typing.Callable[[dict], bool] = None,
+                             **state) -> None:
         dirpath = os.path.split(path)[0]
         if dirpath != '':
             os.makedirs(dirpath, exist_ok=True)
@@ -155,10 +176,18 @@ class TrainerModel(pydantic.BaseModel):
                     f"{key} has no state_dict() attribute.", RuntimeWarning
                 )
         # TODO: add version stamping before here
-        torch.save(state, path)
+        if halt_condition is None or not halt_condition(state):
+            torch.save(state, path)
 
-    def load_from_checkpoint(self, path: str) -> Dict[str, "torch.Tensor"]:
+    def load_from_checkpoint(
+            self,
+            path: str,
+            halt_condition: typing.Callable[[dict], bool] = None
+    ) -> typing.Dict[str, "torch.Tensor"]:
         checkpoint = torch.load(path, map_location=self.device)
+        if halt_condition is not None and halt_condition(checkpoint):
+            return checkpoint
+
         for key in self._get_attr_names():
             module = getattr(self, key)
             if module is None or key not in checkpoint:
@@ -204,6 +233,21 @@ class TrainerModel(pydantic.BaseModel):
         y_pred = self.model(x)
         loss = self.criterion(y_pred, y)
         return y_pred, loss
+
+    def compile(
+            self,
+            model: Module = None,
+            loss: typing.Union[Module, callable] = None,
+            optimizer: Optimizer = None,
+            scheduler: _LRScheduler = None):
+        if model is not None:
+            self.model = model
+        if loss is not None:
+            self.criterion = loss
+        if optimizer is not None:
+            self.optimizer = optimizer
+        if scheduler is not None:
+            self.scheduler = scheduler
 
 
 class TrainingArguments(pydantic.BaseModel):
@@ -260,9 +304,9 @@ class TrainerStatus(pydantic.BaseModel):
 
 class CurrentIterationStatus(pydantic.BaseModel):
     _metric_handler: MetricHandler = pydantic.PrivateAttr()
-    _x: Optional[NpTorchType] = pydantic.PrivateAttr(None)
-    _y_true: Optional[NpTorchType] = pydantic.PrivateAttr(None)
-    _y_pred: Optional[NpTorchType] = pydantic.PrivateAttr(None)
+    _x: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
+    _y_true: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
+    _y_pred: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
     _at_epoch_end: bool = pydantic.PrivateAttr(False)
 
     def __init__(self, handler: MetricHandler):
@@ -301,7 +345,7 @@ class CurrentIterationStatus(pydantic.BaseModel):
         self._metric_handler.reset_score_values()
 
     def get_current_scores(self, *score_names: str
-                           ) -> Dict[str, float]:
+                           ) -> typing.Dict[str, float]:
         """ Returns the latest step or epoch values, depending on
         whether it has finished itereting over the current epoch or not """
         if len(score_names) == 0:
@@ -322,12 +366,12 @@ class CurrentIterationStatus(pydantic.BaseModel):
 
 
 class HandlerArguments(pydantic.BaseModel):
-    args: Union[TrainingArguments, EvaluatingArguments] = None
+    args: typing.Union[TrainingArguments, EvaluatingArguments] = None
     model: TrainerModel
-    status_ptr: List[TrainerStatus]
-    train_dl: Optional[TrainerDataLoader] = None
-    valid_dl: Optional[TrainerDataLoader] = None
-    eval_dl: Optional[TrainerDataLoader] = None
+    status_ptr: typing.List[TrainerStatus]
+    train_dl: typing.Optional[TrainerDataLoader] = None
+    valid_dl: typing.Optional[TrainerDataLoader] = None
+    eval_dl: typing.Optional[TrainerDataLoader] = None
 
     @property
     def status(self):
@@ -351,8 +395,11 @@ class HandlerArguments(pydantic.BaseModel):
             self.__config__.allow_mutation = False
 
             def arguments_setter_callback(
-                    new_args: Union[TrainingArguments, EvaluatingArguments],
-                    dataloaders: Dict[str, Optional[TrainerDataLoader]] = dict()):
+                    new_args: typing.Union[TrainingArguments,
+                                           EvaluatingArguments],
+                    dataloaders: typing.Dict[str,
+                                             typing.Optional[TrainerDataLoader]
+                                             ] = dict()):
                 self.__config__.allow_mutation = True
                 self.args = new_args
                 for dl_name in ('train_dl', 'valid_dl', 'eval_dl'):
@@ -365,6 +412,7 @@ class HandlerArguments(pydantic.BaseModel):
         raise LookupError("HandlerArguments has been locked already.")
 
     @pydantic.validator('train_dl', 'valid_dl', 'eval_dl')
+    @classmethod
     def validate_dataloaders(cls, field_type):
         if isinstance(field_type, TrainerDataLoader):
             return field_type

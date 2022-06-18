@@ -83,5 +83,3 @@ _str2types = {
     'np.uint32': np.uint32,
     'np.uint64': np.uint64,
 }
-
-_types2str = reverse_dict(_str2types)

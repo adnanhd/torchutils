@@ -82,6 +82,10 @@
 	- Add string\_to\_{criterion,scheduler,optimizer}\_class dictionaries in `trainer/utils/mappings.py`
 	- Create TrainerModelBuilder from TrainerModel allowing saving and loading hyperparameters as well as fetching from mappings.py
 
+- **v1.3.1b**: ModelCheckpoint
+	- Fix bugs in ModelCheckpoint
+	- Add conditional save feature to ModelCheckpoint
+
 ## Planned TODOs
 - [ ] Update `torchutils/trainer/handler.py:TrainerHandler` compile and decompile parameters
 - [ ] Fix logging bugs in `torchutils/callbacks/progress_bar.py:ProgressBar` 

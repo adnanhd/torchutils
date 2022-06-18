@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import torchutils.utils.pydantic
 from .version_v2 import Version
 from .fnctutils import overload
 from .mthdutils import hybridmethod
@@ -12,7 +11,7 @@ from .mappings import (
     string_to_scheduler_class,
     string_to_functionals,
     string_to_types,
-    _str2types, _types2str
+    _str2types
 )
 
 
@@ -26,3 +25,4 @@ criterion_class_to_string = reverse_dict(string_to_criterion_class)
 optimizer_class_to_string = reverse_dict(string_to_optimizer_class)
 scheduler_class_to_string = reverse_dict(string_to_scheduler_class)
 functionals_to_string = reverse_dict(string_to_functionals)
+_types2str = reverse_dict(_str2types)
