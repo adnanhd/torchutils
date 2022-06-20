@@ -33,6 +33,7 @@ string_to_scheduler_class = {
     if hasattr(scheduler_class, 'mro')
     and sched._LRScheduler in scheduler_class.mro()
     and scheduler_class is not sched._LRScheduler
+    or scheduler_class is sched.ReduceLROnPlateau
 }
 
 # initialize default types
