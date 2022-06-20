@@ -63,9 +63,9 @@ class ModelCheckpoint(TrainerCallback):
                  verbose: bool = False,
                  load_back_per_epochs: int = 0,
                  init_from_checkpoint: bool = False,
-                 halt_into_checkpoint: bool = True,
+                 halt_into_checkpoint: bool = False,
                  save_only_best_model: bool = True,
-                 eval_with_best_model: bool = True,
+                 eval_with_best_model: bool = False,
                  ):
         self.monitor: str = monitor
         self.model: TrainerModel = trainer_model

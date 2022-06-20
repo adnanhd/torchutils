@@ -1,20 +1,18 @@
 import pydantic
 import torch
-import os
+import inspect
 import warnings
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from torchutils.metrics import MetricHandler, AverageMeter
+from torchutils.metrics import MetricHandler
 import torchsummary
 from collections import OrderedDict
 import typing
-import torch.optim as optimizers
 from .pydantic_types import (
     # NpScalarType,
     NpTorchType,
     ModuleType,
-    LossType,
     OptimizerType,
     SchedulerType,
     DataLoaderType,
@@ -29,107 +27,69 @@ from torchutils.utils import (
 )
 
 
-class TrainerModelBuilder(pydantic.BaseModel):
-    model: ModuleType
-    critr: typing.Union[str, ModuleType, FunctionType]
-    optim: typing.Union[str, OptimizerType]
-    sched: typing.Optional[typing.Union[str, SchedulerType]]
-    _criterion_kwargs: typing.Optional[typing.Dict] = pydantic.PrivateAttr({})
-    _optimizer_kwargs: typing.Optional[typing.Dict] = pydantic.PrivateAttr({})
-    _scheduler_kwargs: typing.Optional[typing.Dict] = pydantic.PrivateAttr({})
-
-    @pydantic.validator('critr')
-    @classmethod
-    def validate_criterion(
-        cls, criterion: typing.Any
-    ) -> typing.Union[str, Module, callable]:
-        if isinstance(criterion, Module) or callable(criterion):
-            return criterion
-        elif criterion not in string_to_criterion_class \
-                and criterion not in string_to_functionals:
-            raise ValueError(
-                f"{criterion} is not valid criterion class name"
-            )
-        else:
-            return criterion
-
-    @pydantic.validator('optim')
-    @classmethod
-    def validate_optimizer(
-        cls, optimizer: typing.Any
-    ) -> typing.Union[str, Optimizer]:
-        if isinstance(optimizer, Optimizer):
-            return optimizer
-        elif optimizer not in string_to_optimizer_class:
-            raise ValueError(f"{optimizer} is not valid optimizer class name")
-        else:
-            return optimizer
-
-    @pydantic.validator('sched')
-    @classmethod
-    def validate_scheduler(
-            cls, scheduler: typing.Any
-    ) -> typing.Union[str, _LRScheduler]:
-        if isinstance(scheduler, _LRScheduler):
-            return scheduler
-        elif scheduler not in string_to_scheduler_class:
-            raise ValueError(f"{scheduler} is not valid scheduler class name")
-        else:
-            return scheduler
-
-    def configure_optimizer(self, lr: float, **kwargs) -> Optimizer:
-        if isinstance(self.optim, str):
-            optimizer_class = string_to_optimizer_class[self.optim]
-            return optimizer_class(self.model.parameters(), lr=lr, **kwargs)
-        else:
-            return self.optim
-
-    def configure_scheduler(self, **kwargs) -> typing.Optional[_LRScheduler]:
-        if isinstance(self.sched, str):
-            scheduler_class = string_to_scheduler_class[self.sched]
-            return scheduler_class(self.optimizer, **kwargs)
-        else:
-            return self.sched
-
-    def configure_criterion(self, **kwargs) -> Module:
-        if isinstance(self.critr, str):
-            criterion_class = string_to_criterion_class[self.critr]
-            return criterion_class(**kwargs)
-        else:
-            return self.critr
-
-    def set_criterion_arguments(self, **kwargs):
-        self._criterion_kwargs.update(kwargs)
-
-    def set_optimizer_arguments(self, **kwargs):
-        self._optimizer_kwargs.update(kwargs)
-
-    def set_scheduler_arguments(self, **kwargs):
-        self._scheduler_kwargs.update(kwargs)
-
-    def reset_criterion_arguments(self):
-        self._criterion_kwargs.clear()
-
-    def reset_optimizer_arguments(self):
-        self._optimizer_kwargs.clear()
-
-    def reset_scheduler_arguments(self):
-        self._scheduler_kwargs.clear()
-
-    def compile(self, lr: float):
-        return TrainerModel(
-            model=self.model,
-            criterion=self.configure_criterion(**self._criterion_kwargs),
-            optimizer=self.configure_optimizer(lr, **self._optimizer_kwargs),
-            scheduler=self.configure_scheduler(**self._scheduler_kwargs)
-        )
-
-
 class TrainerModel(pydantic.BaseModel):
     model: ModuleType
     criterion: typing.Union[ModuleType, FunctionType]
     optimizer: OptimizerType
     scheduler: typing.Optional[SchedulerType]
+
+    def __init__(
+        self,
+        model: Module,
+        criterion: typing.Union[str, Module,
+                                typing.Callable[[NpTorchType, NpTorchType],
+                                                NpTorchType]],
+        optimizer: typing.Union[str, Optimizer],
+        scheduler: typing.Union[str, _LRScheduler, None] = None,
+        ** kwargs,
+    ):
+        def obtain_registered_kwargs(fn: typing.Callable,
+                                     kwargs: typing.Dict[str, typing.Any]):
+            return dict(
+                filter(
+                    lambda item: item[0] in inspect.signature(
+                        fn).parameters.keys(),
+                    kwargs.items()
+                )
+            )
+
+        if isinstance(criterion, str):
+            if criterion in string_to_criterion_class:
+                criterion_class = string_to_criterion_class[criterion]
+            elif criterion in string_to_functionals:
+                criterion_class = string_to_functionals[criterion]
+            else:
+                raise KeyError(
+                    f"{criterion} is not a registered function or Module"
+                )
+            criterion_params = obtain_registered_kwargs(
+                criterion_class, kwargs)
+            criterion = criterion_class(**criterion_params)
+
+        if isinstance(optimizer, str):
+            if optimizer in string_to_optimizer_class:
+                optimizer = string_to_optimizer_class[optimizer]
+                params = obtain_registered_kwargs(optimizer, kwargs)
+                optimizer = optimizer(model.parameters(), **params)
+            else:
+                raise KeyError(
+                    f"{optimizer} is not a registered Optimizer"
+                )
+
+        if isinstance(scheduler, str):
+            if scheduler in string_to_scheduler_class:
+                scheduler = string_to_scheduler_class[scheduler]
+                params = obtain_registered_kwargs(scheduler, kwargs)
+                scheduler = scheduler(optimizer, **params)
+            else:
+                raise KeyError(
+                    f"{scheduler} is not a registered Scheduler"
+                )
+
+        super(TrainerModel, self).__init__(model=model,
+                                           criterion=criterion,
+                                           optimizer=optimizer,
+                                           scheduler=scheduler)
 
     def __setattr__(self, key, value):
         if key == 'device':
@@ -138,6 +98,9 @@ class TrainerModel(pydantic.BaseModel):
         if key == 'dtype':
             self.model = self.model.to(dtype=value)
             return object.__setattr__(self.model, 'dtype', value)
+        if key == 'learning_rate':
+            self.optimizer.param_groups[0]['lr'] = value
+            return object.__setattr__(self.optimizer, 'lr', value)
         return super().__setattr__(key, value)
 
     @property
