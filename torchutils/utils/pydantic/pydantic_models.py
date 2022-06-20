@@ -7,7 +7,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchutils.metrics import MetricHandler, AverageMeter
 import torchsummary
-from collections import defaultdict
+from collections import OrderedDict
 import typing
 import torch.optim as optimizers
 from .pydantic_types import (
@@ -87,7 +87,7 @@ class TrainerModelBuilder(pydantic.BaseModel):
     def configure_scheduler(self, **kwargs) -> typing.Optional[_LRScheduler]:
         if isinstance(self.sched, str):
             scheduler_class = string_to_scheduler_class[self.sched]
-            return scheduler_class(self._optimizer, **kwargs)
+            return scheduler_class(self.optimizer, **kwargs)
         else:
             return self.sched
 
@@ -158,13 +158,8 @@ class TrainerModel(pydantic.BaseModel):
         else:
             return {'model', 'optimizer', 'scheduler'}
 
-    def save_into_checkpoint(self,
-                             path: str,
-                             halt_condition: typing.Callable[[dict], bool] = None,
-                             **state) -> None:
-        dirpath = os.path.split(path)[0]
-        if dirpath != '':
-            os.makedirs(dirpath, exist_ok=True)
+    def state_dict(self):
+        state = OrderedDict()
         for key in self._get_attr_names():
             module = self.__getattribute__(key)
             if module is None:
@@ -175,32 +170,23 @@ class TrainerModel(pydantic.BaseModel):
                 warnings.warn(
                     f"{key} has no state_dict() attribute.", RuntimeWarning
                 )
-        # TODO: add version stamping before here
-        if halt_condition is None or not halt_condition(state):
-            torch.save(state, path)
+        return state
 
-    def load_from_checkpoint(
+    def load_state_dict(
             self,
-            path: str,
-            halt_condition: typing.Callable[[dict], bool] = None
-    ) -> typing.Dict[str, "torch.Tensor"]:
-        checkpoint = torch.load(path, map_location=self.device)
-        if halt_condition is not None and halt_condition(checkpoint):
-            return checkpoint
-
+            state_dict: typing.Dict[str, "torch.Tensor"]) -> None:
         for key in self._get_attr_names():
             module = getattr(self, key)
-            if module is None or key not in checkpoint:
+            if module is None or key not in state_dict:
                 continue
             elif hasattr(module, 'load_state_dict'):
-                module.load_state_dict(checkpoint.pop(key))
+                module.load_state_dict(state_dict.pop(key))
             else:
                 warnings.warn(
-                    f"{key} exits in the checkpoint but that "
+                    f"{key} exits in the state_dict but that "
                     f"of {self.__qualname__} has no load_state_dict()"
                     "attribute.", RuntimeWarning
                 )
-        return checkpoint
 
     def summary(self, input_size, batch_size=-1) -> None:
         torchsummary.summary(
@@ -307,11 +293,21 @@ class CurrentIterationStatus(pydantic.BaseModel):
     _x: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
     _y_true: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
     _y_pred: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
+    _epoch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
+    _batch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
     _at_epoch_end: bool = pydantic.PrivateAttr(False)
 
     def __init__(self, handler: MetricHandler):
         super().__init__()
         self._metric_handler = handler
+
+    # @property
+    # def current_epoch(self):
+    #     return self._epoch_idx
+
+    # @property
+    # def current_batch(self):
+    #     return self._batch_idx
 
     @property
     def x(self):
@@ -328,21 +324,25 @@ class CurrentIterationStatus(pydantic.BaseModel):
     def get_score_names(self):
         return self._metric_handler.get_score_names()
 
-    def set_current_scores(self, x, y_true, y_pred):
+    # every step end
+    def set_current_scores(self, x, y_true, y_pred, batch_idx=None):
         """ Sets the current step input and outputs and calls score groups """
         self._x = x
         self._y_true = y_true
         self._y_pred = y_pred
         self._at_epoch_end = False
         self._metric_handler.run_score_groups(x, y_true, y_pred)
+        self._batch_idx = batch_idx
 
-    def average_current_scores(self):
+    # every epoch end
+    def average_current_scores(self, epoch_idx=None):
         """ Pushes the scores values of the current epoch to the history
         in the metric handler and clears the score values of the all steps
         in the latest epoch in the metric handler """
         self._at_epoch_end = True
         self._metric_handler.push_score_values()
         self._metric_handler.reset_score_values()
+        self._epoch_idx = epoch_idx
 
     def get_current_scores(self, *score_names: str
                            ) -> typing.Dict[str, float]:
