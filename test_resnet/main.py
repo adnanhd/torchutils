@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchutils.trainer import Trainer
 from torchutils.utils.pydantic import TrainerModel
-from torchutils.callbacks import ProgressBar
+from torchutils.callbacks import ProgressBar, ModelCheckpoint
 
 # Download ImageNet labels
 
@@ -69,7 +69,7 @@ model = TrainerModel(
 )
 trainer = Trainer(model=model, device='cuda', ytype=torch.long)
 pbar = ProgressBar()
-trainer.compile(callbacks=[pbar])
+trainer.compile(callbacks=[pbar, ModelCheckpoint()])
 # trainer.compile(metrics=['loss'])
 # trainer.compile(loggers=[pbar._step_bar])
 
