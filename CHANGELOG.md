@@ -22,6 +22,7 @@
 ### Trainer TODOs
 - [ ] Rename TrainerStatus -> TrainerProxy
 - [ ] Bypass TrainerHandler class if you like
+- [ ] Update `torchutils/trainer/handler.py:TrainerHandler` compile and decompile parameters
 
 ### Dataset TODOs
 - [ ] make it compatible with torchvision.datasets
@@ -86,12 +87,25 @@
 	- Fix bugs in ModelCheckpoint
 	- Add conditional save feature to ModelCheckpoint
 
-- **v1.3.1a**: TrainerModel
+- **v1.3.1c**: TrainerModel
 	- change TrainerModel api and method names
 	- Add string\_to\_{criterion,scheduler,optimizer}\_class dictionaries in `trainer/utils/mappings.py`
-	- Create TrainerModelBuilder from TrainerModel allowing saving and loading hyperparameters as well as fetching from mappings.py
+	- Create TrainerModelBuilder from TrainerModel allowing saving and loading hyperparameters as well as fetching from mappings.pytorch
+
+- **v1.3.2**: ModelCheckpoint and TrainerModel
+	- Depricate `load_form_checkpoint` and `save_into_checkpoint` methods from TrainerModel
+	- Add `load_form_checkpoint` and `save_into_checkpoint` methods to ModelCheckpoint
+	- Add `state_dict` and `load_state_dict` methods to ModelCheckpoint
+	- Update the architecture in ModelCheckpoint so that it directly saves and loads on memory
+	- Depricate TrainerModelBuilder and add its features to `TrainerModel.__init__`
+		- Fix bug when TrainerModelBuilder(sched='') param is not None on initialization
 
 ## Planned TODOs
-- [ ] Update `torchutils/trainer/handler.py:TrainerHandler` compile and decompile parameters
 - [ ] Fix logging bugs in `torchutils/callbacks/progress_bar.py:ProgressBar` 
 - [ ] Migrate classes in `torchutils/utils/pydantic/pydantic_models.py` to `torchutils/models`, `torchutils/data`, etc.
+- [ ] Add resume training feature
+- [ ] Make TrainerMetrics compatible with torchmetrics from pytorch lightning
+	- [ ] refactor ScoreHook to torchmetrics.metrics.Metric so that it becomes compatible
+- [ ] create forward pass and backward pass functions for Trainer Class so that overriding only forward pass function becomes enough
+- [ ] rename TrainerLogger -> LoggerInterface and LoggerHandler -> LoggerProxy
+- [ ] rename CurrentIterationStatus -> IterationProxy

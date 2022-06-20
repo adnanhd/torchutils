@@ -1,4 +1,5 @@
 #!/usr/bin/env python3.6
+import torch.nn as nn
 from .mlp import FeedForward
 from .cnn import Convolution, Encoder, Decoder
 from .autoencoders import AutoencoderCNN, AutoencoderMLP
@@ -13,5 +14,13 @@ def SurfaceMLP(li=70, l1=128, l2=512, lo=1000):
     return FeedForward(li, l1, l2, lo)
 
 
-__version__ = "1.0.0"
+class Reshape(nn.Module):
+    def __init__(self, *args):
+        super(Reshape, self).__init__()
+        self.shape = args
 
+    def forward(self, x):
+        return x.view(x.shape[0], *self.shape)
+
+
+__version__ = "1.0.0"
