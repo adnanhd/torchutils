@@ -100,12 +100,16 @@
 	- Depricate TrainerModelBuilder and add its features to `TrainerModel.__init__`
 		- Fix bug when TrainerModelBuilder(sched='') param is not None on initialization
 
+- **v1.4.0**: LoggerProxy and LoggerHandler
+	- Fix logging bugs in `torchutils/callbacks/progress_bar.py:ProgressBar` 
+	- rename TrainerLogger -> LoggerInterface and LoggerHandler -> LoggerProxy
+
 ## Planned TODOs
-- [ ] Fix logging bugs in `torchutils/callbacks/progress_bar.py:ProgressBar` 
 - [ ] Migrate classes in `torchutils/utils/pydantic/pydantic_models.py` to `torchutils/models`, `torchutils/data`, etc.
 - [ ] Add resume training feature
 - [ ] Make TrainerMetrics compatible with torchmetrics from pytorch lightning
 	- [ ] refactor ScoreHook to torchmetrics.metrics.Metric so that it becomes compatible
 - [ ] create forward pass and backward pass functions for Trainer Class so that overriding only forward pass function becomes enough
-- [ ] rename TrainerLogger -> LoggerInterface and LoggerHandler -> LoggerProxy
 - [ ] rename CurrentIterationStatus -> IterationProxy
+- [ ] Hide training and evaluating arguments so that they are set when public arguments are initialized
+	- e.g. setting train\_dl parameter makes train\_dl\_batch\_size to set len(train\_dl)

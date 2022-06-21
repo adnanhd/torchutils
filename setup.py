@@ -1,7 +1,13 @@
 from setuptools import setup
+from configparser import ConfigParser
+from torchutils import __version__
 
-__author__ = 'Adnan Harun Dogan'
-__email__ = 'adnanharundogan@gmail.com'
+cfg = ConfigParser()
+cfg.read('setup.cfg')
+
+__author__ = cfg.get('metadata', 'maintainer_name')
+__email__ = cfg.get('metadata', 'maintainer_email')
+__url__ = cfg.get('metadata', 'url')
 
 with open('README.md') as f:
     long_description = f.readlines()
@@ -10,8 +16,8 @@ with open('requirements.txt') as f:
     required_packages = f.readlines()
 
 setup(
-    name='torchutils',
-    version='1.3.2',
+    name=cfg.get('metadata', 'name'),
+    version=str(__version__),
     description=long_description,
     author=__author__,
     author_email=__email__,
