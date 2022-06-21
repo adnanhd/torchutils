@@ -1,10 +1,10 @@
-from .handler import LoggerHandler as LoggingHandler
-from .proxy import LoggingEvent, LoggingLevel
+from .utils import LoggingEvent
 from .base import TrainerLogger
+from .proxy import LoggerProxy
+from .handler import LoggerHandler
 from .tty import PrintWriter
 from .nop import NoneLogger
 
-import torchutils.logging.base
 import torchutils.logging.tty
 import torchutils.logging.pbar
 

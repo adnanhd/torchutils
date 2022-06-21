@@ -1,25 +1,26 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Optional, List, Any
+import abc
+import typing
 import argparse
+from .utils import LoggerMethodNotImplError, LoggingEvent
 
 
-class LoggerMethodNotImplError(Exception):
-    pass
-
-
-class TrainerLogger(ABC):
+class TrainerLogger(abc.ABC):
     """
     A callback which visualises the state of each training
     and evaluation epoch using a progress bar
     """
-    @abstractmethod
+    @abc.abstractclassmethod
+    def getLogger(self, event: LoggingEvent):
+        raise LoggerMethodNotImplError
+
+    @abc.abstractmethod
     def open(self):
         raise LoggerMethodNotImplError
 
-    @abstractmethod
+    @abc.abstractmethod
     def log_scores(self,
-                   scores: Dict[str, float],
-                   step: Optional[int] = None):
+                   scores: typing.Dict[str, float],
+                   step: typing.Optional[int] = None):
         raise LoggerMethodNotImplError
 
     def log_hyperparams(self,
@@ -30,13 +31,13 @@ class TrainerLogger(ABC):
 
     def log_table(self,
                   key: str,
-                  table: Dict[str, List[Any]]):
+                  table: typing.Dict[str, typing.List[typing.Any]]):
         raise LoggerMethodNotImplError
 
     def log_image(self,
                   key: str,
-                  Images: List[Any],
-                  step: Optional[int] = None):
+                  Images: typing.List[typing.Any],
+                  step: typing.Optional[int] = None):
         raise LoggerMethodNotImplError
 
     def log_string(self, msg):
@@ -45,6 +46,6 @@ class TrainerLogger(ABC):
     def log_module(self, module):
         raise LoggerMethodNotImplError
 
-    @abstractmethod
+    @abc.abstractmethod
     def close(self):
         raise LoggerMethodNotImplError

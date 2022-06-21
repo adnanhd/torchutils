@@ -1,24 +1,9 @@
 import warnings
 from typing import List, Dict, Optional, Any
-from enum import Enum
 import argparse
 from abc import ABC
-from .base import LoggerMethodNotImplError, TrainerLogger
-
-
-class LoggingEvent(Enum):
-    TRAINING_BATCH = 0
-    TRAINING_EPOCH = 1
-    VALIDATION_RUN = 2
-    EVALUATION_RUN = 3
-
-
-class LoggingLevel(Enum):
-    SCALAR = 'log_scalar'
-    HPARAM = 'log_hyperparams'
-    TABLE = 'log_table'
-    IMAGE = 'log_image'
-    STRING = 'log_string'
+from .base import TrainerLogger
+from .utils import LoggerMethodNotImplError, LoggingEvent
 
 
 def __foreach_logger__(mthd):
@@ -27,10 +12,9 @@ def __foreach_logger__(mthd):
                        event: Optional[LoggingEvent] = None,
                        **kwargs):
         assert isinstance(event, LoggingEvent) or event is None
-        # assert isinstance(level, LoggingLevel)
         if event is None:
             event = self._event
-        if self._logger_dict_.__len__() != 0:
+        if self.__loggers__[event].__len__() != 0:
             any_overwritten_method = False
             for logger in self.__loggers__[event]:
                 try:

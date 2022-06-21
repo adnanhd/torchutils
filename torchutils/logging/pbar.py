@@ -1,5 +1,5 @@
 from torchutils.utils.pydantic import HandlerArguments
-from torchutils.logging import TrainerLogger
+from torchutils.logging import TrainerLogger, LoggingEvent
 from collections import OrderedDict
 from typing import Dict, Optional
 from tqdm.autonotebook import tqdm
@@ -13,6 +13,23 @@ class ProgressBarLogger(TrainerLogger):
         self._logs = OrderedDict()
         self._args = kwargs.copy()
         self._pbar = None
+
+    @classmethod
+    def getLogger(self, event: LoggingEvent) -> TrainerLogger:
+        loggers = {
+            StepProgressBar: [LoggingEvent.TRAINING_BATCH],
+            EpochProgressBar: [LoggingEvent.TRAINING_EPOCH],
+            SampleProgressBar: [LoggingEvent.EVALUATION_RUN,
+                                LoggingEvent.VALIDATION_RUN]
+
+        }
+        loggers = {
+            LoggingEvent.TRAINING_BATCH: StepProgressBar,
+            LoggingEvent.TRAINING_EPOCH: EpochProgressBar,
+            LoggingEvent.EVALUATION_RUN: SampleProgressBar,
+            LoggingEvent.VALIDATION_RUN: SampleProgressBar
+        }
+        return loggers[event]()
 
     def open(self, total: int, args: HandlerArguments = None):
         if self._pbar is None:
@@ -47,7 +64,7 @@ class EpochProgressBar(ProgressBarLogger):
         super().__init__(**kwargs)
 
     def open(self, args: HandlerArguments):
-        super().open(total=args.args.num_epochs)
+        super().open(total=args.hparams.num_epochs)
 
 
 class StepProgressBar(ProgressBarLogger):
