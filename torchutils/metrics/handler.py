@@ -17,6 +17,14 @@ class MetricHandler(object):
         """ Returns score names of score meters (in the score list) """
         return set(self._scores.keys())
 
+    def set_score_names(self, score_names: typing.Iterable[str]) -> None:
+        """ Sets score names of score meters (in the score list) """
+        self._history.set_score_names(score_names)
+
+    def reset_score_names(self) -> None:
+        """ Clears score names of score meters (in the score list) """
+        self._history.set_score_names([])
+
     def add_score_meters(self, *scores: AverageMeter) -> None:
         """ Append a score meter to the score list """
         assert all(

@@ -1,37 +1,44 @@
-from torchutils.logging import TrainerLogger
+from typing import Union, Optional, Dict, Any, List
 from torchutils.utils.pydantic import TrainerModel
+from torchutils.logging import TrainerLogger
 from torch.nn import Module
-from typing import Union
-from collections import OrderedDict
+import argparse
 import wandb
 
-class WandBLogger(TrainerLogger):    
+
+class WandbLogger(TrainerLogger):
     __slots__ = ['_wandb']
 
     def open(self):
-        #TODO: add config here
+        # TODO: add config here
         self._wandb = wandb.init()
 
-    def log_score(self, **kwargs):
-        self._wandb.log(kwargs)
+    def log_scores(self,
+                   scores: Dict[str, float],
+                   step: Optional[int] = None):
+        self._wandb.log(scores)
 
-    def log_model(self, model: Union[TrainerModel, Module]):
-        if isinstance(model, TrainerModel):
-            model = model.model
-        self._wandb.watch(model, log="all")
+    def log_hyperparams(self,
+                        params: argparse.Namespace,
+                        step: Optional[int] = None):
+        self._wandb.log(params.__dict__)
 
-    def log_error(self, msg: str):
-        pass
+    def log_table(self,
+                  key: str,
+                  table: Dict[str, List[Any]]):
+        self._wandb.log({key: wandb.Table(columns=table.keys(),
+                                          data=table.values())})
 
-    def log_info(self, msg: str):
-        pass
-    
-    def _flush_step(self):
-        pass
+    def log_image(self,
+                  key: str,
+                  images: List[Any],
+                  step: Optional[int] = None):
+        self._wandb.log({key: [wandb.Image(image) for image in images]})
 
-    def _flush_epoch(self):
-        pass
+    def watch(self, module: Union[Module, TrainerModel], log='all', **kwargs):
+        if isinstance(module, TrainerModel):
+            module = module.module
+        self._wandb.watch(module, log=log, **kwargs)
 
     def close(self):
         self._wandb = None
-

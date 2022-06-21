@@ -1,11 +1,17 @@
-from .base import LoggingHandler
+from .handler import LoggerHandler as LoggingHandler
+from .proxy import LoggingEvent, LoggingLevel
 from .base import TrainerLogger
-from .wandb import WandBLogger
 from .tty import PrintWriter
-from .pbar import ProgressBarLogger
 from .nop import NoneLogger
 
-import torchutils.logging.pbar
-import torchutils.logging.tty
 import torchutils.logging.base
-import torchutils.logging.nop
+import torchutils.logging.tty
+import torchutils.logging.pbar
+
+import importlib
+if importlib.util.find_spec('tqdm') is not None:
+    from .pbar import ProgressBarLogger
+
+if importlib.util.find_spec('wandb') is not None:
+    from .wandb import WandbLogger as WandBLogger
+del importlib

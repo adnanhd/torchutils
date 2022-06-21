@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from abc import ABC, abstractmethod
 import typing
-import warnings
 
 
 class RunHistory(ABC):
@@ -12,7 +11,12 @@ class RunHistory(ABC):
     """
 
     @abstractmethod
-    def get_score_names(self, *score_names: str) -> typing.Iterable:
+    def set_score_names(self, score_names: typing.Iterable[str]) -> None:
+        """ Sets score names of the history """
+        pass
+
+    @abstractmethod
+    def get_score_names(self) -> typing.Set[str]:
         """
         Return a set containing of all unique score names which are being tracked.
         :return: an iterable of the unique score names

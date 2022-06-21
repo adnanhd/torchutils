@@ -1,9 +1,10 @@
-from typing import List
 from abc import ABC, abstractmethod
-from torchutils.utils.pydantic import (
-    HandlerArguments,
-    TrainerModel
-)
+from typing import Dict, Optional, List, Any
+import argparse
+
+
+class LoggerMethodNotImplError(Exception):
+    pass
 
 
 class TrainerLogger(ABC):
@@ -13,60 +14,37 @@ class TrainerLogger(ABC):
     """
     @abstractmethod
     def open(self):
-        ...
+        raise LoggerMethodNotImplError
 
     @abstractmethod
-    def log_score(self, **kwargs):
-        ...
+    def log_scores(self,
+                   scores: Dict[str, float],
+                   step: Optional[int] = None):
+        raise LoggerMethodNotImplError
 
-    def log_info(self, msg):
-        ...
+    def log_hyperparams(self,
+                        params: argparse.Namespace,
+                        *args,
+                        **kwargs):
+        raise LoggerMethodNotImplError
 
-    def log_error(self, msg):
-        ...
+    def log_table(self,
+                  key: str,
+                  table: Dict[str, List[Any]]):
+        raise LoggerMethodNotImplError
 
-    def log_model(self, model):
-        ...
+    def log_image(self,
+                  key: str,
+                  Images: List[Any],
+                  step: Optional[int] = None):
+        raise LoggerMethodNotImplError
+
+    def log_string(self, msg):
+        raise LoggerMethodNotImplError
+
+    def log_module(self, module):
+        raise LoggerMethodNotImplError
 
     @abstractmethod
     def close(self):
-        ...
-
-
-class LoggingHandler(ABC):
-    def __init__(self, loggers=[]):
-        self._loggers: List[TrainerLogger] = []
-        self.add_loggers(loggers)
-
-    def add_logger(self, logger):
-        if isinstance(logger, TrainerLogger):
-            self._loggers.append(logger)
-
-    def remove_logger(self, logger):
-        self._loggers.remove(logger)
-
-    def add_loggers(self, loggers: List[TrainerLogger]):
-        for logger in loggers:
-            self.add_logger(logger)
-
-    def clear_loggers(self):
-        self._loggers.clear()
-
-    def initialize(self, args: HandlerArguments):
-        for logger in self._loggers:
-            logger.open(args)
-
-    def model(self, model: TrainerModel):
-        for logger in self._loggers:
-            logger.log_model(model)
-
-    def score(self, **scores):
-        for logger in self._loggers:
-            logger.log_score(**scores)
-
-    def figure(self, msg):
-        pass
-
-    def terminate(self):
-        for logger in self._loggers:
-            logger.close()
+        raise LoggerMethodNotImplError

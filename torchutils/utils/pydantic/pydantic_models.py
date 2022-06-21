@@ -3,6 +3,7 @@ import torch
 import inspect
 import warnings
 from torch.nn import Module
+from torch.utils.data.dataloader import DataLoader
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchutils.metrics import MetricHandler
@@ -115,7 +116,7 @@ class TrainerModel(pydantic.BaseModel):
     def learning_rate(self):
         return self.optimizer.param_groups[0]['lr']
 
-    def _get_attr_names(self) -> typing.Set[str]:
+    def __getstate__(self) -> typing.Set[str]:
         if isinstance(self.criterion, Module):
             return {'model', 'optimizer', 'scheduler', 'criterion'}
         else:
@@ -123,7 +124,7 @@ class TrainerModel(pydantic.BaseModel):
 
     def state_dict(self):
         state = OrderedDict()
-        for key in self._get_attr_names():
+        for key in self.__getstate__():
             module = self.__getattribute__(key)
             if module is None:
                 continue
@@ -138,7 +139,7 @@ class TrainerModel(pydantic.BaseModel):
     def load_state_dict(
             self,
             state_dict: typing.Dict[str, "torch.Tensor"]) -> None:
-        for key in self._get_attr_names():
+        for key in self.__getstate__():
             module = getattr(self, key)
             if module is None or key not in state_dict:
                 continue
@@ -222,6 +223,9 @@ class TrainerDataLoader(pydantic.BaseModel):
         allow_mutation = False
     dataloader: DataLoaderType
 
+    def __init__(self, dataloader: DataLoader):
+        super().__init__(dataloader=dataloader)
+
     @property
     def dataset(self):
         return self.dataloader.dataset
@@ -249,6 +253,89 @@ class TrainerStatus(pydantic.BaseModel):
                 self.__config__.allow_mutation = True
             return unlock
         raise LookupError("HandlerArguments has been locked already.")
+
+
+class HandlerArguments(pydantic.BaseModel):
+    model: TrainerModel
+    _status_ptr: typing.List[TrainerStatus] = pydantic.PrivateAttr(
+        [TrainerStatus()])
+    _hparams: typing.Union[TrainingArguments,
+                           EvaluatingArguments] = pydantic.PrivateAttr(None)
+    train_dl: typing.Optional[typing.Union[TrainerDataLoader,
+                                           DataLoaderType]] = None
+    valid_dl: typing.Optional[typing.Union[TrainerDataLoader,
+                                           DataLoaderType]] = None
+    eval_dl: typing.Optional[typing.Union[TrainerDataLoader,
+                                          DataLoaderType]] = None
+
+    def __init__(self,
+                 model: Module,
+                 train_dl: DataLoader = None,
+                 valid_dl: DataLoader = None,
+                 eval_dl: DataLoader = None,
+                 **kwargs):
+        is_in_training = train_dl is not None and eval_dl is None
+        is_in_evaluating = train_dl is None and eval_dl is not None
+        assert is_in_evaluating != is_in_training
+        dataloaders = {
+            'train_dl': train_dl,
+            'valid_dl': valid_dl,
+            'eval_dl': eval_dl
+        }
+        dataloaders = {
+            dl_name: TrainerDataLoader(dataloader=dataloader)
+            if isinstance(dataloader, DataLoader) else dataloader
+            for dl_name, dataloader in dataloaders.items()
+            if dataloader is not None
+        }
+        super().__init__(model=model, **dataloaders)
+        if is_in_training:
+            self._hparams = TrainingArguments(**kwargs)
+        else:
+            self._hparams = EvaluatingArguments(**kwargs)
+        self._status_ptr = [TrainerStatus()]
+
+    @property
+    def status(self) -> TrainerStatus:
+        return self._status_ptr[0]
+
+    @property
+    def hparams(self) -> typing.Union[TrainingArguments,
+                                      EvaluatingArguments]:
+        return self._hparams
+
+    def set_status(self, batch=None, epoch=None) -> None:
+        if batch is not None:
+            self._status_ptr[0].current_batch = batch
+        if epoch is not None:
+            self._status_ptr[0].current_epoch = epoch
+
+    def reset_status(self) -> None:
+        self._status_ptr[0].current_epoch = None
+        self._status_ptr[0].current_batch = None
+
+    class Config:
+        allow_mutation = True
+
+    @pydantic.validator('train_dl', 'valid_dl', 'eval_dl')
+    @classmethod
+    def validate_dataloaders(cls, field_type):
+        if isinstance(field_type, TrainerDataLoader):
+            return field_type
+        elif isinstance(field_type, torch.utils.data.DataLoader):
+            return TrainerDataLoader(dataloader=field_type)
+        else:
+            raise ValueError(
+                f'Not possible to accept a type of {type(field_type)}')
+
+    @property
+    def istrainable(self):
+        if isinstance(self.args, TrainerDataLoader):
+            return True
+        elif isinstance(self.args, EvaluatingArguments):
+            return False
+        else:
+            return None
 
 
 class CurrentIterationStatus(pydantic.BaseModel):
@@ -287,6 +374,12 @@ class CurrentIterationStatus(pydantic.BaseModel):
     def get_score_names(self):
         return self._metric_handler.get_score_names()
 
+    def set_score_names(self, score_names: typing.Iterable[str]):
+        self._metric_handler.set_score_names(score_names)
+
+    def reset_score_names(self):
+        self._metric_handler.set_score_names()
+
     # every step end
     def set_current_scores(self, x, y_true, y_pred, batch_idx=None):
         """ Sets the current step input and outputs and calls score groups """
@@ -307,8 +400,7 @@ class CurrentIterationStatus(pydantic.BaseModel):
         self._metric_handler.reset_score_values()
         self._epoch_idx = epoch_idx
 
-    def get_current_scores(self, *score_names: str
-                           ) -> typing.Dict[str, float]:
+    def get_current_scores(self, *score_names: str) -> typing.Dict[str, float]:
         """ Returns the latest step or epoch values, depending on
         whether it has finished itereting over the current epoch or not """
         if len(score_names) == 0:
@@ -326,70 +418,3 @@ class CurrentIterationStatus(pydantic.BaseModel):
         if len(score_names) == 0:
             score_names = self.get_score_names()
         return self._metric_handler.get_score_history(*score_names)
-
-
-class HandlerArguments(pydantic.BaseModel):
-    args: typing.Union[TrainingArguments, EvaluatingArguments] = None
-    model: TrainerModel
-    status_ptr: typing.List[TrainerStatus]
-    train_dl: typing.Optional[TrainerDataLoader] = None
-    valid_dl: typing.Optional[TrainerDataLoader] = None
-    eval_dl: typing.Optional[TrainerDataLoader] = None
-
-    @property
-    def status(self):
-        return self.status_ptr[0]
-
-    def update_status(self, batch=None, epoch=None):
-        if batch is not None:
-            self.status_ptr[0].current_batch = batch
-        if epoch is not None:
-            self.status_ptr[0].current_epoch = epoch
-
-    def reset_status(self):
-        self.status_ptr[0].current_epoch = None
-        self.status_ptr[0].current_batch = None
-
-    class Config:
-        allow_mutation = True
-
-    def set_arguments(self):
-        if self.__config__.allow_mutation:
-            self.__config__.allow_mutation = False
-
-            def arguments_setter_callback(
-                    new_args: typing.Union[TrainingArguments,
-                                           EvaluatingArguments],
-                    dataloaders: typing.Dict[str,
-                                             typing.Optional[TrainerDataLoader]
-                                             ] = dict()):
-                self.__config__.allow_mutation = True
-                self.args = new_args
-                for dl_name in ('train_dl', 'valid_dl', 'eval_dl'):
-                    dl = dataloaders.setdefault(dl_name, None)
-                    if dl is not None:
-                        dl = TrainerDataLoader(dataloader=dl)
-                        self.__setattr__(dl_name, dl)
-                self.__config__.allow_mutation = False
-            return arguments_setter_callback
-        raise LookupError("HandlerArguments has been locked already.")
-
-    @pydantic.validator('train_dl', 'valid_dl', 'eval_dl')
-    @classmethod
-    def validate_dataloaders(cls, field_type):
-        if isinstance(field_type, TrainerDataLoader):
-            return field_type
-        elif isinstance(field_type, torch.utils.data.DataLoader):
-            return TrainerDataLoader(dataloader=field_type)
-        else:
-            raise ValueError(
-                f'Not possible to accept a type of {type(field_type)}')
-
-    @property
-    def is_train(self):
-        if isinstance(self.args, TrainerDataLoader):
-            return True
-        elif isinstance(self.args, EvaluatingArguments):
-            return False
-        else:
-            return None

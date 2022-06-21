@@ -10,7 +10,7 @@ from torchutils.callbacks import (
 
 import warnings
 from .handler import TrainerHandler
-from torchutils.metrics import MetricHandler, AverageMeter
+from torchutils.metrics import AverageMeter
 from torchutils.utils import Version
 from torchutils.utils.pydantic import (
     TrainerModel,
@@ -55,15 +55,17 @@ class Trainer:
         self._model.dtype = xtype
         self.ytype = ytype
 
-        self._handler = TrainerHandler(
-            model=self._model, status_ptr=[TrainerStatus()])
-
+        self._handler = TrainerHandler()
         self._loss_tracker = AverageMeter('Loss')
         self._handler._metrics.add_score_meters(self._loss_tracker)
 
     @property
     def status(self) -> TrainerStatus:
-        return self._handler.arguments.status
+        return self._handler.status
+
+    @property
+    def hyperparams(self) -> Union[TrainingArguments, EvaluatingArguments]:
+        return self._handler.hparams
 
     @property
     def xtype(self) -> torch.dtype:
@@ -100,7 +102,7 @@ class Trainer:
         kwargs.setdefault('pin_memory', not torch.cuda.is_available())
         kwargs.setdefault(
             'num_workers', 0 if torch.cuda.is_available() else os.cpu_count())
-        if train_mode == False or batch_size is None:
+        if not train_mode or batch_size is None:
             kwargs['batch_size'] = dataset.__len__()
         else:
             kwargs['batch_size'] = batch_size
@@ -118,14 +120,14 @@ class Trainer:
         optim=None,
         sched=None,
         metrics=list(),
-        loggers=list(),
+        loggers=dict(),
         callbacks=list(),
         **parameters  # trainer parameters
     ) -> None:
         if device is not None:
             self._model.device = device
         self._model.compile(model, loss, optim, sched)
-        self._handler.compile(loggers, metrics, callbacks)
+        self._handler.compile_handlers(loggers, metrics, callbacks)
 
     def train(
         self,
@@ -136,10 +138,10 @@ class Trainer:
         valid_dataset: Optional[torch.utils.data.Dataset] = None,
         train_dataloader_kwargs: Optional[Mapping] = {},
         valid_dataloader_kwargs: Optional[Mapping] = {},
-        **kwargs
+        **hparams
     ):
         if learning_rate is not None:
-            self._model.configure_optimizers(lr=learning_rate)
+            self._model.learning_rate = learning_rate
         else:
             learning_rate = self._model.learning_rate
 
@@ -151,20 +153,29 @@ class Trainer:
         valid_dl = None
         if valid_dataset is not None:
             valid_dl = self.create_dataloader(dataset=valid_dataset,
-                                              train_mode=False, **valid_dataloader_kwargs,
-                                              batch_size=kwargs.setdefault('valid_dl_batch_size', -1))
-            kwargs['valid_dl_batch_size'] = valid_dl.batch_size
+                                              train_mode=False,
+                                              **valid_dataloader_kwargs,
+                                              batch_size=hparams.setdefault(
+                                                  'valid_dl_batch_size', -1)
+                                              )
+            hparams['valid_dl_batch_size'] = valid_dl.batch_size
 
-        args = TrainingArguments(num_epochs=num_epochs,
-                                 learning_rate=learning_rate,
-                                 train_dl_batch_size=train_dl.batch_size,
-                                 **kwargs)
-        self._handler.set_arguments(args,
-                                    train_dl=train_dl, valid_dl=valid_dl)
+        self._handler.compile_model_and_hparams(
+            model=self._model,
+            train_dl=train_dl,
+            valid_dl=valid_dl,
+            num_epochs=num_epochs,
+            learning_rate=learning_rate,
+            train_dl_batch_size=train_dl.batch_size,
+            **hparams
+        )
         self._handler.on_initialization()
 
         try:
-            return self._run_training(args, train_dl, valid_dl)
+            return self._run_training(
+                train_loader=train_dl,
+                valid_loader=valid_dl
+            )
         except StopTrainingError:
             self._handler.on_stop_training_error()
         finally:
@@ -198,25 +209,24 @@ class Trainer:
 
     def _run_training(
         self,
-        trainer_arguments: TrainingArguments,
         train_loader: torch.utils.data.DataLoader,
         valid_loader: Optional[torch.utils.data.DataLoader] = None,
     ):
         self._handler.on_training_begin()
+        self._handler._arguments.set_status(
+            epoch=self.hyperparams.resume_epochs)
 
-        for epoch in range(trainer_arguments.resume_epochs,
-                           trainer_arguments.num_epochs):
-            self._handler.arguments.update_status(epoch=epoch)
-            self._run_training_epoch(trainer_arguments,
-                                     train_loader, valid_loader)
+        for epoch in range(self.hyperparams.resume_epochs,
+                           self.hyperparams.num_epochs):
+            self._handler._arguments.set_status(epoch=epoch)
+            self._run_training_epoch(train_loader, valid_loader)
 
         self._handler.on_training_end()
-        self._handler.arguments.reset_status()
-        return self._handler.iter_status.get_score_history()
+        self._handler._arguments.reset_status()
+        return self._handler.trainer_proxy.get_score_history()
 
     def _run_training_epoch(
         self,
-        trainer_arguments: TrainingArguments,
         train_loader: torch.utils.data.DataLoader,
         valid_loader: Optional[torch.utils.data.DataLoader] = None,
     ) -> torch.Tensor:
@@ -224,21 +234,21 @@ class Trainer:
         self._model.train()
 
         for batch, (features, y_truth) in enumerate(train_loader):
-            self._handler.arguments.update_status(batch=batch)
+            self._handler._arguments.set_status(batch=batch)
             self._run_training_step(
                 x=features.to(device=self.device, dtype=self.xtype),
                 y=y_truth.to(device=self.device, dtype=self.ytype),
             )
 
         self._model.scheduler_step()
-        self._handler.on_training_epoch_end()
         # TODO: self.status.current_epoch returns None here
-        # This works: self._handler.arguments.status.current_batch
+        # This works: self._handler.hparams.status.current_batch
         # This fails: self.status.current_batch
-        current_epoch = self._handler.arguments.status.current_epoch
-        if valid_loader is not None and (current_epoch + 1) % \
-                trainer_arguments.num_epochs_per_validation == 0:
+        if valid_loader is not None and (self.status.current_epoch + 1) % \
+                self.hyperparams.num_epochs_per_validation == 0:
             self._run_validating(valid_loader)
+
+        self._handler.on_training_epoch_end()
 
     def _run_training_step(
         self,
