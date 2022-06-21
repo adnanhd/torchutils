@@ -44,14 +44,14 @@ class ProgressBar(TrainerCallback):
     # Incrementation part
     def on_training_step_end(self, batch: CurrentIterationStatus):
         scores = batch.get_current_scores(*self._score_names)
-        self._step_bar.log_score(**scores)
+        self._step_bar.log_scores(scores)
         self._step_bar.update(1)
 
     def on_training_epoch_end(self, epoch: CurrentIterationStatus):
         scores = epoch.get_current_scores(*self._score_names)
 
-        self._step_bar.log_score(**scores)
-        self._epoch_bar.log_score(**scores)
+        self._step_bar.log_scores(scores)
+        self._epoch_bar.log_scores(scores)
 
         self._epoch_bar.update(1)
         self._step_bar.close()
@@ -59,13 +59,13 @@ class ProgressBar(TrainerCallback):
 
     def on_validation_step_end(self, batch: CurrentIterationStatus):
         scores = batch.get_current_scores(*self._score_names)
-        self._test_bar.log_score(**scores)
+        self._test_bar.log_scores(scores)
         self._test_bar.update(1)
         self._epoch_bar.update(0)
 
     def on_evaluation_step_end(self, batch: CurrentIterationStatus):
         scores = batch.get_current_scores(*self._score_names)
-        self._test_bar.log_score(**scores)
+        self._test_bar.log_scores(scores)
         self._test_bar.update(1)
         self._epoch_bar.update(0)
 

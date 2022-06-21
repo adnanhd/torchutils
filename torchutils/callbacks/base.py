@@ -1,5 +1,7 @@
 # Copyright © 2021 Chris Hughes
 from abc import ABC
+from typing import Optional
+from torchutils.logging import LoggerProxy, LoggerHandler
 from torchutils.utils.pydantic import (
     HandlerArguments,
     TrainerStatus,
@@ -22,6 +24,16 @@ class TrainerCallback(ABC):
     """
     The abstract base class to be subclassed when creating new callbacks.
     """
+    __slots__ = ['__log__']
+
+    def __init__(self):
+        self.__log__: Optional[LoggerProxy] = None
+
+    @property
+    def _log(self) -> LoggerProxy:
+        if self.__log__ is None:
+            self.__log__ = LoggerHandler.getProxy()
+        return self.__log__
 
     def on_initialization(self, args: HandlerArguments):
         """
