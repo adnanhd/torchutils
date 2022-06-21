@@ -4,6 +4,7 @@ from torchutils.logging import TrainerLogger
 from torch.nn import Module
 import argparse
 import wandb
+from .utils import LoggingEvent
 
 
 class WandbLogger(TrainerLogger):
@@ -12,6 +13,10 @@ class WandbLogger(TrainerLogger):
     def open(self):
         # TODO: add config here
         self._wandb = wandb.init()
+
+    @classmethod
+    def getLogger(cls, event: LoggingEvent) -> TrainerLogger:
+        return cls()
 
     def log_scores(self,
                    scores: Dict[str, float],

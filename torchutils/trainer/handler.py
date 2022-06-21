@@ -1,9 +1,9 @@
 # Import Handlers
 from torchutils.metrics import MetricHandler, AverageMeter
-from torchutils.logging import LoggingHandler, TrainerLogger, LoggingEvent
+from torchutils.logging import LoggerHandler, TrainerLogger, LoggingEvent
 from torchutils.callbacks import CallbackHandler, TrainerCallback
 
-from typing import Union, Optional, List
+from typing import Optional
 import typing
 
 # Import Arguments
@@ -12,18 +12,11 @@ from torchutils.utils.pydantic import (
     TrainerStatus,
     CurrentIterationStatus,
     TrainerModel,
-    TrainingArguments,
-    EvaluatingArguments,
     TrainerDataLoader
 )
 
 
 class TrainerHandler():
-    # train_dl: TrainerDataLoaderArguments
-    # valid_dl: TrainerDataLoaderArguments
-    # eval_dl: TrainerDataLoaderArguments
-    # args: TrainingArguments
-    # model: TrainerModel
     __slots__ = [
         'trainer_proxy',
         '_arguments',
@@ -36,8 +29,8 @@ class TrainerHandler():
     def __init__(self):
         self._metrics = MetricHandler()
         self._callbacks = CallbackHandler()
-        self._loggers: LoggingHandler = LoggingHandler.getHandler()
-        self._log = LoggingHandler.getProxy()
+        self._loggers: LoggerHandler = LoggerHandler.getHandler()
+        self._log = LoggerHandler.getProxy()
         self._arguments: HandlerArguments = None
         self.trainer_proxy = CurrentIterationStatus(handler=self._metrics)
 
@@ -65,32 +58,36 @@ class TrainerHandler():
 
     def compile_handlers(
             self,
-            loggers: typing.Dict[TrainerLogger, LoggingEvent] = dict(),
+            loggers: typing.Dict[TrainerLogger,
+                                 typing.Iterable[LoggingEvent]] = dict(),
             metrics: typing.Iterable[AverageMeter] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
-        for logger, event in loggers.items():
-            self._loggers.add_logger(event=event, logger=logger)
+        for logger, events in loggers.items():
+            for event in events:
+                self._loggers.add_logger(event=event, logger=logger)
         self._metrics.add_score_meters(*metrics)
         self._callbacks.add_callbacks(callbacks)
         score_names = self._metrics.get_score_names()
         self.trainer_proxy.set_score_names(score_names)
 
-    def decompile(
+    def decompile_handlers(
             self,
-            loggers: typing.Dict[TrainerLogger, LoggingEvent] = dict(),
+            loggers: typing.Dict[TrainerLogger,
+                                 typing.Iterable[LoggingEvent]] = dict(),
             metrics: typing.Iterable[AverageMeter] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
-        for logger, event in loggers.items():
-            self._loggers.remove_logger(event=event, logger=logger)
+        for logger, events in loggers.items():
+            for event in events:
+                self._loggers.remove_logger(event=event, logger=logger)
         self._metrics.remove_score_meters(*metrics)
         self._callbacks.remove_callbacks(callbacks)
         # TODO: remove *sign
         score_names = self._metrics.get_score_names()
         self.trainer_proxy.set_score_names(score_names)
 
-    def clear(self):
+    def clear_handlers(self):
         self._loggers.clear_loggers()
         self._callbacks.clear_callbacks()
         score_names = self._metrics.get_score_names()

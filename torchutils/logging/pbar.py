@@ -1,7 +1,7 @@
 from torchutils.utils.pydantic import HandlerArguments
 from torchutils.logging import TrainerLogger, LoggingEvent
 from collections import OrderedDict
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from tqdm.autonotebook import tqdm
 import os
 
@@ -15,21 +15,23 @@ class ProgressBarLogger(TrainerLogger):
         self._pbar = None
 
     @classmethod
-    def getLogger(self, event: LoggingEvent) -> TrainerLogger:
-        loggers = {
-            StepProgressBar: [LoggingEvent.TRAINING_BATCH],
-            EpochProgressBar: [LoggingEvent.TRAINING_EPOCH],
-            SampleProgressBar: [LoggingEvent.EVALUATION_RUN,
-                                LoggingEvent.VALIDATION_RUN]
+    def getEvent(cls) -> Dict[TrainerLogger, List[LoggingEvent]]:
+        return {
+            StepProgressBar(): [LoggingEvent.TRAINING_BATCH],
+            EpochProgressBar(): [LoggingEvent.TRAINING_EPOCH],
+            SampleProgressBar(): [LoggingEvent.EVALUATION_RUN,
+                                  LoggingEvent.VALIDATION_RUN]
+        }
 
-        }
-        loggers = {
-            LoggingEvent.TRAINING_BATCH: StepProgressBar,
-            LoggingEvent.TRAINING_EPOCH: EpochProgressBar,
-            LoggingEvent.EVALUATION_RUN: SampleProgressBar,
-            LoggingEvent.VALIDATION_RUN: SampleProgressBar
-        }
-        return loggers[event]()
+    @classmethod
+    def getLogger(cls, event: LoggingEvent) -> LoggingEvent:
+        assert isinstance(event, LoggingEvent)
+        if event in [LoggingEvent.TRAINING_BATCH]:
+            return StepProgressBar()
+        elif event in [LoggingEvent.TRAINING_EPOCH]:
+            return EpochProgressBar()
+        else:
+            return SampleProgressBar()
 
     def open(self, total: int, args: HandlerArguments = None):
         if self._pbar is None:

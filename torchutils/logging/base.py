@@ -1,6 +1,7 @@
 import abc
 import typing
 import argparse
+from collections import defaultdict
 from .utils import LoggerMethodNotImplError, LoggingEvent
 
 
@@ -9,8 +10,18 @@ class TrainerLogger(abc.ABC):
     A callback which visualises the state of each training
     and evaluation epoch using a progress bar
     """
+    @classmethod
+    def getEvent(cls) -> typing.Dict["TrainerLogger",
+                                     typing.List[LoggingEvent]]:
+        events = [LoggingEvent.TRAINING_BATCH, LoggingEvent.TRAINING_EPOCH,
+                  LoggingEvent.EVALUATION_RUN, LoggingEvent.VALIDATION_RUN]
+        result = defaultdict(list)
+        for event in events:
+            result[cls.getLogger(event)].append(event)
+        return dict(result)
+
     @abc.abstractclassmethod
-    def getLogger(self, event: LoggingEvent):
+    def getLogger(cls, event: LoggingEvent) -> LoggingEvent:
         raise LoggerMethodNotImplError
 
     @abc.abstractmethod

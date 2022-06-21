@@ -58,7 +58,7 @@ class ScoreLoggerCallback(TrainerCallback):
         )
         self._log.update(1, event=LoggingEvent.VALIDATION_RUN)
 
-    def on_validation_run_end(self, stat: TrainerStatus):
+    def on_validation_run_end(self, epoch: CurrentIterationStatus):
         self._handler.terminate(event=LoggingEvent.VALIDATION_RUN)
 
     # Evaluation
