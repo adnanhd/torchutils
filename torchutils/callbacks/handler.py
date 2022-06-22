@@ -108,12 +108,8 @@ class CallbackHandler:
     def clear_callbacks(self):
         self.callbacks = []
 
-    @property
-    def callback_list(self):
-        return "\n".join(cb.__class__.__name__ for cb in self.callbacks)
-
     def __repr__(self):
-        return self.callback_list
+        return "\n".join(cb.__class__.__name__ for cb in self.callbacks)
 
     @_foreach_callback_require_args_
     def on_initialization(self, args: HandlerArguments):

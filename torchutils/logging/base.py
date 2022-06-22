@@ -1,72 +1,62 @@
-from typing import List
-from abc import ABC, abstractmethod
-from torchutils.utils.pydantic import (
-    HandlerArguments,
-    TrainerModel
-)
+import abc
+import typing
+import argparse
+from collections import defaultdict
+from .utils import LoggerMethodNotImplError, LoggingEvent
 
 
-class TrainerLogger(ABC):
+class TrainerLogger(abc.ABC):
     """
     A callback which visualises the state of each training
     and evaluation epoch using a progress bar
     """
-    @abstractmethod
+    @classmethod
+    def getEvent(cls) -> typing.Dict["TrainerLogger",
+                                     typing.List[LoggingEvent]]:
+        events = [LoggingEvent.TRAINING_BATCH, LoggingEvent.TRAINING_EPOCH,
+                  LoggingEvent.EVALUATION_RUN, LoggingEvent.VALIDATION_RUN]
+        result = defaultdict(list)
+        for event in events:
+            result[cls.getLogger(event)].append(event)
+        return dict(result)
+
+    @abc.abstractclassmethod
+    def getLogger(cls, event: LoggingEvent) -> LoggingEvent:
+        raise LoggerMethodNotImplError
+
+    @abc.abstractmethod
     def open(self):
-        ...
+        raise LoggerMethodNotImplError
 
-    @abstractmethod
-    def log_score(self, **kwargs):
-        ...
+    @abc.abstractmethod
+    def log_scores(self,
+                   scores: typing.Dict[str, float],
+                   step: typing.Optional[int] = None):
+        raise LoggerMethodNotImplError
 
-    def log_info(self, msg):
-        ...
+    def log_hyperparams(self,
+                        params: argparse.Namespace,
+                        *args,
+                        **kwargs):
+        raise LoggerMethodNotImplError
 
-    def log_error(self, msg):
-        ...
+    def log_table(self,
+                  key: str,
+                  table: typing.Dict[str, typing.List[typing.Any]]):
+        raise LoggerMethodNotImplError
 
-    def log_model(self, model):
-        ...
+    def log_image(self,
+                  key: str,
+                  Images: typing.List[typing.Any],
+                  step: typing.Optional[int] = None):
+        raise LoggerMethodNotImplError
 
-    @abstractmethod
+    def log_string(self, msg):
+        raise LoggerMethodNotImplError
+
+    def log_module(self, module):
+        raise LoggerMethodNotImplError
+
+    @abc.abstractmethod
     def close(self):
-        ...
-
-
-class LoggingHandler(ABC):
-    def __init__(self, loggers=[]):
-        self._loggers: List[TrainerLogger] = []
-        self.add_loggers(loggers)
-
-    def add_logger(self, logger):
-        if isinstance(logger, TrainerLogger):
-            self._loggers.append(logger)
-
-    def remove_logger(self, logger):
-        self._loggers.remove(logger)
-
-    def add_loggers(self, loggers: List[TrainerLogger]):
-        for logger in loggers:
-            self.add_logger(logger)
-
-    def clear_loggers(self):
-        self._loggers.clear()
-
-    def initialize(self, args: HandlerArguments):
-        for logger in self._loggers:
-            logger.open(args)
-
-    def model(self, model: TrainerModel):
-        for logger in self._loggers:
-            logger.log_model(model)
-
-    def score(self, **scores):
-        for logger in self._loggers:
-            logger.log_score(**scores)
-
-    def figure(self, msg):
-        pass
-
-    def terminate(self):
-        for logger in self._loggers:
-            logger.close()
+        raise LoggerMethodNotImplError

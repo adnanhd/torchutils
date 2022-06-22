@@ -1,5 +1,6 @@
 from torchutils.utils.pydantic import HandlerArguments
 from torchutils.logging import TrainerLogger
+from typing import Dict, Optional
 
 
 class NoneLogger(TrainerLogger):
@@ -9,21 +10,10 @@ class NoneLogger(TrainerLogger):
     def open(self, args: HandlerArguments):
         pass
 
-    def log_score(self, **kwargs):
-        pass
-
-    def log_info(self, msg):
-        pass
-    
-    def log_error(self, msg):
-        pass
-
-    def _flush_step(self):
-        pass
-
-    def _flush_epoch(self):
+    def log_scores(self,
+                   scores: Dict[str, float],
+                   step: Optional[int] = None):
         pass
 
     def close(self):
         pass
-

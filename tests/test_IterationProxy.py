@@ -1,15 +1,17 @@
 from torchutils.utils.pydantic import CurrentIterationStatus
-from torchutils.trainer.loss import LossTracker
 from torchutils.metrics import MetricHandler
+from .utils import epsilon_equal
 import numpy as np
 
-metrics = MetricHandler()
-metrics._add_scores(['loss'])
-loss_tracker: LossTracker = metrics.get_metric_instance('LossTracker')
-proxy = CurrentIterationStatus(metrics)
-proxy.set_score_names('loss')
-# an acceptable error margin
-epsilon = 1e-10
+handler = MetricHandler()
+proxy = CurrentIterationStatus(handler)
+handler.init_score_history('loss')
+total_loss = []
+
+
+@handler.add_score_group('loss')
+def loss_score_group(x, y, y_pred):
+    return {'loss': np.square(y_pred).sum().item()}
 
 
 def random_iteration_arrays():
@@ -20,23 +22,25 @@ def random_iteration_arrays():
 
 
 def random_step(num_batches):
-    assert proxy._score_history.get_score_values('loss') == []
+    assert handler.get_score_history('loss')['loss'] == total_loss
 
-    total_loss = 0
+    epoch_loss = 0
     for _ in range(num_batches):
         x, y, y_pred = random_iteration_arrays()
-        loss_tracker._loss = np.square(y_pred).sum().item()
         proxy.set_current_scores(x, y, y_pred)
 
-        loss = metrics.get_score_values('loss')['loss']
-        total_loss += loss
-        assert proxy._score_history.get_score_values('loss') == []
-        assert abs(proxy._score_tracker['loss'].score_value - loss) < epsilon
+        loss = handler.get_score_values('loss')['loss']
+        epoch_loss += loss
+        assert epsilon_equal(handler.get_score_values('loss')['loss'], loss)
+        assert epsilon_equal(proxy.get_current_scores('loss')['loss'], loss)
 
-    proxy.average_scores()
-    assert abs(proxy.get_latest_scores('loss')[
-               'loss'] - total_loss / num_batches) < epsilon
-    proxy.reset_score_values()
+    # applies both push and reset scores
+    proxy.average_current_scores()
+    epoch_loss /= num_batches
+    assert epsilon_equal(handler.seek_score_history('loss')[
+                         'loss'], epoch_loss)
+    total_loss.append(epoch_loss)
+    assert epsilon_equal(proxy.get_score_history('loss')['loss'], total_loss)
 
 
 def test_step_1():

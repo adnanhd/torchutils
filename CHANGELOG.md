@@ -6,41 +6,42 @@
 
 - 2: in eval.py train.py and valid.py from .engine import Trainer gives compilation error
 
-
-## Handler TODOs
-- [ ] Create a base Handler class having add remove clear and hook functionalities
-    -	hooker mechanism can be implemented here
-- some arguments must be moved back to where it was belong to, instead of under utils/pydantic
-
-## Callback TODOs
-- [ ] `callbacks/progress_bar.py:ProgressBar` instead of incrementing one-by-one from 0 to **STEP_SIZE**, increment by **BATCH_SIZE** from 0 to len(DATASET)
-- [ ] create a registrar mechanism for callbacks
-
-## Trainer TODOs
-- [ ] Return a LossHistory class on return of train method
-- [ ] Return predictions on predict/test method
-- [ ] Rename TrainerStatus -> TrainerProxy
-- [ ] Bypass TrainerHandler class if you like
-
-## Dataset TODOs
-- [ ] make it compatible with torchvision.datasets
- 
-## Modes TODOs
-- [ ] make it compatible with torchvision.datasets
-
-## Metrics TODOs
-- [ ] make it compatible with torchmetrics
-
-## Loggers TODOs
-- [ ] create a LoggerBaseCallback to control all loggings
-    - [ ] update arguments of callback methods
-	- [ ] create CallbackArguments (data)class containing all dataloader size etc. information and to be passed at anytime
-
 ## Backlog
 - [ ] Compile project using Cython or numba
 - [ ] add Accelerator
 
+### Handler TODOs
+- [ ] Create a base Handler class having add remove clear and hook functionalities
+    -	hooker mechanism can be implemented here
+- some arguments must be moved back to where it was belong to, instead of under utils/pydantic
+
+### Callback TODOs
+- [ ] `callbacks/progress_bar.py:ProgressBar` instead of incrementing one-by-one from 0 to **STEP_SIZE**, increment by **BATCH_SIZE** from 0 to len(DATASET)
+- [ ] create a registrar mechanism for callbacks
+
+### Trainer TODOs
+- [ ] Rename TrainerStatus -> TrainerProxy
+- [ ] Bypass TrainerHandler class if you like
+- [ ] Update `torchutils/trainer/handler.py:TrainerHandler` compile and decompile parameters
+
+### Dataset TODOs
+- [ ] make it compatible with torchvision.datasets
+ 
+### Modes TODOs
+- [ ] make it compatible with torchvision.datasets
+
+### Metrics TODOs
+- [ ] make it compatible with torchmetrics
+
+### Loggers TODOs
+- [ ] create a LoggerBaseCallback to control all loggings
+    - [ ] update arguments of callback methods
+	- [ ] create CallbackArguments (data)class containing all dataloader size etc. information and to be passed at anytime
+
 ## Changelog
+- **v1.0**:
+	- refactor code from https://github.com/adnanhd/PyTorch-Utils.git
+
 - **v1.1 Update**:
     - Create TrainerMetric class calculating related and depended scores in one shot
     - Create MetricHandler class registering and feeding and monitoring desired scores
@@ -68,3 +69,47 @@
 - **v1.3.0**: Update CurrentIterationStatus -- i.e. IterationProxy
 	- Replace StepResults and EpochResults with CurrentIterationStatus
 	- Added getting (for end-user) and setting (for engine) metric API
+
+- **v1.3.1**: AverageMeter
+	- Remove TrainerMetric and ScoreTracker classes
+	- Added AverageMeter -- which will be renamed as TrainerScore
+	- Added RunHistory to MetrciHandler -- instead of ScoreTracker
+	- Remove ScoreTracker and SingleScoreTracker
+	- Return a RunHistory class on return of train method
+	- Return predictions on predict/test method
+
+- **v1.3.1a**: TrainerModel
+	- change TrainerModel api and method names
+	- Add string\_to\_{criterion,scheduler,optimizer}\_class dictionaries in `trainer/utils/mappings.py`
+	- Create TrainerModelBuilder from TrainerModel allowing saving and loading hyperparameters as well as fetching from mappings.py
+
+- **v1.3.1b**: ModelCheckpoint
+	- Fix bugs in ModelCheckpoint
+	- Add conditional save feature to ModelCheckpoint
+
+- **v1.3.1c**: TrainerModel
+	- change TrainerModel api and method names
+	- Add string\_to\_{criterion,scheduler,optimizer}\_class dictionaries in `trainer/utils/mappings.py`
+	- Create TrainerModelBuilder from TrainerModel allowing saving and loading hyperparameters as well as fetching from mappings.pytorch
+
+- **v1.3.2**: ModelCheckpoint and TrainerModel
+	- Depricate `load_form_checkpoint` and `save_into_checkpoint` methods from TrainerModel
+	- Add `load_form_checkpoint` and `save_into_checkpoint` methods to ModelCheckpoint
+	- Add `state_dict` and `load_state_dict` methods to ModelCheckpoint
+	- Update the architecture in ModelCheckpoint so that it directly saves and loads on memory
+	- Depricate TrainerModelBuilder and add its features to `TrainerModel.__init__`
+		- Fix bug when TrainerModelBuilder(sched='') param is not None on initialization
+
+- **v1.4.0**: LoggerProxy and LoggerHandler
+	- Fix logging bugs in `torchutils/callbacks/progress_bar.py:ProgressBar` 
+	- rename TrainerLogger -> LoggerInterface and LoggerHandler -> LoggerProxy
+
+## Planned TODOs
+- [ ] Migrate classes in `torchutils/utils/pydantic/pydantic_models.py` to `torchutils/models`, `torchutils/data`, etc.
+- [ ] Add resume training feature
+- [ ] Make TrainerMetrics compatible with torchmetrics from pytorch lightning
+	- [ ] refactor ScoreHook to torchmetrics.metrics.Metric so that it becomes compatible
+- [ ] create forward pass and backward pass functions for Trainer Class so that overriding only forward pass function becomes enough
+- [ ] rename CurrentIterationStatus -> IterationProxy
+- [ ] Hide training and evaluating arguments so that they are set when public arguments are initialized
+	- e.g. setting train\_dl parameter makes train\_dl\_batch\_size to set len(train\_dl)
