@@ -104,12 +104,29 @@
 	- Fix logging bugs in `torchutils/callbacks/progress_bar.py:ProgressBar` 
 	- rename TrainerLogger -> LoggerInterface and LoggerHandler -> LoggerProxy
 
+- **v1.4.1**: TrainerModel
+	- Remove optimizer\_zero\_grad and optimizer\_step methods from TrainerModel
+		- [x] create forward pass and backward pass functions for Trainer Class so that overriding only forward pass function becomes enough
+	- Add backward\_pass method to TrainerModel for handling all backward operations including 
+		- optimizer.zero_grad
+		- loss.backward
+		- optimizer.step
+	- Remove \_loss\_tracker attribute from Trainer
+	- Add \_loss attribute to TrainerModel
+	- data loading in each epoch is changed in `Trainer._run_training_epoch`, `Trainer._run_validating`, and `Trainer._run_evaluating`
+		- instead of `for batch, (x, y) in dataloader` in Trainer make `for batch_idx, batch in dataloader` passed directly as batch
+		- [ ] TODO: pass it directly to TrainerModel.forward\_pass
+
 ## Planned TODOs
-- [ ] Migrate classes in `torchutils/utils/pydantic/pydantic_models.py` to `torchutils/models`, `torchutils/data`, etc.
-- [ ] Add resume training feature
+### v1.4.1
+- [ ] remove LoggerEvent from log messages, instead set it on TrainerHandler
+- [ ] migrate calls in ScoreLoggerCallback to TrainerHandler
 - [ ] Make TrainerMetrics compatible with torchmetrics from pytorch lightning
 	- [ ] refactor ScoreHook to torchmetrics.metrics.Metric so that it becomes compatible
-- [ ] create forward pass and backward pass functions for Trainer Class so that overriding only forward pass function becomes enough
+
+### v1.4.2
+- [ ] Migrate classes in `torchutils/utils/pydantic/pydantic_models.py` to `torchutils/models`, `torchutils/data`, etc.
+- [ ] Add resume training feature
 - [ ] rename CurrentIterationStatus -> IterationProxy
 - [ ] Hide training and evaluating arguments so that they are set when public arguments are initialized
 	- e.g. setting train\_dl parameter makes train\_dl\_batch\_size to set len(train\_dl)

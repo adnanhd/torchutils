@@ -1,3 +1,4 @@
+from torchutils.metrics import AverageMeter
 import pydantic
 import torch
 import inspect
@@ -13,6 +14,7 @@ import typing
 from .pydantic_types import (
     # NpScalarType,
     NpTorchType,
+    GradTensorType,
     ModuleType,
     OptimizerType,
     SchedulerType,
@@ -33,6 +35,9 @@ class TrainerModel(pydantic.BaseModel):
     criterion: typing.Union[ModuleType, FunctionType]
     optimizer: OptimizerType
     scheduler: typing.Optional[SchedulerType]
+    _loss: AverageMeter = pydantic.PrivateAttr(AverageMeter("Loss"))
+    _backward_hooks: typing.List[GradTensorType] = pydantic.PrivateAttr(
+        default_factory=list)
 
     def __init__(
         self,
@@ -107,16 +112,23 @@ class TrainerModel(pydantic.BaseModel):
         return super().__setattr__(key, value)
 
     @property
-    def dtype(self):
+    def dtype(self) -> torch.dtype:
         return next(self.model.parameters()).dtype
 
     @property
-    def device(self):
+    def device(self) -> torch.device:
         return next(self.model.parameters()).device
 
     @property
-    def learning_rate(self):
+    def learning_rate(self) -> float:
         return self.optimizer.param_groups[0]['lr']
+
+    @property
+    def loss(self) -> float:
+        return self._loss.average
+
+    def __call__(self, input):
+        return self.model(input)
 
     def __getstate__(self) -> typing.Set[str]:
         if isinstance(self.criterion, Module):
@@ -168,23 +180,36 @@ class TrainerModel(pydantic.BaseModel):
         self.model.eval()
         self.criterion.eval()
 
-    def optimizer_step(self):
-        self.optimizer.step()
-
-    def optimizer_zero_grad(self):
-        self.optimizer.zero_grad()
+    def register_metrics_to(self, handler: MetricHandler):
+        assert isinstance(handler, MetricHandler)
+        handler.add_score_meters(self._loss)
 
     def scheduler_step(self):
-        if self.scheduler is not None:
+        if self.scheduler is None:
+            pass
+        elif isinstance(self.scheduler,
+                        torch.optim.lr_scheduler.ReduceLROnPlateau):
+            self.scheduler.step(self.loss)
+        else:
             self.scheduler.step()
 
-    def __call__(self, input):
-        return self.model(input)
+    def reset_backward(self):
+        self.scheduler_step()
+        self._backward_hooks.clear()
+        # self._loss.reset()
 
     def forward_pass(self, x, y, batch_idx=None):
         y_pred = self.model(x)
         loss = self.criterion(y_pred, y)
-        return y_pred, loss
+        self._loss.update(loss.item())
+        self._backward_hooks.append(loss)
+        return y_pred
+
+    def backward_pass(self):
+        self.optimizer.zero_grad()
+        while self._backward_hooks.__len__():
+            self._backward_hooks.pop().backward()
+        self.optimizer.step()
 
     def compile(
             self,

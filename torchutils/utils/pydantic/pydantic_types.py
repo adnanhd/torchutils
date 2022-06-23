@@ -43,6 +43,24 @@ class NpTorchType(ABC):
             pass
 
 
+class GradTensorType(ABC):
+    """
+    A generic array/tensor type that returns true for every 
+    f. call isinstance() with any torch.tensor and np.ndarray
+    """
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_np_torch
+
+    @classmethod
+    def validate_np_torch(cls, field_type):
+        field_type = validate_torch_tensor(field_type)
+        if not field_type.requires_grad:
+            raise ValueError(
+                "Tensor must have a gradient"
+            )
+
+
 class DatasetType(ABC):
 
     @classmethod

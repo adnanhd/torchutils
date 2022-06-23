@@ -10,7 +10,6 @@ from torchutils.callbacks import (
 
 import warnings
 from .handler import TrainerHandler
-from torchutils.metrics import AverageMeter
 from torchutils.utils import Version
 from torchutils.utils.pydantic import (
     TrainerModel,
@@ -21,6 +20,7 @@ from torchutils.utils.pydantic import (
 
 from typing import (
     List,
+    Iterable,
     Mapping,
     Optional,
     Union,
@@ -32,7 +32,7 @@ version = Version('1.2.0')
 
 
 class Trainer:
-    __slots__ = ['ytype', '_model', '_handler', '_loss_tracker']
+    __slots__ = ['ytype', '_model', '_handler']
 
     def __init__(
         self,
@@ -56,8 +56,8 @@ class Trainer:
         self.ytype = ytype
 
         self._handler = TrainerHandler()
-        self._loss_tracker = AverageMeter('Loss')
-        self._handler._metrics.add_score_meters(self._loss_tracker)
+        if model is not None:
+            self._model.register_metrics_to(self._handler._metrics)
 
     @property
     def status(self) -> TrainerStatus:
@@ -126,6 +126,8 @@ class Trainer:
     ) -> None:
         if device is not None:
             self._model.device = device
+        if model is not None:
+            self._model.register_metrics_to(self._handler._metrics)
         self._model.compile(model, loss, optim, sched)
         self._handler.compile_handlers(loggers, metrics, callbacks)
 
@@ -169,16 +171,21 @@ class Trainer:
             train_dl_batch_size=train_dl.batch_size,
             **hparams
         )
-        self._handler.on_initialization()
 
         try:
-            return self._run_training(
+            self._handler._arguments.set_status(
+                epoch=self.hyperparams.resume_epochs)
+            self._handler.on_initialization()
+            results = self._run_training(
                 train_loader=train_dl,
                 valid_loader=valid_dl
             )
         except StopTrainingError:
             self._handler.on_stop_training_error()
+        else:
+            return results
         finally:
+            self._handler._arguments.reset_status()
             self._handler.on_termination()
 
     def evaluate(
@@ -200,14 +207,17 @@ class Trainer:
             eval_dl_batch_size=eval_dl.batch_size,
             **kwargs
         )
-        self._handler.on_initialization()
 
         try:
-            return self._run_evaluating(eval_dl)
+            self._handler.on_initialization()
+            results = self._run_evaluating(eval_dl)
         except StopTrainingError:
             self._handler.on_stop_training_error()
+        else:
+            return results
         finally:
             self._handler.on_termination()
+            self._handler._arguments.reset_status()
 
     def _run_training(
         self,
@@ -215,8 +225,6 @@ class Trainer:
         valid_loader: Optional[torch.utils.data.DataLoader] = None,
     ):
         self._handler.on_training_begin()
-        self._handler._arguments.set_status(
-            epoch=self.hyperparams.resume_epochs)
 
         for epoch in range(self.hyperparams.resume_epochs,
                            self.hyperparams.num_epochs):
@@ -224,7 +232,6 @@ class Trainer:
             self._run_training_epoch(train_loader, valid_loader)
 
         self._handler.on_training_end()
-        self._handler._arguments.reset_status()
         return self._handler.trainer_proxy.get_score_history()
 
     def _run_training_epoch(
@@ -235,17 +242,10 @@ class Trainer:
         self._handler.on_training_epoch_begin()
         self._model.train()
 
-        for batch, (features, y_truth) in enumerate(train_loader):
-            self._handler._arguments.set_status(batch=batch)
-            self._run_training_step(
-                x=features.to(device=self.device, dtype=self.xtype),
-                y=y_truth.to(device=self.device, dtype=self.ytype),
-            )
+        for batch_idx, batch in enumerate(train_loader):
+            self._run_training_step(batch, batch_idx)
 
-        self._model.scheduler_step()
-        # TODO: self.status.current_epoch returns None here
-        # This works: self._handler.hparams.status.current_batch
-        # This fails: self.status.current_batch
+        self._model.reset_backward()
         if valid_loader is not None and (self.status.current_epoch + 1) % \
                 self.hyperparams.num_epochs_per_validation == 0:
             self._run_validating(valid_loader)
@@ -254,25 +254,23 @@ class Trainer:
 
     def _run_training_step(
         self,
-        x: torch.Tensor,
-        y: torch.Tensor,
+        batch: Iterable[torch.Tensor],
+        batch_idx: int
     ) -> torch.Tensor:
+        x = batch[0].to(device=self.device, dtype=self.xtype)
+        y = batch[1].to(device=self.device, dtype=self.ytype)
+
+        self._handler._arguments.set_status(batch=batch_idx)
         self._handler.on_training_step_begin()
 
-        self._model.optimizer_zero_grad()
-        y_pred, loss = self._model.forward_pass(
-            x=x, y=y,
-            batch_idx=self.status.current_batch
-        )
-        self._loss_tracker.update(loss.detach().item())
-        loss.backward()
-        self._model.optimizer_step()
+        y_pred = self._model.forward_pass(x, y, self.status.current_batch)
+        self._model.backward_pass()
 
-        with torch.no_grad():
-            self._handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
+        self._handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
 
         return y_pred.detach()
 
+    @torch.no_grad()
     def _run_evaluating(
         self,
         eval_loader: Optional[torch.utils.data.DataLoader],
@@ -282,33 +280,35 @@ class Trainer:
         self._model.eval()
 
         preds = []
-        with torch.no_grad():
-            for batch, (features, y_truth) in enumerate(eval_loader):
-                pred = self._run_evaluating_step(
-                    x=features.to(device=self.device, dtype=self.xtype),
-                    y=y_truth.to(device=self.device, dtype=self.ytype),
-                )
-                preds.extend(pred)
+        for batch_idx, batch in enumerate(eval_loader):
+            pred = self._run_evaluating_step(batch_idx, batch)
+            preds.extend(pred)
 
+        self._model.reset_backward()
         self._handler.on_evaluation_run_end()
         return preds
 
+    @torch.no_grad()
     def _run_evaluating_step(
         self,
-        x: torch.Tensor,
-        y: torch.Tensor,
+        batch_idx: int,
+        batch: Iterable[torch.Tensor]
     ) -> torch.Tensor:
+        x = batch[0].to(device=self.device, dtype=self.xtype)
+        y = batch[1].to(device=self.device, dtype=self.ytype)
+
+        self._handler._arguments.set_status(batch=batch_idx)
         self._handler.on_evaluation_step_begin()
 
-        y_pred, loss = self._model.forward_pass(
+        y_pred = self._model.forward_pass(
             x=x, y=y, batch_idx=self.status.current_batch
         )
-        self._loss_tracker.update(loss.detach().item())
 
         self._handler.on_evaluation_step_end(x=x, y=y, y_pred=y_pred)
 
         return y_pred.detach()
 
+    @torch.no_grad()
     def _run_validating(
         self,
         valid_loader: Optional[torch.utils.data.DataLoader],
@@ -317,26 +317,27 @@ class Trainer:
         self._handler.on_validation_run_begin()
         self._model.eval()
 
-        with torch.no_grad():
-            for batch, (features, y_truth) in enumerate(valid_loader):
-                self._run_validating_step(
-                    x=features.to(device=self.device, dtype=self.xtype),
-                    y=y_truth.to(device=self.device, dtype=self.ytype),
-                )
+        for step_idx, batch in enumerate(valid_loader):
+            self._run_validating_step(step_idx, batch)
 
+        self._model.reset_backward()
         self._handler.on_validation_run_end()
 
+    @torch.no_grad()
     def _run_validating_step(
         self,
-        x: torch.Tensor,
-        y: torch.Tensor,
+        batch_idx: int,
+        batch: Iterable[torch.Tensor]
     ) -> torch.Tensor:
+        x = batch[0].to(device=self.device, dtype=self.xtype)
+        y = batch[1].to(device=self.device, dtype=self.ytype)
+
+        self._handler._arguments.set_status(batch=batch_idx)
         self._handler.on_validation_step_begin()
 
-        y_pred, loss = self._model.forward_pass(
+        y_pred = self._model.forward_pass(
             x=x, y=y, batch_idx=self.status.current_batch
         )
-        self._loss_tracker.update(loss.detach().item())
 
         self._handler.on_validation_step_end(x=x, y=y, y_pred=y_pred)
 
