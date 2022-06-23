@@ -87,10 +87,12 @@ class TrainerModel(pydantic.BaseModel):
                     f"{scheduler} is not a registered Scheduler"
                 )
 
-        super(TrainerModel, self).__init__(model=model,
-                                           criterion=criterion,
-                                           optimizer=optimizer,
-                                           scheduler=scheduler)
+        super(TrainerModel, self).__init__(
+            model=model,
+            criterion=criterion,
+            optimizer=optimizer,
+            scheduler=scheduler
+        )
 
     def __setattr__(self, key, value):
         if key == 'device':
