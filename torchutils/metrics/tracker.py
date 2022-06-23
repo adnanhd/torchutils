@@ -1,4 +1,9 @@
 import numpy as np
+import warnings
+
+
+class NanValueWarning(Warning):
+    pass
 
 
 class AverageMeter(object):
@@ -24,6 +29,8 @@ class AverageMeter(object):
         self.count = 0
 
     def update(self, value, n=1) -> None:
+        if np.isnan(value):
+            warnings.warn(f"Metric({self._name}) receiveed a nan value)")
         self.value = value
         self.sum += value * n
         self.count += n
