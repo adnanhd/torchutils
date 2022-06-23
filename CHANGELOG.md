@@ -118,6 +118,10 @@
 		- [ ] TODO: pass it directly to TrainerModel.forward\_pass
 
 ## Planned TODOs
+### ASAP
+- [ ] Refactor WandbLogger and FileLogger to work with current API
+- [ ] instead of TrainerLogger.getEvent() method create TrainerLoggerGroup as an either function or class
+
 ### v1.4.1
 - [ ] remove LoggerEvent from log messages, instead set it on TrainerHandler
 - [ ] migrate calls in ScoreLoggerCallback to TrainerHandler
