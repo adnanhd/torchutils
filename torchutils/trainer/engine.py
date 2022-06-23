@@ -194,10 +194,12 @@ class Trainer:
             **dataloader_kwargs,
         )
 
-        args = EvaluatingArguments(**kwargs,
-                                   eval_dl_batch_size=eval_dl.batch_size)
-
-        self._handler.set_arguments(args, eval_dl=eval_dl)
+        self._handler.compile_model_and_hparams(
+            model=self._model,
+            eval_dl=eval_dl,
+            eval_dl_batch_size=eval_dl.batch_size,
+            **kwargs
+        )
         self._handler.on_initialization()
 
         try:
@@ -273,7 +275,6 @@ class Trainer:
 
     def _run_evaluating(
         self,
-        # trainer_arguments: TrainingArguments,
         eval_loader: Optional[torch.utils.data.DataLoader],
     ) -> torch.Tensor:
 
@@ -310,7 +311,6 @@ class Trainer:
 
     def _run_validating(
         self,
-        # trainer_arguments: TrainingArguments,
         valid_loader: Optional[torch.utils.data.DataLoader],
     ) -> torch.Tensor:
 

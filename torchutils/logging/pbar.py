@@ -99,8 +99,8 @@ class SampleProgressBar(ProgressBarLogger):
         super().__init__(**kwargs)
 
     def open(self, args: HandlerArguments, valid: bool = True):
-        if valid:
+        if args.valid_dl is not None:
             total = args.valid_dl.num_steps
         else:
-            total = args.test_dl.num_steps
+            total = args.eval_dl.num_steps
         super().open(total=total)

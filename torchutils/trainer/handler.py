@@ -122,6 +122,7 @@ class TrainerHandler():
         self._callbacks.on_training_end(self.status)
 
     def on_validation_run_begin(self):
+        self.trainer_proxy.average_current_scores()
         self._callbacks.on_validation_run_begin(self.status)
 
     def on_validation_step_begin(self):
@@ -133,7 +134,6 @@ class TrainerHandler():
         self._callbacks.on_validation_step_end(self.trainer_proxy)
 
     def on_validation_run_end(self):
-        self.trainer_proxy.average_current_scores()
         self._callbacks.on_validation_run_end(self.trainer_proxy)
 
     def on_evaluation_run_begin(self):

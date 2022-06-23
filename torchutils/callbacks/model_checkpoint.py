@@ -111,7 +111,7 @@ class ModelCheckpoint(TrainerCallback):
             else:
                 save_model = self.is_value_better(metric_value=best_score)
         else:
-            save_model
+            save_model = True
         if save_model:
             checkpoint = {'state_dict': self._best_weights,
                           'scores': {self.monitor: self._best_score}}
@@ -150,10 +150,11 @@ class ModelCheckpoint(TrainerCallback):
                 "the current best checkpoint is reset with None."
             )
 
-    def on_training_epoch_begin(self, status: TrainerStatus):
-        if self._best_weights is not None and \
-                status.current_epoch % self.load_back_per_epochs == 0:
-            self.set_checkpoint_into_model()
+    def on_initialization(self, args: HandlerArguments):
+        if self.model is None:
+            self.model = args.model
+        if self.init_from_checkpoint and os.path.isfile(self.save_path):
+            self.load_from_checkpoint()
 
     def on_training_epoch_end(self, epoch: CurrentIterationStatus):
         metric_value = epoch.get_current_scores(self.monitor)[self.monitor]
@@ -165,12 +166,17 @@ class ModelCheckpoint(TrainerCallback):
     def on_training_end(self, stat: TrainerStatus):
         if self._best_weights is not None:
             self.model.load_state_dict(self._best_weights)
-        self.save_into_checkpoint()
-
-    def on_training_begin(self, stat: TrainerStatus):
-        if False and self._best_weights is not None:
-            self.model.load_state_dict(self._best_weights)
+            if self.halt_into_checkpoint:
+                self.save_into_checkpoint()
 
     def on_evaluation_begin(self, stat: TrainerStatus):
-        if False and self._best_weights is not None:
+        if self.eval_with_best_model and self._best_weights is not None:
             self.model.load_state_dict(self._best_weights)
+
+    def on_termination(self, stat: TrainerStatus):
+        if self.halt_into_checkpoint and self._best_weights is not None:
+            self.save_into_checkpoint()
+
+    def on_stop_training_error(self, stat: TrainerStatus):
+        if self.halt_into_checkpoint and self._best_weights is not None:
+            self.save_into_checkpoint()
