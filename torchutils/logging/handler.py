@@ -7,13 +7,14 @@ from .proxy import LoggingEvent, LoggerProxy
 
 
 class LoggerHandler(ABC):
-    __slots__ = ['_logger_dict_', '_logger_list_']
+    __slots__ = ['_logger_dict_', '_logger_list_', '_current_event_']
     __handler__ = None
 
     def __init__(self):
         self._logger_dict_: Dict[LoggingEvent,
                                  List[TrainerLogger]] = defaultdict(list)
         self._logger_list_: List[TrainerLogger] = list()
+        self._current_event_: List[LoggingEvent] = [None]
 
     def add_logger(self,
                    event: LoggingEvent,
@@ -39,6 +40,14 @@ class LoggerHandler(ABC):
         else:
             raise AssertionError(f"{logger} must be of TrainerLogger")
 
+    def set_event(self, event):
+        assert isinstance(event, LoggingEvent)
+        self._current_event_[0] = event
+
+    def set_status(self, status: TrainerStatus) -> None:
+        assert isinstance(status, TrainerStatus)
+        self.setStatus(status)
+
     def clear_loggers(self):
         self._logger_dict_.clear()
         self._logger_list_.clear()
@@ -60,10 +69,12 @@ class LoggerHandler(ABC):
 
     @classmethod
     def getProxy(cls) -> LoggerProxy:
-        return LoggerProxy(loggers=cls.getHandler()._logger_dict_)
+        handler: LoggerHandler = cls.getHandler()
+        return LoggerProxy(loggers=handler._logger_dict_,
+                           _event_ptr=handler._current_event_)
 
     @classmethod
-    def setStatus(cls, status) -> None:
+    def setStatus(cls, status: TrainerStatus) -> None:
         LoggerProxy.__status__[0] = status
 
     def terminate(self, stats: TrainerStatus, event: LoggingEvent = None):

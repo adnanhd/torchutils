@@ -34,7 +34,7 @@ class ScoreLoggerCallback(TrainerCallback):
                                  event=LoggingEvent.TRAINING_BATCH)
 
     def on_training_step_end(self, batch: CurrentIterationStatus):
-        self._log.event = LoggingEvent.TRAINING_BATCH
+        # self._log.event = LoggingEvent.TRAINING_BATCH
         self._log.log_scores(batch.get_current_scores())
         self._log.update(1)
 
@@ -44,7 +44,7 @@ class ScoreLoggerCallback(TrainerCallback):
                                  event=LoggingEvent.VALIDATION_RUN)
 
     def on_validation_step_end(self, batch: CurrentIterationStatus):
-        self._log.event = LoggingEvent.VALIDATION_RUN
+        # self._log.event = LoggingEvent.VALIDATION_RUN
         self._log.log_scores(batch.get_current_scores())
         self._log.update(1)
 
@@ -55,7 +55,7 @@ class ScoreLoggerCallback(TrainerCallback):
     def on_training_epoch_end(self, epoch: CurrentIterationStatus):
         self._handler.terminate(stats=epoch.status,
                                 event=LoggingEvent.TRAINING_BATCH)
-        self._log.event = LoggingEvent.TRAINING_EPOCH
+        # self._log.event = LoggingEvent.TRAINING_EPOCH
         self._log.log_scores(epoch.get_current_scores())
         self._log.update(1)
 
@@ -71,10 +71,16 @@ class ScoreLoggerCallback(TrainerCallback):
                                  event=LoggingEvent.EVALUATION_RUN)
 
     def on_evaluation_step_end(self, batch: CurrentIterationStatus):
-        self._log.event = LoggingEvent.EVALUATION_RUN
+        # self._log.event = LoggingEvent.EVALUATION_RUN
         self._log.log_scores(batch.get_current_scores())
         self._log.update(1)
 
     def on_evaluation_run_end(self, stat: TrainerStatus):
         self._handler.terminate(stats=stat,
                                 event=LoggingEvent.EVALUATION_RUN)
+
+    def on_stop_training_error(self, stat: TrainerStatus):
+        self._handler.terminate(stats=stat, event=LoggingEvent.TRAINING_BATCH)
+        self._handler.terminate(stats=stat, event=LoggingEvent.TRAINING_EPOCH)
+        self._handler.terminate(stats=stat, event=LoggingEvent.EVALUATION_RUN)
+        self._handler.terminate(stats=stat, event=LoggingEvent.VALIDATION_RUN)

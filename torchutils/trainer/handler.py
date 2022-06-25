@@ -18,7 +18,7 @@ from torchutils.utils.pydantic import (
 
 class TrainerHandler():
     __slots__ = [
-        'trainer_proxy',
+        'iteration_proxy',
         '_arguments',
         '_loggers',
         '_metrics',
@@ -32,7 +32,7 @@ class TrainerHandler():
         self._loggers: LoggerHandler = LoggerHandler.getHandler()
         self._log = LoggerHandler.getProxy()
         self._arguments: HandlerArguments = None
-        self.trainer_proxy = CurrentIterationStatus(handler=self._metrics)
+        self.iteration_proxy = CurrentIterationStatus(handler=self._metrics)
 
     @property
     def status(self) -> TrainerStatus:
@@ -55,7 +55,7 @@ class TrainerHandler():
             eval_dl=eval_dl,
             **hparams
         )
-        self.trainer_proxy.status = self._arguments.status
+        self.iteration_proxy.status = self._arguments.status
         self._loggers.setStatus(self._arguments.status)
 
     def compile_handlers(
@@ -71,7 +71,7 @@ class TrainerHandler():
         self._metrics.add_score_meters(*metrics)
         self._callbacks.add_callbacks(callbacks)
         score_names = self._metrics.get_score_names()
-        self.trainer_proxy.set_score_names(score_names)
+        self.iteration_proxy.set_score_names(score_names)
 
     def decompile_handlers(
             self,
@@ -87,14 +87,14 @@ class TrainerHandler():
         self._callbacks.remove_callbacks(callbacks)
         # TODO: remove *sign
         score_names = self._metrics.get_score_names()
-        self.trainer_proxy.set_score_names(score_names)
+        self.iteration_proxy.set_score_names(score_names)
 
     def clear_handlers(self):
         self._loggers.clear_loggers()
         self._callbacks.clear_callbacks()
         score_names = self._metrics.get_score_names()
         self._metrics.remove_score_meters(*score_names)
-        self.trainer_proxy.reset_score_names()
+        self.iteration_proxy.reset_score_names()
 
     def on_initialization(self):
         self._callbacks.on_initialization(self._arguments)
@@ -111,32 +111,32 @@ class TrainerHandler():
         self._callbacks.on_training_step_begin(self.status)
 
     def on_training_step_end(self, x, y, y_pred):
-        self._log.event = LoggingEvent.TRAINING_BATCH
-        self.trainer_proxy.set_current_scores(x, y_true=y, y_pred=y_pred)
-        self._callbacks.on_training_step_end(self.trainer_proxy)
+        self._loggers.set_event(LoggingEvent.TRAINING_BATCH)
+        self.iteration_proxy.set_current_scores(x, y_true=y, y_pred=y_pred)
+        self._callbacks.on_training_step_end(self.iteration_proxy)
 
     def on_training_epoch_end(self):
-        self._log.event = LoggingEvent.TRAINING_EPOCH
-        self.trainer_proxy.average_current_scores()
-        self._callbacks.on_training_epoch_end(self.trainer_proxy)
+        self._loggers.set_event(LoggingEvent.TRAINING_EPOCH)
+        self.iteration_proxy.average_current_scores()
+        self._callbacks.on_training_epoch_end(self.iteration_proxy)
 
     def on_training_end(self):
         self._callbacks.on_training_end(self.status)
 
     def on_validation_run_begin(self):
-        self.trainer_proxy.average_current_scores()
+        self.iteration_proxy.average_current_scores()
         self._callbacks.on_validation_run_begin(self.status)
 
     def on_validation_step_begin(self):
         self._callbacks.on_validation_step_begin(self.status)
 
     def on_validation_step_end(self, x, y, y_pred):
-        self._log.event = LoggingEvent.VALIDATION_RUN
-        self.trainer_proxy.set_current_scores(x=x, y_true=y, y_pred=y_pred)
-        self._callbacks.on_validation_step_end(self.trainer_proxy)
+        self._loggers.set_event(LoggingEvent.VALIDATION_RUN)
+        self.iteration_proxy.set_current_scores(x=x, y_true=y, y_pred=y_pred)
+        self._callbacks.on_validation_step_end(self.iteration_proxy)
 
     def on_validation_run_end(self):
-        self._callbacks.on_validation_run_end(self.trainer_proxy)
+        self._callbacks.on_validation_run_end(self.iteration_proxy)
 
     def on_evaluation_run_begin(self):
         self._callbacks.on_evaluation_run_begin(self.status)
@@ -145,13 +145,13 @@ class TrainerHandler():
         self._callbacks.on_evaluation_step_begin(self.status)
 
     def on_evaluation_step_end(self, x, y, y_pred):
-        self._log.event = LoggingEvent.EVALUATION_RUN
-        self.trainer_proxy.set_current_scores(x=x, y_true=y, y_pred=y_pred)
-        self._callbacks.on_evaluation_step_end(self.trainer_proxy)
+        self._loggers.set_event(LoggingEvent.EVALUATION_RUN)
+        self.iteration_proxy.set_current_scores(x=x, y_true=y, y_pred=y_pred)
+        self._callbacks.on_evaluation_step_end(self.iteration_proxy)
 
     def on_evaluation_run_end(self):
-        self.trainer_proxy.average_current_scores()
-        self._callbacks.on_evaluation_run_end(self.trainer_proxy)
+        self.iteration_proxy.average_current_scores()
+        self._callbacks.on_evaluation_run_end(self.iteration_proxy)
 
     def on_stop_training_error(self):
         self._callbacks.on_stop_training_error(self.status)

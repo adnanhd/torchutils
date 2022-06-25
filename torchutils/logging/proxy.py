@@ -3,7 +3,7 @@ import enum
 import argparse
 import warnings
 from .base import TrainerLogger
-from typing import Dict, Optional, Any
+from typing import Dict, List, Any
 from torchutils.utils.pydantic import TrainerStatus
 from .utils import LoggerMethodNotImplError, LoggingEvent, Image, DataFrame
 
@@ -19,36 +19,28 @@ class ProxyMethods(enum.Enum):
 
 class LoggerProxy(abc.ABC):
 
-    __slots__ = ['__loggers__', '_event']
+    __slots__ = ['__loggers__', '__event__']
     __status__ = [None]
 
     def __init__(self,
-                 loggers: Dict[str, TrainerLogger]):
+                 loggers: Dict[str, TrainerLogger],
+                 _event_ptr: List[LoggingEvent]):
         assert all(
             all(isinstance(logger, TrainerLogger) for logger in logger_list)
             for logger_list in loggers.values()), (
             f"{loggers.values()} must be a list of TrainerLogger"
         )
         self.__loggers__ = loggers
-        self._event: Optional[LoggingEvent] = None
+        self.__event__: List[LoggingEvent] = _event_ptr
 
     @property
-    def event(self):
-        return self._event.value
-
-    @event.setter
-    def event(self, event):
-        if isinstance(event, LoggingEvent):
-            self._event = event
-        else:
-            raise AssertionError(
-                f"event must be of LoggingEvent, not {type(event)}"
-            )
+    def event(self) -> LoggingEvent:
+        return self.__event__[0]
 
     def __log__(self, method: ProxyMethods, message: Any):
-        if self.__loggers__[self._event].__len__() != 0:
+        if self.__loggers__[self.event].__len__() != 0:
             any_overwritten_method = False
-            for logger in self.__loggers__[self._event]:
+            for logger in self.__loggers__[self.event]:
                 try:
                     log_fn = getattr(logger, method.name.lower())
                     log_fn(message, status=self.__status__[0])

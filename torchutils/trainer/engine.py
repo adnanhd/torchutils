@@ -230,7 +230,7 @@ class Trainer:
             self._run_training_epoch(train_loader, valid_loader)
 
         self._handler.on_training_end()
-        return self._handler.trainer_proxy.get_score_history()
+        return self._handler.iteration_proxy.get_score_history()
 
     def _run_training_epoch(
         self,
