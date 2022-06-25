@@ -8,9 +8,9 @@ ${install_path}: ${utils_files}
 	@-pip uninstall -y torchutils
 	@pip install -U ./
 
-tests: ${install_path}
+test_trainer: ${install_path}
 	#cd tests/ && python3 -c 'import torchutils'
-	python3 -m pytest ./$@/
+	python3 -m pytest ./tests/$@/
 
 resnet: ${install_path}
 	python3 ./test_resnet/main.py
