@@ -3,4 +3,4 @@ import torchutils.models
 import torchutils.trainer
 import torchutils.logging
 
-__version__ = torchutils.utils.Version('1.4.1a')
+__version__ = torchutils.utils.Version('1.4.1b')

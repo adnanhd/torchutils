@@ -37,13 +37,14 @@ class WandbLogger(TrainerLogger):
 
     @classmethod
     def getLogger(cls, event: LoggingEvent,
-                  experiment: str = None,
-                  project: str = None,
-                  username: str = None,
+                  experiment: str,
+                  project: str,
+                  username: str,
                   groupname: str = None,
                   **kwargs) -> "TrainerLogger":
-        return cls(experiment=experiment, project=project,
-                   username=username, groupname=groupname)
+        if event == LoggingEvent.TRAINING_EPOCH:
+            return cls(experiment=experiment, project=project,
+                       username=username, groupname=groupname)
 
     def log_scores(self,
                    scores: typing.Dict[str, float],

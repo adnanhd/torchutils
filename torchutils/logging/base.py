@@ -13,11 +13,14 @@ class TrainerLogger(abc.ABC):
     and evaluation epoch using a progress bar
     """
     @classmethod
-    def getLoggerGroup(cls) -> typing.Dict["TrainerLogger",
-                                           typing.List[LoggingEvent]]:
+    def getLoggerGroup(cls, **kwargs
+                       ) -> typing.Dict["TrainerLogger",
+                                        typing.List[LoggingEvent]]:
         result = collections.defaultdict(list)
         for event in LoggingEvent.getAllEvents():
-            result[cls.getLogger(event)].append(event)
+            logger = cls.getLogger(event=event, **kwargs)
+            if isinstance(logger, TrainerLogger):
+                result[logger].append(event)
         return dict(result)
 
     @classmethod
