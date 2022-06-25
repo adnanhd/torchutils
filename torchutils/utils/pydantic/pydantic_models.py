@@ -1,4 +1,6 @@
+from torchutils.metrics import AverageMeter
 import pydantic
+import enum
 import torch
 import inspect
 import warnings
@@ -13,6 +15,7 @@ import typing
 from .pydantic_types import (
     # NpScalarType,
     NpTorchType,
+    GradTensorType,
     ModuleType,
     OptimizerType,
     SchedulerType,
@@ -24,7 +27,8 @@ from torchutils.utils import (
     string_to_criterion_class,
     string_to_optimizer_class,
     string_to_scheduler_class,
-    string_to_functionals
+    string_to_functionals,
+    obtain_registered_kwargs
 )
 
 
@@ -33,6 +37,9 @@ class TrainerModel(pydantic.BaseModel):
     criterion: typing.Union[ModuleType, FunctionType]
     optimizer: OptimizerType
     scheduler: typing.Optional[SchedulerType]
+    _loss: AverageMeter = pydantic.PrivateAttr(AverageMeter("Loss"))
+    _backward_hooks: typing.List[GradTensorType] = pydantic.PrivateAttr(
+        default_factory=list)
 
     def __init__(
         self,
@@ -44,16 +51,6 @@ class TrainerModel(pydantic.BaseModel):
         scheduler: typing.Union[str, _LRScheduler, None] = None,
         ** kwargs,
     ):
-        def obtain_registered_kwargs(fn: typing.Callable,
-                                     kwargs: typing.Dict[str, typing.Any]):
-            return dict(
-                filter(
-                    lambda item: item[0] in inspect.signature(
-                        fn).parameters.keys(),
-                    kwargs.items()
-                )
-            )
-
         if isinstance(criterion, str):
             if criterion in string_to_criterion_class:
                 criterion_class = string_to_criterion_class[criterion]
@@ -87,10 +84,8 @@ class TrainerModel(pydantic.BaseModel):
                     f"{scheduler} is not a registered Scheduler"
                 )
 
-        super(TrainerModel, self).__init__(model=model,
-                                           criterion=criterion,
-                                           optimizer=optimizer,
-                                           scheduler=scheduler)
+        super().__init__(model=model, criterion=criterion, **kwargs,
+                         optimizer=optimizer, scheduler=scheduler)
 
     def __setattr__(self, key, value):
         if key == 'device':
@@ -105,16 +100,23 @@ class TrainerModel(pydantic.BaseModel):
         return super().__setattr__(key, value)
 
     @property
-    def dtype(self):
+    def dtype(self) -> torch.dtype:
         return next(self.model.parameters()).dtype
 
     @property
-    def device(self):
+    def device(self) -> torch.device:
         return next(self.model.parameters()).device
 
     @property
-    def learning_rate(self):
+    def learning_rate(self) -> float:
         return self.optimizer.param_groups[0]['lr']
+
+    @property
+    def loss(self) -> float:
+        return self._loss.average
+
+    def __call__(self, input):
+        return self.model(input)
 
     def __getstate__(self) -> typing.Set[str]:
         if isinstance(self.criterion, Module):
@@ -166,23 +168,45 @@ class TrainerModel(pydantic.BaseModel):
         self.model.eval()
         self.criterion.eval()
 
-    def optimizer_step(self):
-        self.optimizer.step()
-
-    def optimizer_zero_grad(self):
-        self.optimizer.zero_grad()
+    def register_metrics_to(self, handler: MetricHandler):
+        assert isinstance(handler, MetricHandler)
+        handler.add_score_meters(self._loss)
 
     def scheduler_step(self):
-        if self.scheduler is not None:
+        if self.scheduler is None:
+            pass
+        elif isinstance(self.scheduler,
+                        torch.optim.lr_scheduler.ReduceLROnPlateau):
+            self.scheduler.step(self.loss)
+        else:
             self.scheduler.step()
 
-    def __call__(self, input):
-        return self.model(input)
+    def reset_backward(self):
+        self.scheduler_step()
+        self._backward_hooks.clear()
+
+    def _push_for_backward(self, tensor: torch.Tensor) -> None:
+        if hasattr(tensor, 'requires_grad') and tensor.requires_grad:
+            self._backward_hooks.append(tensor)
 
     def forward_pass(self, x, y, batch_idx=None):
         y_pred = self.model(x)
         loss = self.criterion(y_pred, y)
-        return y_pred, loss
+        self._loss.update(loss.item())
+        self._push_for_backward(loss)
+        return y_pred
+
+    def backward_pass(self):
+        self.optimizer.zero_grad()
+        if self._backward_hooks.__len__() == 0:
+            warnings.warn(
+                "TrainerModel.backward_pass receives no loss to backward"
+                "check requires_grad attribute of input and output pairs",
+                RuntimeWarning
+            )
+        while self._backward_hooks.__len__() != 0:
+            self._backward_hooks.pop().backward()
+        self.optimizer.step()
 
     def compile(
             self,
@@ -208,7 +232,7 @@ class TrainingArguments(pydantic.BaseModel):
     learning_rate: float = pydantic.Field(ge=0.0, le=1.0)
     resume_epochs: int = 0
     train_dl_batch_size: int
-    valid_dl_batch_size: int = -1  # All elements at a batch
+    valid_dl_batch_size: typing.Optional[int] = -1  # All elements at a batch
     num_epochs_per_validation: int = 1
 
 
@@ -216,6 +240,9 @@ class EvaluatingArguments(pydantic.BaseModel):
     class Config:
         allow_mutation = False
     eval_dl_batch_size: int = 1  # One element per patch
+
+    def num_steps(self):
+        return self.dataloader.__len__()
 
 
 class TrainerDataLoader(pydantic.BaseModel):
@@ -240,19 +267,32 @@ class TrainerDataLoader(pydantic.BaseModel):
 
 
 class TrainerStatus(pydantic.BaseModel):
+    class StatusCode(enum.Enum):
+        FINISHED_SUCCESSFULLY = 0
+        UNINITIALIZED = 1
+        STARTED_SUCCESSFULLY = 2
+        STOP_TRAINING_ERROR_OCCURED = 3
+        AN_EXTERNAL_ERROR_OCCURED = 4
+
     class Config:
         allow_mutation = True
     current_epoch: int = None
     current_batch: int = None
+    _status_code: StatusCode = pydantic.PrivateAttr(
+        default=StatusCode(StatusCode.UNINITIALIZED)
+    )
 
-    def lock(self):
-        if self.__config__.allow_mutation:
-            self.__config__.allow_mutation = False
+    @property
+    def status_code(self) -> int:
+        return self._status_code.value
 
-            def unlock(self):
-                self.__config__.allow_mutation = True
-            return unlock
-        raise LookupError("HandlerArguments has been locked already.")
+    def set_status_code(self, status_code: StatusCode):
+        assert isinstance(status_code, self.StatusCode)
+        self._status_code = status_code
+
+    @property
+    def status_message(self) -> str:
+        return self._status_code.name
 
 
 class HandlerArguments(pydantic.BaseModel):
@@ -290,9 +330,20 @@ class HandlerArguments(pydantic.BaseModel):
         }
         super().__init__(model=model, **dataloaders)
         if is_in_training:
-            self._hparams = TrainingArguments(**kwargs)
+            if valid_dl is not None:
+                kwargs['valid_dl_batch_size'] = valid_dl.batch_size
+            else:
+                kwargs['valid_dl_batch_size'] = None
+            self._hparams = TrainingArguments(
+                learning_rate=model.learning_rate,
+                train_dl_batch_size=train_dl.batch_size,
+                **kwargs
+            )
         else:
-            self._hparams = EvaluatingArguments(**kwargs)
+            self._hparams = EvaluatingArguments(
+                eval_dl_batch_size=eval_dl.batch_size,
+                **kwargs
+            )
         self._status_ptr = [TrainerStatus()]
 
     @property
@@ -339,25 +390,19 @@ class HandlerArguments(pydantic.BaseModel):
 
 
 class CurrentIterationStatus(pydantic.BaseModel):
+    _at_epoch_end: bool = pydantic.PrivateAttr(False)
     _metric_handler: MetricHandler = pydantic.PrivateAttr()
+    _epoch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
+    _batch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
     _x: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
     _y_true: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
     _y_pred: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
-    _epoch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
-    _batch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
-    _at_epoch_end: bool = pydantic.PrivateAttr(False)
+    _status_ptr: typing.List[TrainerStatus] = pydantic.PrivateAttr([None])
 
     def __init__(self, handler: MetricHandler):
         super().__init__()
         self._metric_handler = handler
-
-    # @property
-    # def current_epoch(self):
-    #     return self._epoch_idx
-
-    # @property
-    # def current_batch(self):
-    #     return self._batch_idx
+        self._status_ptr = [None]
 
     @property
     def x(self):
@@ -370,6 +415,17 @@ class CurrentIterationStatus(pydantic.BaseModel):
     @property
     def y_true(self):
         return self._y_true
+
+    @property
+    def status(self) -> typing.Optional[TrainerStatus]:
+        return self._status_ptr[0]
+
+    def __setattr__(self, key, value):
+        if key == 'status':
+            assert isinstance(value, TrainerStatus)
+            self._status_ptr[0] = value
+            return object.__setattr__(self._status_ptr[0], 'status', value)
+        return super().__setattr__(key, value)
 
     def get_score_names(self):
         return self._metric_handler.get_score_names()

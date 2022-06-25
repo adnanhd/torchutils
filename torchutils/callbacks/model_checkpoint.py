@@ -1,5 +1,6 @@
 # Copyright © 2021 Chris Hughes
 import os
+import copy
 import torch
 import warnings
 from .base import TrainerCallback
@@ -90,10 +91,10 @@ class ModelCheckpoint(TrainerCallback):
             def on_training_epoch_begin(self, status: TrainerStatus):
                 if self._best_weights is not None and \
                         status.current_epoch % self.load_back_per_epochs == 0:
-                    self.set_checkpoint_into_model()
+                    self._put_checkpoint_into_model()
             self.on_training_epoch_begin = on_training_epoch_begin
 
-    def is_value_better(self, metric_value):
+    def is_value_better(self, metric_value: float) -> bool:
         # if aim is to maximize score, then check whether metric_value is
         # greater then our best score with a margin/confidency of delta
         # otherwise, then check whether metric_value is lower then our best
@@ -101,7 +102,7 @@ class ModelCheckpoint(TrainerCallback):
         return self.maximize and metric_value > (1 + self.delta) * self._best_score \
             or metric_value < (1 - self.delta) * self._best_score
 
-    def save_into_checkpoint(self) -> None:
+    def _save_into_filesystem(self) -> None:
         if self.save_only_best_model and os.path.isfile(self.save_path):
             checkpoint = torch.load(self.save_path)
             try:
@@ -111,38 +112,54 @@ class ModelCheckpoint(TrainerCallback):
             else:
                 save_model = self.is_value_better(metric_value=best_score)
         else:
-            save_model
+            save_model = True
         if save_model:
             checkpoint = {'state_dict': self._best_weights,
                           'scores': {self.monitor: self._best_score}}
             torch.save(checkpoint, self.save_path)
 
-    def load_from_checkpoint(self):
+    def _load_from_filesystem(self):
         if os.path.isfile(self.save_path):
-            checkpoint = torch.load(
-                self.save_path, map_location=self.model.device)
-            self._best_weights = checkpoint['state_dict']
+            checkpoint = torch.load(f=self.save_path,
+                                    map_location=self.model.device)
+            try:
+                best_score = checkpoint['scores'][self.monitor]
+            except KeyError:
+                load_model = False
+                best_score = None
+            else:
+                load_model = not self.is_value_better(best_score)
+
+            if not self.save_only_best_model:
+                load_model = True
+
+            if load_model:
+                self._reset_checkpoints()
+                self._best_weights = checkpoint['state_dict']
+                if best_score is not None:
+                    self._best_score = best_score
+
         else:
             warnings.warn(
-                "ModelCheckpoint.load_from_checkpoint: file could not "
+                "ModelCheckpoint._load_from_filesystem: file could not "
                 f"found in {self.save_path}")
 
-    def get_checkpoint_from_model(self, model_score):
+    def _get_checkpoint_from_model(self, model_score):
         self._best_score = model_score
-        self._best_weights = self.model.state_dict()
+        self._best_weights = copy.deepcopy(self.model.state_dict())
         if self.verbose:
             self.trace_func(
                 "A newer checkpoint is obtained from the model."
             )
 
-    def set_checkpoint_into_model(self):
+    def _put_checkpoint_into_model(self):
         self.model.load_state_dict(self._best_weights)
         if self.verbose:
             self.trace_func(
                 "the current checkpoint is loaded into the model."
             )
 
-    def reset_checkpoint(self):
+    def _reset_checkpoints(self):
         self._best_weights = None
         self._best_score: float = float("-inf" if self.maximize else "inf")
         if self.verbose:
@@ -150,27 +167,30 @@ class ModelCheckpoint(TrainerCallback):
                 "the current best checkpoint is reset with None."
             )
 
-    def on_training_epoch_begin(self, status: TrainerStatus):
-        if self._best_weights is not None and \
-                status.current_epoch % self.load_back_per_epochs == 0:
-            self.set_checkpoint_into_model()
+    def on_initialization(self, args: HandlerArguments):
+        if self.model is None:
+            self.model = args.model
+        if self.init_from_checkpoint and os.path.isfile(self.save_path):
+            self._load_from_filesystem()
 
     def on_training_epoch_end(self, epoch: CurrentIterationStatus):
         metric_value = epoch.get_current_scores(self.monitor)[self.monitor]
 
         if self.is_value_better(metric_value):
-            self._best_score = metric_value
-            self._best_weights = self.model.state_dict()
+            self._get_checkpoint_from_model(metric_value)
 
     def on_training_end(self, stat: TrainerStatus):
         if self._best_weights is not None:
-            self.model.load_state_dict(self._best_weights)
-        self.save_into_checkpoint()
-
-    def on_training_begin(self, stat: TrainerStatus):
-        if False and self._best_weights is not None:
-            self.model.load_state_dict(self._best_weights)
+            self._put_checkpoint_into_model()
 
     def on_evaluation_begin(self, stat: TrainerStatus):
-        if False and self._best_weights is not None:
-            self.model.load_state_dict(self._best_weights)
+        if self.eval_with_best_model and self._best_weights is not None:
+            self._put_checkpoint_into_model()
+
+    def on_termination(self, stat: TrainerStatus):
+        if self.halt_into_checkpoint and self._best_weights is not None:
+            self._save_into_filesystem()
+
+    def on_stop_training_error(self, stat: TrainerStatus):
+        if self.halt_into_checkpoint and self._best_weights is not None:
+            self._save_into_filesystem()

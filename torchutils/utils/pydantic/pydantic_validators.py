@@ -5,7 +5,7 @@ from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
 from torch.nn import Module
 from torch.optim import Optimizer
-from torch.optim.lr_scheduler import _LRScheduler
+from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
 
 
 def validate_torch_dataloader(other: Any) -> DataLoader:
@@ -65,7 +65,7 @@ def validate_nn_optimizer(other) -> Optional[Optimizer]:
 
 
 def validate_nn_scheduler(other) -> Optional[_LRScheduler]:
-    if isinstance(other, _LRScheduler):
+    if isinstance(other, _LRScheduler) or isinstance(other, ReduceLROnPlateau):
         return other
     else:
         raise ValueError()

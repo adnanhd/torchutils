@@ -168,8 +168,8 @@ class CallbackHandler:
         self._callback.on_evaluation_step_end(batch=batch)
 
     @_foreach_callback_
-    def on_evaluation_run_end(self, epoch: CurrentIterationStatus):
-        self._callback.on_evaluation_run_end(epoch=epoch)
+    def on_evaluation_run_end(self, stat: TrainerStatus):
+        self._callback.on_evaluation_run_end(stat)
 
     @_foreach_callback_require_stat_
     def on_stop_training_error(self, stat: TrainerStatus):

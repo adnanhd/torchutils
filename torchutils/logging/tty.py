@@ -1,43 +1,87 @@
-from torchutils.utils.pydantic import HandlerArguments
-from torchutils.logging.base import TrainerLogger
-from typing import Optional, Dict, List, Any
+import typing
+import argparse
 import logging
+from .utils import DataFrame
+from .utils import LoggingEvent
+from torchutils.logging.base import TrainerLogger
+from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
 
 
-class PrintWriter(TrainerLogger):
-    __slots__ = ['_logger', '_summary']
+class SlurmLogger(TrainerLogger):
+    __slots__ = ['_logger', '_level', '_handler', '_log_dict_']
 
     def __init__(self,
-                 filename: Optional[str] = None,
+                 experiment: str,
+                 host: typing.Optional[str] = None,
+                 port: typing.Optional[float] = None,
                  format: str = '[%(asctime)s] %(levelname)-8s %(name)-12s %(message)s',
-                 level=logging.INFO,
-                 **kwargs):
+                 filename: typing.Optional[str] = None,
+                 level=logging.INFO, **config):
+        self._level: int = level
+        self._log_dict_ = dict()
         self._logger: logging.Logger = None
-        logging.basicConfig(format=format,
-                            filename=filename,
-                            level=level,
-                            **kwargs)
-        self._summary = None
+        if filename is not None:
+            self._handler = logging.FileHandler(filename)
+        elif host is not None:
+            self._handler = logging.handlers.SocketHandler(host, port)
+        else:
+            self._handler = logging.NullHandler(level=level)
+        logging.basicConfig(format=format, level=level, **config)
 
-    def open(self, args: HandlerArguments = None, **kwargs):
-        self._logger = logging.getLogger(**kwargs)
+    @classmethod
+    def getLogger(cls, event: LoggingEvent,
+                  **kwargs) -> "TrainerLogger":
+        if event == LoggingEvent.TRAINING_EPOCH:
+            kwargs.setdefault('level', logging.INFO)
+            return EpochSlurmLogger(**kwargs)
+        else:
+            kwargs.setdefault('level', logging.WARN)
+            return BatchSlurmLogger(**kwargs)
+
+    def open(self, args: HandlerArguments):
+        self._logger = logging.getLogger()
+        self._logger.addHandler(self._handler)
 
     def log_scores(self,
-                   scores: Dict[str, float],
-                   step: Optional[int] = None):
-        self._logger.info(scores)
+                   scores: typing.Dict[str, float],
+                   status: TrainerStatus):
+        self._log_dict_.update(scores)
+
+    def update(self, n, status: TrainerStatus):
+        pass
+
+    def log_string(self,
+                   string: str,
+                   status: TrainerStatus):
+        self._logger.log(self._level, string)
+
+    def close(self, status: TrainerStatus):
+        self._handler.close()
+
+
+class EpochSlurmLogger(SlurmLogger):
+    def open(self, args: HandlerArguments):
+        name = f'Epoch {args.status.current_epoch}'
+        self._logger = logging.getLogger(name=name)
+        self._logger.addHandler(self._handler)
+
+    def log_hyperparams(self,
+                        params: argparse.Namespace,
+                        status: TrainerStatus):
+        self._log_dict_.update(params.__dict__)
 
     def log_table(self,
-                  key: str,
-                  table: Dict[str, List[Any]]):
-        self._logger.info(str(table))
+                  tables: typing.Dict[str, DataFrame],
+                  status: TrainerStatus):
+        self._log_dict_.update(tables)
 
-    def log_string(self, msg):
-        self._logger.info(msg)
+    def update(self, n, status: TrainerStatus):
+        self._logger.log(self._level, self._log_dict_)
+        self._log_dict_.clear()
 
-    # TODO: add summary to log_module
-    # def log_module(self, module):
-    #     raise LoggerMethodNotImpl()
 
-    def close(self):
-        self._logger = None
+class BatchSlurmLogger(SlurmLogger):
+    def log_scores(self,
+                   scores: typing.Dict[str, float],
+                   status: TrainerStatus):
+        pass
