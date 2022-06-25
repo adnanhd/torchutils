@@ -43,7 +43,7 @@ class EarlyStopping(TrainerCallback):
         self.trace_func = trace_func
 
     def on_training_epoch_end(self, epoch: CurrentIterationStatus):
-        score = - epoch.get_latest_scores(self.monitor)[self.monitor]
+        score = - epoch.get_current_scores(self.monitor)[self.monitor]
 
         if self.best_score is None:
             self.best_score = score
@@ -60,5 +60,3 @@ class EarlyStopping(TrainerCallback):
         else:
             self.best_score = score
             self.counter = 0
-
-        return self.early_stop

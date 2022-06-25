@@ -1,6 +1,4 @@
-from torchutils.utils.pydantic import (
-    HandlerArguments,
-)
+from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
 from collections import defaultdict
 from typing import List, Dict
 from abc import ABC
@@ -64,11 +62,15 @@ class LoggerHandler(ABC):
     def getProxy(cls) -> LoggerProxy:
         return LoggerProxy(loggers=cls.getHandler()._logger_dict_)
 
-    def terminate(self, event: LoggingEvent = None):
+    @classmethod
+    def setStatus(cls, status) -> None:
+        LoggerProxy.__status__[0] = status
+
+    def terminate(self, stats: TrainerStatus, event: LoggingEvent = None):
         if event is None:
             loggers = self._logger_list_
         else:
             loggers = self._logger_dict_[event]
 
         for logger in loggers:
-            logger.close()
+            logger.close(stats)

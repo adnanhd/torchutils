@@ -55,6 +55,8 @@ class TrainerHandler():
             eval_dl=eval_dl,
             **hparams
         )
+        self.trainer_proxy.status = self._arguments.status
+        self._loggers.setStatus(self._arguments.status)
 
     def compile_handlers(
             self,

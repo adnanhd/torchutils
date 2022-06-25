@@ -167,8 +167,6 @@ class Trainer:
             train_dl=train_dl,
             valid_dl=valid_dl,
             num_epochs=num_epochs,
-            learning_rate=learning_rate,
-            train_dl_batch_size=train_dl.batch_size,
             **hparams
         )
 

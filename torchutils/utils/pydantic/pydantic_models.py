@@ -1,5 +1,6 @@
 from torchutils.metrics import AverageMeter
 import pydantic
+import enum
 import torch
 import inspect
 import warnings
@@ -244,6 +245,9 @@ class EvaluatingArguments(pydantic.BaseModel):
         allow_mutation = False
     eval_dl_batch_size: int = 1  # One element per patch
 
+    def num_steps(self):
+        return self.dataloader.__len__()
+
 
 class TrainerDataLoader(pydantic.BaseModel):
     class Config:
@@ -267,19 +271,32 @@ class TrainerDataLoader(pydantic.BaseModel):
 
 
 class TrainerStatus(pydantic.BaseModel):
+    class StatusCode(enum.Enum):
+        FINISHED_SUCCESSFULLY = 0
+        UNINITIALIZED = 1
+        STARTED_SUCCESSFULLY = 2
+        STOP_TRAINING_ERROR_OCCURED = 3
+        AN_EXTERNAL_ERROR_OCCURED = 4
+
     class Config:
         allow_mutation = True
     current_epoch: int = None
     current_batch: int = None
+    _status_code: StatusCode = pydantic.PrivateAttr(
+        default=StatusCode(StatusCode.UNINITIALIZED)
+    )
 
-    def lock(self):
-        if self.__config__.allow_mutation:
-            self.__config__.allow_mutation = False
+    @property
+    def status_code(self) -> int:
+        return self._status_code.value
 
-            def unlock(self):
-                self.__config__.allow_mutation = True
-            return unlock
-        raise LookupError("HandlerArguments has been locked already.")
+    def set_status_code(self, status_code: StatusCode):
+        assert isinstance(status_code, self.StatusCode)
+        self._status_code = status_code
+
+    @property
+    def status_message(self) -> str:
+        return self._status_code.name
 
 
 class HandlerArguments(pydantic.BaseModel):
@@ -317,9 +334,20 @@ class HandlerArguments(pydantic.BaseModel):
         }
         super().__init__(model=model, **dataloaders)
         if is_in_training:
-            self._hparams = TrainingArguments(**kwargs)
+            if valid_dl is not None:
+                kwargs['valid_dl_batch_size'] = valid_dl.batch_size
+            else:
+                kwargs['valid_dl_batch_size'] = None
+            self._hparams = TrainingArguments(
+                learning_rate=model.learning_rate,
+                train_dl_batch_size=train_dl.batch_size,
+                **kwargs
+            )
         else:
-            self._hparams = EvaluatingArguments(**kwargs)
+            self._hparams = EvaluatingArguments(
+                eval_dl_batch_size=eval_dl.batch_size,
+                **kwargs
+            )
         self._status_ptr = [TrainerStatus()]
 
     @property
@@ -366,25 +394,19 @@ class HandlerArguments(pydantic.BaseModel):
 
 
 class CurrentIterationStatus(pydantic.BaseModel):
+    _at_epoch_end: bool = pydantic.PrivateAttr(False)
     _metric_handler: MetricHandler = pydantic.PrivateAttr()
+    _epoch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
+    _batch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
     _x: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
     _y_true: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
     _y_pred: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
-    _epoch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
-    _batch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
-    _at_epoch_end: bool = pydantic.PrivateAttr(False)
+    _status_ptr: typing.List[TrainerStatus] = pydantic.PrivateAttr([None])
 
     def __init__(self, handler: MetricHandler):
         super().__init__()
         self._metric_handler = handler
-
-    # @property
-    # def current_epoch(self):
-    #     return self._epoch_idx
-
-    # @property
-    # def current_batch(self):
-    #     return self._batch_idx
+        self._status_ptr = [None]
 
     @property
     def x(self):
@@ -397,6 +419,17 @@ class CurrentIterationStatus(pydantic.BaseModel):
     @property
     def y_true(self):
         return self._y_true
+
+    @property
+    def status(self) -> typing.Optional[TrainerStatus]:
+        return self._status_ptr[0]
+
+    def __setattr__(self, key, value):
+        if key == 'status':
+            assert isinstance(value, TrainerStatus)
+            self._status_ptr[0] = value
+            return object.__setattr__(self._status_ptr[0], 'status', value)
+        return super().__setattr__(key, value)
 
     def get_score_names(self):
         return self._metric_handler.get_score_names()

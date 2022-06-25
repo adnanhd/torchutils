@@ -7,7 +7,7 @@ from torchutils.utils.pydantic import (
 from typing import List
 from torchutils.logging.pbar import (
     EpochProgressBar,
-    StepProgressBar,
+    BatchProgressBar,
     SampleProgressBar
 )
 
@@ -21,7 +21,7 @@ class ProgressBar(TrainerCallback):
     def __init__(self, *score_names: str):
         self._test_bar = SampleProgressBar()
         self._epoch_bar = EpochProgressBar()
-        self._step_bar = StepProgressBar()
+        self._step_bar = BatchProgressBar()
         self._score_names: List[str] = score_names
         self._args: HandlerArguments = None
 

@@ -2,7 +2,7 @@ from .utils import LoggingEvent
 from .base import TrainerLogger
 from .proxy import LoggerProxy
 from .handler import LoggerHandler
-from .tty import PrintWriter
+from .tty import SlurmLogger
 from .nop import NoneLogger
 
 import torchutils.logging.tty
