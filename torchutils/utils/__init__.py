@@ -11,7 +11,7 @@ from .hash import Hashable
 from .config import INIObject
 from .decorators import verbose, profile
 from .mthdutils import hybridmethod
-from .fnctutils import overload
+from .fnctutils import overload, obtain_registered_kwargs
 from .version_v2 import Version
 from .inspect_ import isiterable, islistlike, issubscriptable
 import torch

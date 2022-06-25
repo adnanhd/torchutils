@@ -27,7 +27,8 @@ from torchutils.utils import (
     string_to_criterion_class,
     string_to_optimizer_class,
     string_to_scheduler_class,
-    string_to_functionals
+    string_to_functionals,
+    obtain_registered_kwargs
 )
 
 
@@ -50,16 +51,6 @@ class TrainerModel(pydantic.BaseModel):
         scheduler: typing.Union[str, _LRScheduler, None] = None,
         ** kwargs,
     ):
-        def obtain_registered_kwargs(fn: typing.Callable,
-                                     kwargs: typing.Dict[str, typing.Any]):
-            return dict(
-                filter(
-                    lambda item: item[0] in inspect.signature(
-                        fn).parameters.keys(),
-                    kwargs.items()
-                )
-            )
-
         if isinstance(criterion, str):
             if criterion in string_to_criterion_class:
                 criterion_class = string_to_criterion_class[criterion]
@@ -93,12 +84,8 @@ class TrainerModel(pydantic.BaseModel):
                     f"{scheduler} is not a registered Scheduler"
                 )
 
-        super(TrainerModel, self).__init__(
-            model=model,
-            criterion=criterion,
-            optimizer=optimizer,
-            scheduler=scheduler
-        )
+        super().__init__(model=model, criterion=criterion, **kwargs,
+                         optimizer=optimizer, scheduler=scheduler)
 
     def __setattr__(self, key, value):
         if key == 'device':
@@ -197,18 +184,27 @@ class TrainerModel(pydantic.BaseModel):
     def reset_backward(self):
         self.scheduler_step()
         self._backward_hooks.clear()
-        # self._loss.reset()
+
+    def _push_for_backward(self, tensor: torch.Tensor) -> None:
+        if hasattr(tensor, 'requires_grad') and tensor.requires_grad:
+            self._backward_hooks.append(tensor)
 
     def forward_pass(self, x, y, batch_idx=None):
         y_pred = self.model(x)
         loss = self.criterion(y_pred, y)
         self._loss.update(loss.item())
-        self._backward_hooks.append(loss)
+        self._push_for_backward(loss)
         return y_pred
 
     def backward_pass(self):
         self.optimizer.zero_grad()
-        while self._backward_hooks.__len__():
+        if self._backward_hooks.__len__() == 0:
+            warnings.warn(
+                "TrainerModel.backward_pass receives no loss to backward"
+                "check requires_grad attribute of input and output pairs",
+                RuntimeWarning
+            )
+        while self._backward_hooks.__len__() != 0:
             self._backward_hooks.pop().backward()
         self.optimizer.step()
 
@@ -236,7 +232,7 @@ class TrainingArguments(pydantic.BaseModel):
     learning_rate: float = pydantic.Field(ge=0.0, le=1.0)
     resume_epochs: int = 0
     train_dl_batch_size: int
-    valid_dl_batch_size: int = -1  # All elements at a batch
+    valid_dl_batch_size: typing.Optional[int] = -1  # All elements at a batch
     num_epochs_per_validation: int = 1
 
 
