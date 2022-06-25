@@ -108,12 +108,8 @@ class CallbackHandler:
     def clear_callbacks(self):
         self.callbacks = []
 
-    @property
-    def callback_list(self):
-        return "\n".join(cb.__class__.__name__ for cb in self.callbacks)
-
     def __repr__(self):
-        return self.callback_list
+        return "\n".join(cb.__class__.__name__ for cb in self.callbacks)
 
     @_foreach_callback_require_args_
     def on_initialization(self, args: HandlerArguments):
@@ -172,8 +168,8 @@ class CallbackHandler:
         self._callback.on_evaluation_step_end(batch=batch)
 
     @_foreach_callback_
-    def on_evaluation_run_end(self, epoch: CurrentIterationStatus):
-        self._callback.on_evaluation_run_end(epoch=epoch)
+    def on_evaluation_run_end(self, stat: TrainerStatus):
+        self._callback.on_evaluation_run_end(stat)
 
     @_foreach_callback_require_stat_
     def on_stop_training_error(self, stat: TrainerStatus):

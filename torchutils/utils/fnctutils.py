@@ -1,4 +1,6 @@
 from collections import defaultdict
+import typing
+import inspect
 
 
 class ArgumentError(Exception):
@@ -11,6 +13,17 @@ def determine_types(args, kwargs):
 
 
 function_table = defaultdict(dict)
+
+
+def obtain_registered_kwargs(fn: typing.Callable,
+                             kwargs: typing.Dict[str, typing.Any]):
+    return dict(
+        filter(
+            lambda item: item[0] in inspect.signature(
+                fn).parameters.keys(),
+            kwargs.items()
+        )
+    )
 
 
 def overload(*arg_types, **kwarg_types):

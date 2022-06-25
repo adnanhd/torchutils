@@ -1,72 +1,80 @@
-from typing import List
-from abc import ABC, abstractmethod
-from torchutils.utils.pydantic import (
-    HandlerArguments,
-    TrainerModel
-)
+import abc
+import typing
+import argparse
+import collections
+from .utils import DataFrame, Image, Module
+from .utils import LoggerMethodNotImplError, LoggingEvent
+from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
 
 
-class TrainerLogger(ABC):
+class TrainerLogger(abc.ABC):
     """
     A callback which visualises the state of each training
     and evaluation epoch using a progress bar
     """
-    @abstractmethod
-    def open(self):
-        ...
+    @classmethod
+    def getLoggerGroup(cls, **kwargs
+                       ) -> typing.Dict["TrainerLogger",
+                                        typing.List[LoggingEvent]]:
+        result = collections.defaultdict(list)
+        for event in LoggingEvent.getAllEvents():
+            logger = cls.getLogger(event=event, **kwargs)
+            if isinstance(logger, TrainerLogger):
+                result[logger].append(event)
+        return dict(result)
 
-    @abstractmethod
-    def log_score(self, **kwargs):
-        ...
+    @classmethod
+    def setEvent(
+            cls,
+            *events: LoggingEvent
+        ) -> typing.Dict["TrainerLogger",
+                         typing.List[LoggingEvent]]:
+        return {cls: list(events)}
 
-    def log_info(self, msg):
-        ...
+    @abc.abstractclassmethod
+    def getLogger(cls, event: LoggingEvent,
+                  **kwargs) -> "TrainerLogger":
+        raise LoggerMethodNotImplError
 
-    def log_error(self, msg):
-        ...
+    @abc.abstractmethod
+    def open(self, args: HandlerArguments):
+        raise LoggerMethodNotImplError
 
-    def log_model(self, model):
-        ...
+    @ abc.abstractmethod
+    def log_scores(self,
+                   scores: typing.Dict[str, float],
+                   status: TrainerStatus):
+        raise LoggerMethodNotImplError
 
-    @abstractmethod
-    def close(self):
-        ...
+    def log_hyperparams(self,
+                        params: argparse.Namespace,
+                        status: TrainerStatus):
+        raise LoggerMethodNotImplError
 
+    def log_table(self,
+                  tables: typing.Dict[str, DataFrame],
+                  status: TrainerStatus):
+        raise LoggerMethodNotImplError
 
-class LoggingHandler(ABC):
-    def __init__(self, loggers=[]):
-        self._loggers: List[TrainerLogger] = []
-        self.add_loggers(loggers)
+    def log_image(self,
+                  images: typing.Dict[str, Image],
+                  status: TrainerStatus):
+        raise LoggerMethodNotImplError
 
-    def add_logger(self, logger):
-        if isinstance(logger, TrainerLogger):
-            self._loggers.append(logger)
+    def log_string(self,
+                   string: str,
+                   status: TrainerStatus):
+        raise LoggerMethodNotImplError
 
-    def remove_logger(self, logger):
-        self._loggers.remove(logger)
+    @abc.abstractmethod
+    def update(self, n, status: TrainerStatus):
+        raise LoggerMethodNotImplError
 
-    def add_loggers(self, loggers: List[TrainerLogger]):
-        for logger in loggers:
-            self.add_logger(logger)
+    def watch(self,
+              module: Module,
+              status: TrainerStatus, **kwargs):
+        raise LoggerMethodNotImplError
 
-    def clear_loggers(self):
-        self._loggers.clear()
-
-    def initialize(self, args: HandlerArguments):
-        for logger in self._loggers:
-            logger.open(args)
-
-    def model(self, model: TrainerModel):
-        for logger in self._loggers:
-            logger.log_model(model)
-
-    def score(self, **scores):
-        for logger in self._loggers:
-            logger.log_score(**scores)
-
-    def figure(self, msg):
-        pass
-
-    def terminate(self):
-        for logger in self._loggers:
-            logger.close()
+    @ abc.abstractmethod
+    def close(self, status: TrainerStatus):
+        raise LoggerMethodNotImplError
