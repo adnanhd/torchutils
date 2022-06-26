@@ -7,7 +7,7 @@ from .mappings import (
     string_to_types,
     _str2types
 )
-from .hash import Hashable
+from .hash import Hashable, digest_numpy, digest_torch
 from .config import INIObject
 from .decorators import verbose, profile
 from .mthdutils import hybridmethod

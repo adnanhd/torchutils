@@ -268,6 +268,13 @@ class TrainerDataLoader(pydantic.BaseModel):
 
 class TrainerStatus(pydantic.BaseModel):
     class StatusCode(enum.Enum):
+        """
+        STARTED
+        FINISHED
+        FAILED
+        STOPPED
+        CRUSHED
+        """
         FINISHED_SUCCESSFULLY = 0
         UNINITIALIZED = 1
         STARTED_SUCCESSFULLY = 2
