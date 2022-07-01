@@ -1,7 +1,12 @@
 from torchutils.metrics import AverageMeter
+from torchutils.metrics import MetricHandler
 from .utils import epsilon_equal
 
-tracker = AverageMeter('Loss', fmt=':e')
+tracker = AverageMeter('Test Loss', fmt=':e')
+
+
+def test_create_AverageMeter():
+    AverageMeter('Test')
 
 
 def test_AverageMeter():
