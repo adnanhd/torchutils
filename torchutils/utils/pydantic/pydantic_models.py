@@ -269,10 +269,12 @@ class TrainerDataLoader(pydantic.BaseModel):
 class TrainerStatus(pydantic.BaseModel):
     class StatusCode(enum.Enum):
         """
-        STARTED
-        FINISHED
+        STARTED -- started successfully
+        FINISHED -- finished successfully
+        ABORTED -- an exception occurred
+        STOPPED -- StopTrainingError occured
+        ----
         FAILED
-        STOPPED
         CRUSHED
         """
         FINISHED_SUCCESSFULLY = 0
@@ -450,7 +452,7 @@ class CurrentIterationStatus(pydantic.BaseModel):
         self._y_true = y_true
         self._y_pred = y_pred
         self._at_epoch_end = False
-        self._metric_handler.run_score_groups(x, y_true, y_pred)
+        self._metric_handler.run_score_functional(preds=y_pred, target=y_true)
         self._batch_idx = batch_idx
 
     # every epoch end

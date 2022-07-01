@@ -62,15 +62,16 @@ class TrainerHandler():
             self,
             loggers: typing.Dict[TrainerLogger,
                                  typing.Iterable[LoggingEvent]] = dict(),
-            metrics: typing.Iterable[AverageMeter] = list(),
+            metrics: typing.Iterable[str] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
         for logger, events in loggers.items():
             for event in events:
                 self._loggers.add_logger(event=event, logger=logger)
-        self._metrics.add_score_meters(*metrics)
+        self._metrics.set_score_names(metrics)
         self._callbacks.add_callbacks(callbacks)
         score_names = self._metrics.get_score_names()
+        print(score_names)
         self.iteration_proxy.set_score_names(score_names)
 
     def decompile_handlers(

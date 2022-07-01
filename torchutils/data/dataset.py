@@ -9,6 +9,7 @@ from typing import Callable, Tuple
 import torchvision.transforms as tf
 
 
+# TODO: rename NumpyDataset
 class Dataset(torch.utils.data.dataset.Dataset):
     __class_version__ = Version('1.0.0')
     __slots__ = ('x', 'y', 'xtransforms', 'ytransforms')
