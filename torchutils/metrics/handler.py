@@ -1,76 +1,77 @@
-from .tracker import AverageMeter
+from .tracker import AverageMeter, AverageMeterFunction
 from collections import OrderedDict
 from .history import RunHistory, DataFrameRunHistory
+import warnings
 import typing
 
 
 class MetricHandler(object):
-    __slots__ = ['_scores', '_history', '_callbacks']
+    from .tracker import MetricRegistrar
+    __slots__ = ['_score_names', '_history', '_callbacks']
     DEFAULT_RUN_HISTORY = DataFrameRunHistory
 
     def __init__(self):
-        self._scores: typing.Dict[str, AverageMeter] = OrderedDict()
+        self._score_names: typing.Set[str] = set()
         self._history: typing.Optional[RunHistory] = DataFrameRunHistory()
         self._callbacks: typing.List = list()
 
+    @property
+    def __scores__(self) -> typing.Dict[str, AverageMeter]:
+        return {score_name: score_meter
+                for score_name, score_meter in
+                self.MetricRegistrar.__score__.items()
+                if score_name in self._score_names}
+
     def get_score_names(self) -> typing.Set[str]:
         """ Returns score names of score meters (in the score list) """
-        return set(self._scores.keys())
+        return set(self.__scores__.keys())
 
     def set_score_names(self, score_names: typing.Iterable[str]) -> None:
         """ Sets score names of score meters (in the score list) """
         self._history.set_score_names(score_names)
+        self._score_names.clear()
+        for score_name in score_names:
+            if score_name is None:
+                warnings.warn(f"{score_name} is not a registered score")
+            elif score_name in self._score_names:
+                warnings.warn(f"{score_name} is already in the score names")
+            else:
+                self._score_names.add(score_name)
 
     def reset_score_names(self) -> None:
         """ Clears score names of score meters (in the score list) """
         self._history.set_score_names([])
+        self._score_names.clear()
 
     def add_score_meters(self, *scores: AverageMeter) -> None:
         """ Append a score meter to the score list """
-        assert all(
-            map(lambda o: isinstance(o, AverageMeter), scores)
-        ), """values must be an instance of AverageMeter"""
-        for score_meter in scores:
-            self._scores[score_meter.name] = score_meter
+        warnings.warn(
+            "this method is no longer used, use "
+            "MetricRegistrar.register_meter instead", DeprecationWarning
+        )
 
     def remove_score_meters(self, *scores: str) -> None:
         """ Removes a score meter from the score list """
-        for score_name in scores:
-            self._scores.pop(score_name)
+        warnings.warn(
+            "this method is no longer used, use "
+            "MetricRegistrar.unregister_meter instead", DeprecationWarning
+        )
 
-    def add_score_group(self, *score_names: str):
-        """ Appends a score function to callback list to call automatically """
-        handler = self
-        self._scores.update({
-            name: AverageMeter(name)
-            for name in score_names
-        })
-
-        class ScoreHook(object):
-            __slots__ = ['score_names', 'fn', 'handler']
-
-            def __init__(self, fn, score_names=score_names, handler=handler):
-                self.fn = fn
-                self.handler: MetricHandler = handler
-                self.handler._callbacks.append(self)
-                self.score_names: typing.List[str] = score_names
-
-            def __call__(self, x, y, y_pred):
-                scores = self.fn(x=x, y=y, y_pred=y_pred)
-                self.handler.set_scores_values(**scores)
-
-        return ScoreHook
-
-    def run_score_groups(self, x, y, y_pred):
+    def run_score_functional(self, preds, target):
         """ Runs callbacks hooked by add_score_group method """
-        for fn in self._callbacks:
-            fn(x=x, y=y, y_pred=y_pred)
+        for cb in self._callbacks:
+            cb.update(preds=preds, target=target)
 
     # AverageMeter functions
     def set_scores_values(self, **kwargs: float) -> None:
         """ Sets score values of the latest step """
         for score_name, score_value in kwargs.items():
-            self._scores[score_name].update(value=score_value)
+            try:
+                self.__scores__[score_name].update(value=score_value)
+            except KeyError:
+                warnings.warn(f"{score_name} is not in the registered"
+                              "scores. Make sure that you passed the "
+                              "key to set_score_names method beforehand.")
 
     def get_score_values(self, *score_names: str) -> typing.Dict[str, float]:
         """ Returns score values of the latest step """
@@ -78,11 +79,11 @@ class MetricHandler(object):
             score_names = self.get_score_names()
         # returns step result
         return {name: meter.value for name,
-                meter in self._scores.items()}
+                meter in self.__scores__.items()}
 
     def reset_score_values(self) -> None:
         """ Resets score values of the step tracker """
-        for score_meter in self._scores.values():
+        for score_meter in self.__scores__.values():
             score_meter.reset()
 
     # RunHistory functions
@@ -95,7 +96,7 @@ class MetricHandler(object):
     def push_score_values(self, index: int = None) -> None:
         """ Stamps the score values of the latest epoch """
         for name in self._history.get_score_names():
-            self._history.set_latest_score(name, self._scores[name].average)
+            self._history.set_latest_score(name, self.__scores__[name].average)
         self._history._increment_epoch()
 
     def seek_score_history(self, *score_names: str) -> typing.Dict[str, float]:

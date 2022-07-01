@@ -32,7 +32,7 @@ class DType(BaseModel, Hashable):
         return isinstance(other, (np.ndarray, torch.Tensor)) and other.dtype == self.dtype or isinstance(other, self.dtype)
 
     def __hash__(self):
-        return int(self._md5(), 16)
+        return int(self.md5, 16)
 
     def __call__(self, value):
         value = self.dtype(value)

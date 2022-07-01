@@ -116,13 +116,11 @@
 	- data loading in each epoch is changed in `Trainer._run_training_epoch`, `Trainer._run_validating`, and `Trainer._run_evaluating`
 		- instead of `for batch, (x, y) in dataloader` in Trainer make `for batch_idx, batch in dataloader` passed directly as batch
 		- [ ] TODO: pass it directly to TrainerModel.forward\_pass
+	- [x] Refactor WandbLogger and FileLogger to work with current API
+	- [x] instead of TrainerLogger.getEvent() method create TrainerLoggerGroup as an either function or class
 
 ## Planned TODOs
 ### ASAP
-- [ ] Refactor WandbLogger and FileLogger to work with current API
-- [ ] instead of TrainerLogger.getEvent() method create TrainerLoggerGroup as an either function or class
-
-### v1.4.1
 - [ ] remove LoggerEvent from log messages, instead set it on TrainerHandler
 - [ ] migrate calls in ScoreLoggerCallback to TrainerHandler
 - [ ] Make TrainerMetrics compatible with torchmetrics from pytorch lightning
@@ -134,3 +132,7 @@
 - [ ] rename CurrentIterationStatus -> IterationProxy
 - [ ] Hide training and evaluating arguments so that they are set when public arguments are initialized
 	- e.g. setting train\_dl parameter makes train\_dl\_batch\_size to set len(train\_dl)
+
+- add accuracy and other metrics
+	- change Trainer.compile method so that we can chose which metrics to use, default loss only
+- change batch sampling mechanism https://pytorch.org/docs/stable/data.html#memory-pinning
