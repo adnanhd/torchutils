@@ -3,7 +3,7 @@ utils_files=$(wildcard ${project_prefix}/torchutils/**/*.py)
 env_path=${project_prefix}/envs/torchutils
 install_path=${env_path}/lib/python3.6/site-packages/torchutils
 
-all: docs ${install_path}
+all: ${install_path} docs
 
 ${install_path}: ${utils_files}
 	@-pip uninstall -y torchutils

@@ -1,4 +1,5 @@
-from torchutils.utils.pydantic import TrainerModel, HandlerArguments, TrainerStatus
+from torchutils.trainer.utils import HandlerArguments, TrainerStatus
+from torchutils.models.utils import TrainerModel
 from torchutils.logging import TrainerLogger
 from torch.nn import Module
 import argparse

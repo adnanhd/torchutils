@@ -1,7 +1,7 @@
 import enum
 from typing import NewType, Dict, Iterable, List, Union
 import torch.nn as nn
-from torchutils.utils.pydantic import TrainerModel
+from torchutils.models.utils import TrainerModel
 DataFrame = NewType('DataFrame', Dict[str, Iterable[List[float]]])
 Image = NewType('Image', Iterable[Iterable[Iterable[float]]])
 Module = NewType('Module', Union[nn.Module, TrainerModel])

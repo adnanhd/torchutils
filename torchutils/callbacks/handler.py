@@ -1,7 +1,7 @@
 # Copyright © 2021 Chris Hughes
 from typing import List, Optional
 from .base import CallbackMethodNotImplementedError, TrainerCallback
-from torchutils.utils.pydantic import (
+from torchutils.trainer.utils import (
     HandlerArguments,
     TrainerStatus,
     CurrentIterationStatus

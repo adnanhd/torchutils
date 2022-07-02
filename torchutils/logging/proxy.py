@@ -4,7 +4,6 @@ import argparse
 import warnings
 from .base import TrainerLogger
 from typing import Dict, List, Any
-from torchutils.utils.pydantic import TrainerStatus
 from .utils import LoggerMethodNotImplError, LoggingEvent, Image, DataFrame
 
 

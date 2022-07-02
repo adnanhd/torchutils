@@ -1,4 +1,4 @@
-from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
+from torchutils.trainer.utils import HandlerArguments, TrainerStatus
 from torchutils.logging import TrainerLogger, LoggingEvent
 from tqdm.autonotebook import tqdm
 from typing import Dict, List

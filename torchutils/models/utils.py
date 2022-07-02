@@ -1,14 +1,15 @@
-from torchutils.metrics import AverageMeter
 import pydantic
 import torch
 import warnings
+import torchsummary
+import typing
+import torch.nn as nn
+
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from torchutils.metrics import MetricHandler
-import torchsummary
+from torchutils.metrics import AverageMeter, MetricHandler
 from collections import OrderedDict
-import typing
 from torchutils.utils.pydantic.types import (
     # NpScalarType,
     NpTorchType,
@@ -26,7 +27,6 @@ from torchutils.utils import (
     string_to_functionals,
     obtain_registered_kwargs
 )
-import torch.nn as nn
 
 
 def _add_modules(self, modules, layer_num=None):

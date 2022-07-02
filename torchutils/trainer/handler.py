@@ -7,12 +7,12 @@ from typing import Optional
 import typing
 
 # Import Arguments
-from torchutils.utils.pydantic import (
+from ..data.utils import TrainerDataLoader
+from ..models.utils import TrainerModel
+from .utils import (
     HandlerArguments,
     TrainerStatus,
-    CurrentIterationStatus,
-    TrainerModel,
-    TrainerDataLoader
+    CurrentIterationStatus
 )
 
 

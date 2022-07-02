@@ -4,7 +4,7 @@ import argparse
 import collections
 from .utils import DataFrame, Image, Module
 from .utils import LoggerMethodNotImplError, LoggingEvent
-from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
+from torchutils.trainer.utils import HandlerArguments, TrainerStatus
 
 
 class TrainerLogger(abc.ABC):

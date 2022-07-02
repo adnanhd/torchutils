@@ -1,4 +1,4 @@
-from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
+from torchutils.trainer.utils import HandlerArguments, TrainerStatus
 from collections import defaultdict
 from typing import List, Dict
 from abc import ABC

@@ -2,7 +2,7 @@
 import numpy as np
 import typing
 from .base import TrainerCallback, StopTrainingError
-from torchutils.utils.pydantic import CurrentIterationStatus
+from torchutils.trainer.utils import CurrentIterationStatus
 
 
 class EarlyStopping(TrainerCallback):

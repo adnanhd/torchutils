@@ -11,11 +11,11 @@ from torchutils.callbacks import (
 import warnings
 from .handler import TrainerHandler
 from torchutils.utils import Version
-from torchutils.utils.pydantic import (
-    TrainerModel,
+from ..models.utils import TrainerModel
+from .utils import (
+    TrainerStatus,
     TrainingArguments,
-    EvaluatingArguments,
-    TrainerStatus
+    EvaluatingArguments
 )
 
 from typing import (

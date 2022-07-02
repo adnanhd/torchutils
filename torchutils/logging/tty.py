@@ -4,7 +4,7 @@ import logging
 from .utils import DataFrame
 from .utils import LoggingEvent
 from torchutils.logging.base import TrainerLogger
-from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
+from torchutils.trainer.utils import HandlerArguments, TrainerStatus
 
 
 class SlurmLogger(TrainerLogger):

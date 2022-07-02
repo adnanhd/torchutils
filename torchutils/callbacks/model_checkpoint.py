@@ -5,8 +5,8 @@ import torch
 import warnings
 from .base import TrainerCallback
 from typing import Callable
-from torchutils.utils.pydantic import (
-    TrainerModel,
+from ..models.utils import TrainerModel
+from ..trainer.utils import (
     HandlerArguments,
     TrainerStatus,
     CurrentIterationStatus

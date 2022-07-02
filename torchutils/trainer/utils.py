@@ -1,10 +1,12 @@
 import pydantic
 import enum
 import torch
-from torch.nn import Module
-from torch.utils.data.dataloader import DataLoader
-from torchutils.metrics import MetricHandler
 import typing
+from torch.nn import Module
+from torchutils.metrics import MetricHandler
+from torch.utils.data.dataloader import DataLoader
+from torchutils.data.utils import TrainerDataLoader
+from torchutils.models.utils import TrainerModel
 from torchutils.utils.pydantic.types import (
     NpTorchType,
     DataLoaderType,

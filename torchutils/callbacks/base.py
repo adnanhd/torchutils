@@ -2,7 +2,7 @@
 from abc import ABC
 from typing import Optional
 from torchutils.logging import LoggerProxy, LoggerHandler
-from torchutils.utils.pydantic import (
+from torchutils.trainer.utils import (
     HandlerArguments,
     TrainerStatus,
     CurrentIterationStatus
