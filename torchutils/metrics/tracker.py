@@ -1,8 +1,8 @@
 import typing
 import warnings
 import numpy as np
+from torchutils.utils.pydantic.types import NpTorchType
 from .utils import has_allowed_arguments, to_capital, to_lower
-from torchutils.utils.pydantic.pydantic_types import NpTorchType
 
 
 class NanValueWarning(Warning):
