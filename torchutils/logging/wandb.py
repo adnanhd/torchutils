@@ -28,13 +28,11 @@ class WandbLogger(TrainerLogger):
         self._wandb = None
 
     def open(self, args: IterationArguments):
-        self._wandb = wandb.init(
-            project=self.project,
-            entity=self.username,
-            group=self.groupname,
-            name=self.experiment,
-            config=args.hparams.dict()
-        )
+        self._wandb = wandb.init(project=self.project,
+                                 entity=self.username,
+                                 group=self.groupname,
+                                 name=self.experiment,
+                                 config=args.dict())
 
     @classmethod
     def getLogger(cls, event: LoggingEvent,

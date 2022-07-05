@@ -189,11 +189,13 @@ class TrainerModel(pydantic.BaseModel):
 
     def train(self) -> None:
         self.model.train()
-        self.criterion.train()
+        if isinstance(self.criterion, Module):
+            self.criterion.train()
 
     def eval(self) -> None:
         self.model.eval()
-        self.criterion.eval()
+        if isinstance(self.criterion, Module):
+            self.criterion.eval()
 
     def register_metrics_to(self, handler: MetricHandler):
         assert isinstance(handler, MetricHandler)

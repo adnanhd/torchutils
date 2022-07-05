@@ -57,7 +57,7 @@ class ScoreLoggerCallback(TrainerCallback):
         self._handler.terminate(stats=epoch.status,
                                 event=LoggingEvent.TRAINING_BATCH)
         # self._log.event = LoggingEvent.TRAINING_EPOCH
-        self._log.log_scores(epoch.get_current_scores())
+        self._log.log_scores(epoch.get_current_scores(*self._score_names))
         self._log.update(1)
 
     def on_training_end(self, stat: IterationStatus):

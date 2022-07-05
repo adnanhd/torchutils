@@ -1,4 +1,4 @@
-from .tracker import AverageMeter, AverageMeterFunction
+from .tracker import AverageMeter, AverageMeterFunction, AverageMeterModule_Base
 from collections import OrderedDict
 import warnings
 import typing
@@ -22,6 +22,18 @@ class MetricHandler(object):
         #  if score_name in self._score_names}
         return self.MetricRegistrar.__score__
 
+    def add_score_meters(self, meters: typing.Iterable[AverageMeter]):
+        for meter in meters:
+            assert isinstance(meter, AverageMeter)
+            if isinstance(meter, AverageMeterModule_Base):
+                self._callbacks.append(meter)
+            elif isinstance(meter, AverageMeterFunction):
+                self._callbacks.append(meter)
+            elif meter.name not in self.__scores__:
+                self.MetricRegistrar.register_meter(meter)
+            else:
+                raise KeyError(f"{meter.name} is already registered.")
+
     def get_score_names(self) -> typing.Set[str]:
         """ Returns score names of score meters (in the score list) """
         return set(self.__scores__.keys())
@@ -43,19 +55,19 @@ class MetricHandler(object):
         # self._history.set_score_names([])
         self._score_names.clear()
 
-    def add_score_meters(self, *scores: AverageMeter) -> None:
-        """ Append a score meter to the score list """
-        warnings.warn(
-            "this method is no longer used, use "
-            "MetricRegistrar.register_meter instead", DeprecationWarning
-        )
+    # def add_score_meters(self, *scores: AverageMeter) -> None:
+    #     """ Append a score meter to the score list """
+    #     warnings.warn(
+    #         "this method is no longer used, use "
+    #         "MetricRegistrar.register_meter instead", DeprecationWarning
+    #     )
 
-    def remove_score_meters(self, *scores: str) -> None:
-        """ Removes a score meter from the score list """
-        warnings.warn(
-            "this method is no longer used, use "
-            "MetricRegistrar.unregister_meter instead", DeprecationWarning
-        )
+    # def remove_score_meters(self, *scores: str) -> None:
+    #     """ Removes a score meter from the score list """
+    #     warnings.warn(
+    #         "this method is no longer used, use "
+    #         "MetricRegistrar.unregister_meter instead", DeprecationWarning
+    #     )
 
     def run_score_functional(self, preds, target):
         """ Runs callbacks hooked by add_score_group method """

@@ -18,7 +18,7 @@ class AverageMeter(object):
         self._name = name  # to_capital(name)
         self.fmt = fmt
         self.reset()
-        MetricRegistrar.register_meter(name, self)
+        MetricRegistrar.register_meter(self)
 
     @property
     def name(self) -> str:
@@ -123,17 +123,16 @@ class MetricRegistrar(object):
     }
 
     @classmethod
-    def register_meter(cls, name: str, meter: AverageMeter) -> None:
+    def register_meter(cls, meter: AverageMeter) -> None:
         assert isinstance(meter, AverageMeter)
-        assert isinstance(name, str)
         # if not name.istitle():
         # name = to_capital(name)
-        if name in cls.__score__:
+        if meter._name in cls.__score__:
             raise KeyError(
-                f"{name} is already registered."
+                f"{meter._name} is already registered."
             )
         else:
-            cls.__score__.__setitem__(name, meter)
+            cls.__score__.__setitem__(meter._name, meter)
 
     @classmethod
     def register_functional(cls, name: str, fn: typing.Callable) -> None:

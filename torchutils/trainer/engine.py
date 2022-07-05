@@ -10,6 +10,7 @@ from torchutils.callbacks import (
     StopTrainingError,
 )
 
+from ..metrics import AverageMeter
 from .handler import TrainingHandler, EvaluatingHandler
 from ..models.utils import TrainerModel
 from .utils import (
@@ -128,9 +129,11 @@ class Trainer:
             self,
             loggers: typing.Dict[TrainerLogger,
                                  typing.Iterable[LoggingEvent]] = dict(),
+            metrics: typing.Iterable[AverageMeter] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
         self._loggers.add_loggers(loggers)
+        self._metrics.add_score_meters(metrics)
         self._callbacks.add_callbacks(callbacks)
 
     def decompile_handlers(

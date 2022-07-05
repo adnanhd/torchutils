@@ -7,7 +7,7 @@ all: ${install_path} docs
 
 ${install_path}: ${utils_files}
 	@-pip uninstall -y torchutils
-	@pip install -U ./
+	@python3 setup.py install
 
 docs:  docs/man/man3/_home_ceng_public_torchutils_torchutils_.3
 

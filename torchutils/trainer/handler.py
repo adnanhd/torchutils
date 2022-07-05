@@ -10,6 +10,7 @@ from ..metrics.history import DataFrameRunHistory
 from .utils import (
     TrainingArguments,
     EvaluatingArguments,
+    IterationArguments,
     IterationInterface,
     IterationStatus
 )
@@ -35,6 +36,7 @@ class IterationHandler(object):
         self._metrics = metrics
         self._loggers = loggers
         self._callbacks = callbacks
+        self.hparams: IterationArguments
         # @TODO: current_epoch=self.hparams.resume_epochs
         self._history = DataFrameRunHistory(history)
 
