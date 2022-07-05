@@ -1,4 +1,4 @@
-from torchutils.trainer.utils import HandlerArguments, TrainerStatus
+from torchutils.trainer.utils import IterationArguments, IterationStatus
 from torchutils.models.utils import TrainerModel
 from torchutils.logging import TrainerLogger
 from torch.nn import Module
@@ -27,7 +27,7 @@ class WandbLogger(TrainerLogger):
         self.groupname = groupname
         self._wandb = None
 
-    def open(self, args: HandlerArguments):
+    def open(self, args: IterationArguments):
         self._wandb = wandb.init(
             project=self.project,
             entity=self.username,
@@ -49,17 +49,17 @@ class WandbLogger(TrainerLogger):
 
     def log_scores(self,
                    scores: typing.Dict[str, float],
-                   status: TrainerStatus):
+                   status: IterationStatus):
         self._wandb.log(scores)
 
     def log_hyperparams(self,
                         params: argparse.Namespace,
-                        status: TrainerStatus):
+                        status: IterationStatus):
         self._wandb.config.update(params.__dict__)
 
     def log_table(self,
                   tables: typing.Dict[str, pd.DataFrame],
-                  status: TrainerStatus):
+                  status: IterationStatus):
         to_log = dict()
 
         for table_name, data_frame in tables.items():
@@ -78,13 +78,13 @@ class WandbLogger(TrainerLogger):
 
     def log_image(self,
                   images: typing.Dict[str, Image],
-                  status: TrainerStatus):
+                  status: IterationStatus):
         self._wandb.log({name: [wandb.Image(img) for img in image]
                         for name, image in images.items()})
 
     def watch(self,
               module: typing.Union[Module, TrainerModel],
-              status: TrainerStatus, **kwargs):
+              status: IterationStatus, **kwargs):
         if isinstance(module, TrainerModel):
             module = module.module
             self._wandb.watch(
@@ -98,9 +98,9 @@ class WandbLogger(TrainerLogger):
                 **kwargs
             )
 
-    def update(self, n, status: TrainerStatus):
+    def update(self, n, status: IterationStatus):
         pass
 
-    def close(self, status: TrainerStatus):
+    def close(self, status: IterationStatus):
         self._wandb.finish(quiet=True, exit_code=status.status_code)
         self._wandb = None

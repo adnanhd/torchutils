@@ -3,6 +3,7 @@ import enum
 import argparse
 import warnings
 from .base import TrainerLogger
+from ..trainer.utils import IterationStatus
 from typing import Dict, List, Any
 from .utils import LoggerMethodNotImplError, LoggingEvent, Image, DataFrame
 
@@ -18,19 +19,24 @@ class ProxyMethods(enum.Enum):
 
 class LoggerProxy(abc.ABC):
 
-    __slots__ = ['__loggers__', '__event__']
-    __status__ = [None]
+    __slots__ = ['__loggers__', '__event__', '__status__']
 
     def __init__(self,
                  loggers: Dict[str, TrainerLogger],
-                 _event_ptr: List[LoggingEvent]):
+                 _event_ptr: List[LoggingEvent],
+                 _status_ptr: List[IterationStatus]):
         assert all(
             all(isinstance(logger, TrainerLogger) for logger in logger_list)
             for logger_list in loggers.values()), (
             f"{loggers.values()} must be a list of TrainerLogger"
         )
+        # assert len(_status_ptr) == 1 and isinstance(
+        #     _status_ptr[0], IterationStatus), f"{_status_ptr} is not IterationStatus"
+        # assert len(_event_ptr) == 1 and isinstance(
+        #     _event_ptr[0], LoggingEvent), f"{_event_ptr} is not LoggingEvent"
         self.__loggers__ = loggers
         self.__event__: List[LoggingEvent] = _event_ptr
+        self.__status__: List[IterationStatus] = _status_ptr
 
     @property
     def event(self) -> LoggingEvent:
@@ -53,7 +59,7 @@ class LoggerProxy(abc.ABC):
                 )
         else:
             warnings.warn(
-                f"No logger added for {self._event.name}"
+                f"No logger added for {self.event.name}"
             )
 
     def log_table(self, tables: Dict[str, DataFrame]):

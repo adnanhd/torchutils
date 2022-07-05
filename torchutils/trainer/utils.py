@@ -1,55 +1,41 @@
 import pydantic
+import os
+import numpy as np
+import warnings
 import enum
 import torch
 import typing
-from torch.nn import Module
-from torchutils.metrics import MetricHandler
+from torch.utils.data.dataset import Dataset as TorchDataset
 from torch.utils.data.dataloader import DataLoader
-from torchutils.data.utils import TrainerDataLoader
-from torchutils.models.utils import TrainerModel
-from torchutils.utils.pydantic.types import (
-    NpTorchType,
-    DataLoaderType,
-)
+from ..data.dataset import Dataset as NumpyDataset
+from ..metrics.handler import MetricHandler
+from ..metrics.history import RunHistory
+from ..data.utils import TrainerDataLoader
+from ..models.utils import TrainerModel
+from ..utils.pydantic.types import NpTorchType, DataLoaderType
 
 
-class TrainingArguments(pydantic.BaseModel):
-    class Config:
-        allow_mutation = False
-
-    num_epochs: int = pydantic.Field(ge=0, description="Number of epochs")
-    learning_rate: float = pydantic.Field(ge=0.0, le=1.0)
-    resume_epochs: int = 0
-    train_dl_batch_size: int
-    valid_dl_batch_size: typing.Optional[int] = -1  # All elements at a batch
-    num_epochs_per_validation: int = 1
-
-
-class EvaluatingArguments(pydantic.BaseModel):
-    class Config:
-        allow_mutation = False
-    eval_dl_batch_size: int = 1  # One element per patch
-
-    def num_steps(self):
-        return self.dataloader.__len__()
-
-
-class TrainerStatus(pydantic.BaseModel):
+class IterationStatus(pydantic.BaseModel):
+    """ A class for holding information that """
+    """changes as the trainer iterates """
     class StatusCode(enum.Enum):
-        """
-        STARTED -- started successfully
-        FINISHED -- finished successfully
-        ABORTED -- an exception occurred
-        STOPPED -- StopTrainingError occured
-        ----
-        FAILED
-        CRUSHED
-        """
-        FINISHED_SUCCESSFULLY = 0
-        UNINITIALIZED = 1
-        STARTED_SUCCESSFULLY = 2
-        STOP_TRAINING_ERROR_OCCURED = 3
-        AN_EXTERNAL_ERROR_OCCURED = 4
+        # An error occured before starting.
+        # Started unsuccessfully.
+        ABORTED = 1
+        # Started successfully.
+        STARTED = 2
+        # Finished successfully.
+        FINISHED = 0
+        # Training finishead early on purpose
+        # StopTrainingError raised
+        STOPPED = 3
+        # @TODO: NOT IMPLEMENTED YET.
+        CRUSHED = 4
+        # An exception occured after starting,
+        # i.e. finished unsuccessfully.
+        FAILED = 5
+
+        UNINITIALIZED = 6
 
     class Config:
         allow_mutation = True
@@ -72,82 +58,92 @@ class TrainerStatus(pydantic.BaseModel):
         return self._status_code.name
 
 
-class HandlerArguments(pydantic.BaseModel):
+class IterationArguments(pydantic.BaseModel):
     model: TrainerModel
-    _status_ptr: typing.List[TrainerStatus] = pydantic.PrivateAttr(
-        [TrainerStatus()])
-    _hparams: typing.Union[TrainingArguments,
-                           EvaluatingArguments] = pydantic.PrivateAttr(None)
-    train_dl: typing.Optional[typing.Union[TrainerDataLoader,
-                                           DataLoaderType]] = None
+
+    @typing.overload
+    def is_training_hparams(self) -> bool:
+        raise NotImplementedError
+
+    def create_dataloader(
+        self,
+        dataset: TorchDataset,
+        train_mode: bool = True,
+        batch_size: typing.Optional[int] = None,
+        **kwargs,
+    ) -> DataLoader:
+        assert isinstance(dataset, TorchDataset), \
+            "Dataset must be inherited from {TorchDataset}"
+
+        try:
+            if isinstance(dataset.x, np.ndarray) \
+                    and self.device != torch.device('cpu'):
+                dataset.x = torch.from_numpy(dataset.x)
+            dataset.x = dataset.x.to(
+                device=self.device,
+                dtype=self.xtype
+            )
+            if isinstance(dataset.y, np.ndarray) and \
+                    self.device != torch.device('cpu'):
+                dataset.y = torch.from_numpy(dataset.y)
+            dataset.y = dataset.y.to(
+                device=self.device,
+                dtype=self.ytype
+            )
+        except AttributeError:
+            warnings.warn(
+                "Using a Dataset not derived from torchutils.data.Dataset "
+                "is dangerous for dtype integrity"
+            )
+
+        kwargs.setdefault('shuffle', train_mode)
+        kwargs.setdefault('pin_memory', not torch.cuda.is_available())
+        kwargs.setdefault(
+            'num_workers', 0 if torch.cuda.is_available() else os.cpu_count())
+        if not train_mode or batch_size is None:
+            kwargs['batch_size'] = dataset.__len__()
+        else:
+            kwargs['batch_size'] = batch_size
+
+        if isinstance(dataset, NumpyDataset):
+            return dataset.dataloader(**kwargs)
+        else:
+            return DataLoader(dataset, **kwargs)
+
+
+class TrainingArguments(IterationArguments):
+    class Config:
+        allow_mutation = False
+
+    num_epochs: int = pydantic.Field(ge=0, description="Number of epochs")
+    learning_rate: float = pydantic.Field(ge=0.0, le=1.0)
+    resume_epochs: int = 0
+    num_epochs_per_validation: int = 1
+
+    train_dl: typing.Union[TrainerDataLoader, DataLoaderType]
     valid_dl: typing.Optional[typing.Union[TrainerDataLoader,
                                            DataLoaderType]] = None
-    eval_dl: typing.Optional[typing.Union[TrainerDataLoader,
-                                          DataLoaderType]] = None
 
-    def __init__(self,
-                 model: Module,
-                 train_dl: DataLoader = None,
-                 valid_dl: DataLoader = None,
-                 eval_dl: DataLoader = None,
-                 **kwargs):
-        is_in_training = train_dl is not None and eval_dl is None
-        is_in_evaluating = train_dl is None and eval_dl is not None
-        assert is_in_evaluating != is_in_training
-        dataloaders = {
-            'train_dl': train_dl,
-            'valid_dl': valid_dl,
-            'eval_dl': eval_dl
-        }
-        dataloaders = {
-            dl_name: TrainerDataLoader(dataloader=dataloader)
-            if isinstance(dataloader, DataLoader) else dataloader
-            for dl_name, dataloader in dataloaders.items()
-            if dataloader is not None
-        }
-        super().__init__(model=model, **dataloaders)
-        if is_in_training:
-            if valid_dl is not None:
-                kwargs['valid_dl_batch_size'] = valid_dl.batch_size
-            else:
-                kwargs['valid_dl_batch_size'] = None
-            self._hparams = TrainingArguments(
-                learning_rate=model.learning_rate,
-                train_dl_batch_size=train_dl.batch_size,
-                **kwargs
-            )
+    @property
+    def is_training_hparams(self) -> bool:
+        return True
+
+    @property
+    def train_dl_batch_size(self) -> int:
+        return self._train_dl.batch_size
+
+    @property
+    def valid_dl_batch_size(self) -> typing.Optional[int]:
+        if self._valid_dl is None:
+            return None
         else:
-            self._hparams = EvaluatingArguments(
-                eval_dl_batch_size=eval_dl.batch_size,
-                **kwargs
-            )
-        self._status_ptr = [TrainerStatus()]
+            return self._valid_dl.batch_size
 
-    @property
-    def status(self) -> TrainerStatus:
-        return self._status_ptr[0]
-
-    @property
-    def hparams(self) -> typing.Union[TrainingArguments,
-                                      EvaluatingArguments]:
-        return self._hparams
-
-    def set_status(self, batch=None, epoch=None) -> None:
-        if batch is not None:
-            self._status_ptr[0].current_batch = batch
-        if epoch is not None:
-            self._status_ptr[0].current_epoch = epoch
-
-    def reset_status(self) -> None:
-        self._status_ptr[0].current_epoch = None
-        self._status_ptr[0].current_batch = None
-
-    class Config:
-        allow_mutation = True
-
-    @pydantic.validator('train_dl', 'valid_dl', 'eval_dl')
+    @pydantic.validator('train_dl')
     @classmethod
-    def validate_dataloaders(cls, field_type):
+    def validate_train_dataloader(
+            cls, field_type
+    ) -> TrainerDataLoader:
         if isinstance(field_type, TrainerDataLoader):
             return field_type
         elif isinstance(field_type, torch.utils.data.DataLoader):
@@ -156,98 +152,118 @@ class HandlerArguments(pydantic.BaseModel):
             raise ValueError(
                 f'Not possible to accept a type of {type(field_type)}')
 
-    @property
-    def istrainable(self):
-        if isinstance(self.args, TrainerDataLoader):
-            return True
-        elif isinstance(self.args, EvaluatingArguments):
-            return False
+    @pydantic.validator('valid_dl')
+    @classmethod
+    def validate_valid_dataloader(
+            cls, field_type) -> typing.Optional[TrainerDataLoader]:
+        if field_type is None:
+            return field_type
         else:
-            return None
+            return cls.validate_train_dataloader(field_type)
 
 
-class CurrentIterationStatus(pydantic.BaseModel):
+class EvaluatingArguments(IterationArguments):
+    class Config:
+        allow_mutation = False
+
+    eval_dl: typing.Union[TrainerDataLoader, DataLoaderType]
+
+    @pydantic.validator('eval_dl')
+    @classmethod
+    def validate_eval_dataloader(
+            cls, field_type
+    ) -> TrainerDataLoader:
+        return TrainingArguments.validate_train_dataloader(field_type)
+
+    @property
+    def is_training_hparams(self) -> bool:
+        return False
+
+    @property
+    def eval_dl_batch_size(self):
+        return self._eval_dl.batch_size
+
+
+class IterationBatch(pydantic.BaseModel):
+    # @TODO: create validator for those types
+    # xtype: str
+    # ytype: str
+    # device: str
+    input: typing.Optional[NpTorchType]
+    preds: typing.Optional[NpTorchType]
+    target: typing.Optional[NpTorchType]
+
+    class Config:
+        allow_mutation = False
+
+    def collate_fn(self, input, preds, target):
+        self.Config.allow_mutation = True
+        self.input = input
+        self.target = target
+        self.preds = preds
+        self.Config.allow_mutation = False
+
+
+class IterationInterface(pydantic.BaseModel):
+    batch: IterationBatch = IterationBatch()
+    status: IterationStatus = IterationStatus()
+    hparams: IterationArguments = pydantic.Field(None)
+
     _at_epoch_end: bool = pydantic.PrivateAttr(False)
     _metric_handler: MetricHandler = pydantic.PrivateAttr()
-    _epoch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
-    _batch_idx: typing.Optional[int] = pydantic.PrivateAttr(None)
-    _x: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
-    _y_true: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
-    _y_pred: typing.Optional[NpTorchType] = pydantic.PrivateAttr(None)
-    _status_ptr: typing.List[TrainerStatus] = pydantic.PrivateAttr([None])
+    _metric_history: RunHistory = pydantic.PrivateAttr()
+    _score_names: typing.Set[str] = pydantic.PrivateAttr()
 
-    def __init__(self, handler: MetricHandler):
+    def __init__(self,
+                 metrics: MetricHandler,
+                 history: RunHistory,
+                 hparams: IterationArguments):
         super().__init__()
-        self._metric_handler = handler
-        self._status_ptr = [None]
+        self.hparams = hparams
+        self._metric_handler = metrics
+        self._metric_history = history
+        score_names = self._metric_history.get_score_names()
+        self._score_names = score_names
 
-    @property
-    def x(self):
-        return self._x
-
-    @property
-    def y_pred(self):
-        return self._y_pred
-
-    @property
-    def y_true(self):
-        return self._y_true
-
-    @property
-    def status(self) -> typing.Optional[TrainerStatus]:
-        return self._status_ptr[0]
-
-    def __setattr__(self, key, value):
-        if key == 'status':
-            assert isinstance(value, TrainerStatus)
-            self._status_ptr[0] = value
-            return object.__setattr__(self._status_ptr[0], 'status', value)
-        return super().__setattr__(key, value)
-
-    def get_score_names(self):
-        return self._metric_handler.get_score_names()
-
-    def set_score_names(self, score_names: typing.Iterable[str]):
-        self._metric_handler.set_score_names(score_names)
-
-    def reset_score_names(self):
-        self._metric_handler.set_score_names()
-
-    # every step end
-    def set_current_scores(self, x, y_true, y_pred, batch_idx=None):
-        """ Sets the current step input and outputs and calls score groups """
-        self._x = x
-        self._y_true = y_true
-        self._y_pred = y_pred
+    # functions for IterationHandler
+    def collate_fn(self, input, preds, target):
         self._at_epoch_end = False
-        self._metric_handler.run_score_functional(preds=y_pred, target=y_true)
-        self._batch_idx = batch_idx
+        self.batch.collate_fn(input, preds, target)
+        self._metric_handler.run_score_functional(preds=preds,
+                                                  target=target)
 
-    # every epoch end
-    def average_current_scores(self, epoch_idx=None):
-        """ Pushes the scores values of the current epoch to the history
-        in the metric handler and clears the score values of the all steps
-        in the latest epoch in the metric handler """
+    def set_metric_scores(self):
         self._at_epoch_end = True
-        self._metric_handler.push_score_values()
-        self._metric_handler.reset_score_values()
-        self._epoch_idx = epoch_idx
 
-    def get_current_scores(self, *score_names: str) -> typing.Dict[str, float]:
+    def reset_metric_scores(self):
+        score_values = self._metric_handler.get_score_averages(
+            *self._metric_history.get_score_names())
+        for score_name, score_value in score_values.items():
+            self._metric_history.set_latest_score(score_name, score_value)
+        # @TODO: instead of (postincrementing) _increment_epoch
+        # use allocate_score_values (preincrementing)
+        self._metric_history._increment_epoch()
+        self._metric_handler.reset_score_values()
+
+    # functions for Callbacks and Third Party Comp.
+
+    def get_current_scores(self,
+                           *score_names: str
+                           ) -> typing.Dict[str, float]:
         """ Returns the latest step or epoch values, depending on
         whether it has finished itereting over the current epoch or not """
-        if len(score_names) == 0:
-            score_names = self._metric_handler.get_score_names()
+        # @TODO: make calls without star
         if self._at_epoch_end:
-            return self._metric_handler.seek_score_history(*score_names)
+            return self._metric_handler.get_score_averages(*score_names)
         else:
             return self._metric_handler.get_score_values(*score_names)
 
-    def get_score_history(
+    def get_stored_scores(
             self,
             *score_names: str
     ) -> typing.Dict[str, typing.List[float]]:
         """ Returns the all epoch values with given score names """
-        if len(score_names) == 0:
-            score_names = self.get_score_names()
-        return self._metric_handler.get_score_history(*score_names)
+        return {
+            score_name: self._metric_history.get_score_values(score_name)
+            for score_name in score_names
+        }

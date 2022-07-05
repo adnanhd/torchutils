@@ -55,12 +55,16 @@ def _add_last_layer(self, output, choices=(None, ), *args, **kwargs):
         self.add_module('submodule', output)
 
 
+def init_avg_loss():
+    return AverageMeter("Loss")
+
+
 class TrainerModel(pydantic.BaseModel):
     model: ModuleType
     criterion: typing.Union[ModuleType, FunctionType]
     optimizer: OptimizerType
     scheduler: typing.Optional[SchedulerType]
-    _loss: AverageMeter = pydantic.PrivateAttr(AverageMeter("Loss"))
+    _loss: AverageMeter = pydantic.PrivateAttr(default_factory=init_avg_loss)
     _backward_hooks: typing.List[GradTensorType] = pydantic.PrivateAttr(
         default_factory=list)
 
@@ -206,7 +210,11 @@ class TrainerModel(pydantic.BaseModel):
 
     def reset_backward(self):
         self.scheduler_step()
-        self._backward_hooks.clear()
+        if self._backward_hooks.__len__() != 0:
+            warnings.warn(
+                "BackwardHook is not empty", RuntimeWarning
+            )
+            self._backward_hooks.clear()
 
     def _push_for_backward(self, tensor: torch.Tensor) -> None:
         if hasattr(tensor, 'requires_grad') and tensor.requires_grad:

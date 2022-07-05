@@ -44,4 +44,4 @@ import torchutils.trainer
 import torchutils.logging
 import torchutils.metrics
 
-__version__ = torchutils.utils.Version('1.4.2c')
+__version__ = torchutils.utils.Version('1.5.0')

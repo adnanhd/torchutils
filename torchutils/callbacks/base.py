@@ -1,11 +1,13 @@
 # Copyright © 2021 Chris Hughes
 from abc import ABC
-from typing import Optional
+from typing import Optional, Union
 from torchutils.logging import LoggerProxy, LoggerHandler
 from torchutils.trainer.utils import (
-    HandlerArguments,
-    TrainerStatus,
-    CurrentIterationStatus
+    IterationArguments,
+    TrainingArguments,
+    EvaluatingArguments,
+    IterationStatus,
+    IterationInterface
 )
 
 
@@ -35,13 +37,14 @@ class TrainerCallback(ABC):
             self.__log__ = LoggerHandler.getProxy()
         return self.__log__
 
-    def on_initialization(self, args: HandlerArguments):
+    def on_initialization(self, hparams: Union[TrainingArguments,
+                                               EvaluatingArguments]):
         """
         Event called at the end of trainer initialisation.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_begin(self, stat: TrainerStatus):
+    def on_training_begin(self, status: IterationStatus):
         """
         Event called at the start of training run.
         :param num_epochs total number of epochs at the most 
@@ -50,20 +53,20 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_epoch_begin(self, stat: TrainerStatus):
+    def on_training_epoch_begin(self, stat: IterationStatus):
         """
         Event called at the beginning of a training epoch.
         :param epoch
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_step_begin(self, stat: TrainerStatus):
+    def on_training_step_begin(self, stat: IterationStatus):
         """
         Event called at the beginning of a training step.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_step_end(self, batch: CurrentIterationStatus):
+    def on_training_step_end(self, batch: IterationInterface):
         """
         Event called at the end of a training step.
         :param batch: the current batch of training data
@@ -71,31 +74,31 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_epoch_end(self, epoch: CurrentIterationStatus):
+    def on_training_epoch_end(self, epoch: IterationInterface):
         """
         Event called at the end of a training epoch.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_end(self, stat: TrainerStatus):
+    def on_training_end(self, stat: IterationStatus):
         """
         Event called at the end of training run.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_validation_run_begin(self, stat: TrainerStatus):
+    def on_validation_run_begin(self, stat: IterationStatus):
         """
         Event called at the beginning of an evaluation epoch.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_validation_step_begin(self, stat: TrainerStatus):
+    def on_validation_step_begin(self, stat: IterationStatus):
         """
         Event called at the beginning of a evaluation step.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_validation_step_end(self, batch: CurrentIterationStatus):
+    def on_validation_step_end(self, batch: IterationInterface):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data
@@ -103,31 +106,31 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_validation_run_end(self, epoch: CurrentIterationStatus):
+    def on_validation_run_end(self, epoch: IterationInterface):
         """
         Event called at the start of an evaluation run.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_valid_end(self, stat: TrainerStatus):
+    def on_training_valid_end(self, stat: IterationStatus):
         """
         Event called during a training run after both training and evaluation epochs have been completed.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_evaluation_run_begin(self, stat: TrainerStatus):
+    def on_evaluation_run_begin(self, stat: IterationStatus):
         """
         Event called at the start of an evaluation run.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_evaluation_step_begin(self, stat: TrainerStatus):
+    def on_evaluation_step_begin(self, stat: IterationStatus):
         """
         Event called at the beginning of a evaluation step.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_evaluation_step_end(self, batch: CurrentIterationStatus):
+    def on_evaluation_step_end(self, batch: IterationInterface):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data
@@ -135,19 +138,19 @@ class TrainerCallback(ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_evaluation_run_end(self, epoch: CurrentIterationStatus):
+    def on_evaluation_run_end(self, epoch: IterationInterface):
         """
         Event called at the end of an evaluation run.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_stop_training_error(self, stat: TrainerStatus):
+    def on_stop_training_error(self, stat: IterationStatus):
         """
         Event called when a stop training error is raised
         """
         raise CallbackMethodNotImplementedError
 
-    def on_termination(self, stat: TrainerStatus):
+    def on_termination(self, stat: IterationStatus):
         raise CallbackMethodNotImplementedError
 
     # def __getattr__(self, item):

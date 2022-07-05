@@ -1,49 +1,52 @@
 #!/usr/bin/env python3
 import os
-from torchutils.data.dataset import Dataset
 import torch
+import typing
+import warnings
 import numpy as np
+
 from torchutils.callbacks import (
     TrainerCallback,
     StopTrainingError,
 )
 
-import warnings
-from .handler import TrainerHandler
-from torchutils.utils import Version
+from .handler import TrainingHandler, EvaluatingHandler
 from ..models.utils import TrainerModel
 from .utils import (
-    TrainerStatus,
+    IterationStatus,
     TrainingArguments,
     EvaluatingArguments
 )
 
+from torchutils.data.dataset import Dataset
+from torchutils.metrics import MetricHandler
+from torchutils.logging import LoggerHandler, TrainerLogger, LoggingEvent
+from torchutils.callbacks import CallbackHandler
 from typing import (
-    List,
     Iterable,
     Mapping,
     Optional,
     Union,
-    Tuple,
-    Set
 )
-
-version = Version('1.2.0')
 
 
 class Trainer:
-    __slots__ = ['ytype', '_model', '_handler']
+    __slots__ = [
+        '_model',
+        '_loggers',
+        '_metrics',
+        '_callbacks',
+        # TODO: migrate xtype and ytype to TrainerModel
+        'ytype',
+    ]
 
     def __init__(
         self,
         model: Union[TrainerModel, torch.nn.Module],
         loss: Optional[Union[torch.autograd.Function, torch.nn.Module]] = None,
-        device=None,  # todo: remove
+        device: Optional[Union[str, torch.device]] = None,  # todo: remove
         xtype: Union[torch.dtype, np.dtype, type] = torch.float32,
         ytype: Union[torch.dtype, np.dtype, type] = torch.float32,
-        callbacks: List[TrainerCallback] = list(),
-        metrics: Union[Set[str], List[str], Tuple[str]] = set(),
-        **kwargs,
     ):
         assert isinstance(model, TrainerModel) or loss is not None
         if not isinstance(model, TrainerModel):
@@ -55,17 +58,12 @@ class Trainer:
         self._model.dtype = xtype
         self.ytype = ytype
 
-        self._handler = TrainerHandler()
-        if model is not None:
-            self._model.register_metrics_to(self._handler._metrics)
-
-    @property
-    def status(self) -> TrainerStatus:
-        return self._handler.status
-
-    @property
-    def hyperparams(self) -> Union[TrainingArguments, EvaluatingArguments]:
-        return self._handler.hparams
+        # initializing handlers
+        self._metrics = MetricHandler()
+        self._callbacks = CallbackHandler()
+        # TODO: self._loggers = LoggerHandler()
+        self._loggers = LoggerHandler.getHandler()
+        self._loggers: LoggerHandler
 
     @property
     def xtype(self) -> torch.dtype:
@@ -82,26 +80,34 @@ class Trainer:
         batch_size: Optional[int] = None,
         **kwargs,
     ) -> torch.utils.data.DataLoader:
-        assert isinstance(dataset, torch.utils.data.Dataset), """type(dataset), \
-                {} must be inherited from torch.utils.data.Dataset""".format(type(dataset))
+        assert isinstance(dataset, torch.utils.data.Dataset), \
+            "Dataset must be inherited from torch.utils.data.Dataset"
 
         try:
-            if isinstance(dataset.features, np.ndarray) and self.device != torch.device('cpu'):
-                dataset.features = torch.from_numpy(dataset.features)
-            dataset.features = dataset.features.to(
-                device=self.device, dtype=self.xtype)
-            if isinstance(dataset.labels, np.ndarray) and self.device != torch.device('cpu'):
-                dataset.labels = torch.from_numpy(dataset.labels)
-            dataset.labels = dataset.labels.to(
-                device=self.device, dtype=self.ytype)
+            if isinstance(dataset.x, np.ndarray) \
+                    and self.device != torch.device('cpu'):
+                dataset.x = torch.from_numpy(dataset.x)
+            dataset.x = dataset.x.to(
+                device=self.device,
+                dtype=self.xtype
+            )
+            if isinstance(dataset.y, np.ndarray) and \
+                    self.device != torch.device('cpu'):
+                dataset.y = torch.from_numpy(dataset.y)
+            dataset.y = dataset.y.to(
+                device=self.device,
+                dtype=self.ytype
+            )
         except AttributeError:
             warnings.warn(
-                "Using a Dataset not derived from torchutils.data.Dataset is dangerous for dtype integrity")
+                "Using a Dataset not derived from torchutils.data.Dataset "
+                "is dangerous for dtype integrity"
+            )
 
         kwargs.setdefault('shuffle', train_mode)
         kwargs.setdefault('pin_memory', not torch.cuda.is_available())
-        kwargs.setdefault(
-            'num_workers', 0 if torch.cuda.is_available() else os.cpu_count())
+        kwargs.setdefault('num_workers',
+                          0 if torch.cuda.is_available() else os.cpu_count())
         if not train_mode or batch_size is None:
             kwargs['batch_size'] = dataset.__len__()
         else:
@@ -112,24 +118,35 @@ class Trainer:
         else:
             return torch.utils.data.DataLoader(dataset, **kwargs)
 
-    def compile(
-        self,
-        device=None,
-        model=None,
-        loss=None,
-        optim=None,
-        sched=None,
-        metrics=list(),
-        loggers=dict(),
-        callbacks=list(),
-        **parameters  # trainer parameters
-    ) -> None:
-        if device is not None:
-            self._model.device = device
-        if model is not None:
-            self._model.register_metrics_to(self._handler._metrics)
-        self._model.compile(model, loss, optim, sched)
-        self._handler.compile_handlers(loggers, metrics, callbacks)
+    def compile_model_and_hparams(self,
+                                  ** hparams) -> None:
+        for field_name in set(self._model.__fields__):
+            hparams.setdefault(field_name, getattr(self._model, field_name))
+        self._model = TrainerModel(**hparams)
+
+    def compile_handlers(
+            self,
+            loggers: typing.Dict[TrainerLogger,
+                                 typing.Iterable[LoggingEvent]] = dict(),
+            callbacks: typing.Iterable[TrainerCallback] = list(),
+    ):
+        self._loggers.add_loggers(loggers)
+        self._callbacks.add_callbacks(callbacks)
+
+    def decompile_handlers(
+            self,
+            loggers: typing.Dict[TrainerLogger,
+                                 typing.Iterable[LoggingEvent]] = dict(),
+            callbacks: typing.Iterable[TrainerCallback] = list(),
+    ):
+        for logger, events in loggers.items():
+            for event in events:
+                self._loggers.remove_logger(event=event, logger=logger)
+        self._callbacks.remove_callbacks(callbacks)
+
+    def clear_handlers(self):
+        self._loggers.clear_loggers()
+        self._callbacks.clear_callbacks()
 
     def train(
         self,
@@ -138,14 +155,16 @@ class Trainer:
         train_dataset: torch.utils.data.Dataset,
         learning_rate: float = None,
         valid_dataset: Optional[torch.utils.data.Dataset] = None,
-        train_dataloader_kwargs: Optional[Mapping] = {},
-        valid_dataloader_kwargs: Optional[Mapping] = {},
+        train_dataloader_kwargs: Optional[Mapping] = dict(),
+        valid_dataloader_kwargs: Optional[Mapping] = dict(),
+        history: typing.Set[str] = set(),
         **hparams
     ):
         if learning_rate is not None:
             self._model.learning_rate = learning_rate
         else:
             learning_rate = self._model.learning_rate
+        hparams['learning_rate'] = learning_rate
 
         train_dl = self.create_dataloader(
             dataset=train_dataset, train_mode=True,
@@ -154,43 +173,44 @@ class Trainer:
 
         valid_dl = None
         if valid_dataset is not None:
-            valid_dl = self.create_dataloader(dataset=valid_dataset,
-                                              train_mode=False,
-                                              **valid_dataloader_kwargs,
-                                              batch_size=hparams.setdefault(
-                                                  'valid_dl_batch_size', -1)
-                                              )
+            valid_dl = self.create_dataloader(
+                dataset=valid_dataset,
+                train_mode=False,
+                **valid_dataloader_kwargs,
+                batch_size=hparams.setdefault('valid_dl_batch_size', -1)
+            )
             hparams['valid_dl_batch_size'] = valid_dl.batch_size
 
-        self._handler.compile_model_and_hparams(
-            model=self._model,
-            train_dl=train_dl,
-            valid_dl=valid_dl,
-            num_epochs=num_epochs,
-            **hparams
+        handler = TrainingHandler(
+            metrics=self._metrics,
+            loggers=self._loggers,
+            callbacks=self._callbacks,
+            history=history,
+            arguments=TrainingArguments(
+                model=self._model,
+                train_dl=train_dl,
+                valid_dl=valid_dl,
+                num_epochs=num_epochs,
+                **hparams
+            )
         )
 
         try:
-            self._handler._arguments.set_status(
-                epoch=self.hyperparams.resume_epochs)
-            self._handler.on_initialization()
-            results = self._run_training(
-                train_loader=train_dl,
-                valid_loader=valid_dl
-            )
+            handler.on_initialization()
+            self._run_training(handler)
         except StopTrainingError:
-            self._handler.on_stop_training_error()
+            handler.on_stop_training_error()
         else:
-            return results
+            return handler.interface.get_stored_scores(*history)
         finally:
-            self._handler._arguments.reset_status()
-            self._handler.on_termination()
+            handler.on_termination()
 
     def evaluate(
         self,
         dataset,
-        dataloader_kwargs={},
-        **kwargs
+        dataloader_kwargs=dict(),
+        history: typing.Set[str] = set(),
+        **hparams
     ):
         eval_dl = self.create_dataloader(
             dataset=dataset,
@@ -199,144 +219,142 @@ class Trainer:
             **dataloader_kwargs,
         )
 
-        self._handler.compile_model_and_hparams(
-            model=self._model,
-            eval_dl=eval_dl,
-            eval_dl_batch_size=eval_dl.batch_size,
-            **kwargs
+        handler = EvaluatingHandler(
+            metrics=self._metrics,
+            loggers=self._loggers,
+            callbacks=self._callbacks,
+            history=history,
+            arguments=EvaluatingArguments(
+                model=self._model,
+                eval_dl=eval_dl,
+                **hparams
+            )
         )
 
         try:
-            self._handler.on_initialization()
+            handler.on_initialization()
             results = self._run_evaluating(eval_dl)
         except StopTrainingError:
-            self._handler.on_stop_training_error()
+            handler.on_stop_training_error()
         else:
             return results
         finally:
-            self._handler.on_termination()
-            self._handler._arguments.reset_status()
+            handler.on_termination()
 
     def _run_training(
         self,
-        train_loader: torch.utils.data.DataLoader,
-        valid_loader: Optional[torch.utils.data.DataLoader] = None,
+        handler: TrainingHandler,
     ):
-        self._handler.on_training_begin()
+        handler.on_training_begin()
 
-        for epoch in range(self.hyperparams.resume_epochs,
-                           self.hyperparams.num_epochs):
-            self._handler._arguments.set_status(epoch=epoch)
-            self._run_training_epoch(train_loader, valid_loader)
+        for epoch_idx in range(handler.hparams.resume_epochs,
+                               handler.hparams.num_epochs):
+            self._run_training_epoch(epoch_idx, handler)
 
-        self._handler.on_training_end()
-        return self._handler.iteration_proxy.get_score_history()
+        handler.on_training_end()
 
     def _run_training_epoch(
         self,
-        train_loader: torch.utils.data.DataLoader,
-        valid_loader: Optional[torch.utils.data.DataLoader] = None,
+        epoch_idx: int,
+        handler: TrainingHandler,
     ) -> torch.Tensor:
-        self._handler.on_training_epoch_begin()
+        handler.on_training_epoch_begin(epoch_idx)
         self._model.train()
 
-        for batch_idx, batch in enumerate(train_loader):
-            self._run_training_step(batch, batch_idx)
+        for batch_idx, batch in enumerate(handler.hparams.train_dl):
+            self._run_training_step(batch_idx, batch, handler)
 
         self._model.reset_backward()
-        if valid_loader is not None and (self.status.current_epoch + 1) % \
-                self.hyperparams.num_epochs_per_validation == 0:
-            self._run_validating(valid_loader)
+        if handler.hparams.valid_dl is not None \
+                and (handler.interface.status.current_epoch + 1) % \
+                handler.interface.hparams.num_epochs_per_validation == 0:
+            self._run_validating(handler)
 
-        self._handler.on_training_epoch_end()
+        handler.on_training_epoch_end()
 
     def _run_training_step(
         self,
+        batch_idx: int,
         batch: Iterable[torch.Tensor],
-        batch_idx: int
+        handler: TrainingHandler,
     ) -> torch.Tensor:
         x = batch[0].to(device=self.device, dtype=self.xtype)
         y = batch[1].to(device=self.device, dtype=self.ytype)
 
-        self._handler._arguments.set_status(batch=batch_idx)
-        self._handler.on_training_step_begin()
+        handler.on_training_step_begin(batch_idx)
 
-        y_pred = self._model.forward_pass(x, y, self.status.current_batch)
+        y_pred = self._model.forward_pass(x, y, batch_idx)
         self._model.backward_pass()
 
-        self._handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
+        handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
 
         return y_pred.detach()
 
     @torch.no_grad()
     def _run_evaluating(
         self,
-        eval_loader: Optional[torch.utils.data.DataLoader],
+        handler: EvaluatingHandler
     ) -> torch.Tensor:
 
-        self._handler.on_evaluation_run_begin()
+        handler.on_evaluation_run_begin()
         self._model.eval()
 
         preds = []
-        for batch_idx, batch in enumerate(eval_loader):
-            pred = self._run_evaluating_step(batch_idx, batch)
+        for batch_idx, batch in enumerate(handler.hparams.eval_dl):
+            pred = self._run_evaluating_step(batch_idx, batch, handler)
             preds.extend(pred)
 
         self._model.reset_backward()
-        self._handler.on_evaluation_run_end()
+        handler.on_evaluation_run_end()
         return preds
 
     @torch.no_grad()
     def _run_evaluating_step(
         self,
         batch_idx: int,
-        batch: Iterable[torch.Tensor]
+        batch: Iterable[torch.Tensor],
+        handler: EvaluatingHandler
     ) -> torch.Tensor:
         x = batch[0].to(device=self.device, dtype=self.xtype)
         y = batch[1].to(device=self.device, dtype=self.ytype)
 
-        self._handler._arguments.set_status(batch=batch_idx)
-        self._handler.on_evaluation_step_begin()
+        handler.on_evaluation_step_begin()
 
-        y_pred = self._model.forward_pass(
-            x=x, y=y, batch_idx=self.status.current_batch
-        )
+        y_pred = self._model.forward_pass(x=x, y=y, batch_idx=batch_idx)
 
-        self._handler.on_evaluation_step_end(x=x, y=y, y_pred=y_pred)
+        handler.on_evaluation_step_end(x=x, y=y, y_pred=y_pred)
 
         return y_pred.detach()
 
     @torch.no_grad()
     def _run_validating(
         self,
-        valid_loader: Optional[torch.utils.data.DataLoader],
+        handler: TrainingHandler
     ) -> torch.Tensor:
 
-        self._handler.on_validation_run_begin()
+        handler.on_validation_run_begin()
         self._model.eval()
 
-        for step_idx, batch in enumerate(valid_loader):
-            self._run_validating_step(step_idx, batch)
+        for step_idx, batch in enumerate(handler.hparams.valid_dl):
+            self._run_validating_step(step_idx, batch, handler)
 
         self._model.reset_backward()
-        self._handler.on_validation_run_end()
+        handler.on_validation_run_end()
 
     @torch.no_grad()
     def _run_validating_step(
         self,
         batch_idx: int,
-        batch: Iterable[torch.Tensor]
+        batch: Iterable[torch.Tensor],
+        handler: TrainingHandler
     ) -> torch.Tensor:
         x = batch[0].to(device=self.device, dtype=self.xtype)
         y = batch[1].to(device=self.device, dtype=self.ytype)
 
-        self._handler._arguments.set_status(batch=batch_idx)
-        self._handler.on_validation_step_begin()
+        handler.on_validation_step_begin()
 
-        y_pred = self._model.forward_pass(
-            x=x, y=y, batch_idx=self.status.current_batch
-        )
+        y_pred = self._model.forward_pass(x=x, y=y, batch_idx=batch_idx)
 
-        self._handler.on_validation_step_end(x=x, y=y, y_pred=y_pred)
+        handler.on_validation_step_end(x=x, y=y, y_pred=y_pred)
 
         return y_pred.detach()

@@ -80,10 +80,13 @@ class DataFrameRunHistory(RunHistory):
     """
     __slots__ = ['_current_epoch', '_scores', '_has_latest_row']
 
-    def __init__(self, current_epoch: int = 1):
+    def __init__(self,
+                 score_names: typing.Set[str] = set(),
+                 current_epoch: int = 1):
         self._current_epoch: int = current_epoch
         self._scores: pd.DataFrame = None
         self._has_latest_row = False
+        self.set_score_names(score_names)
 
     @property
     def current_epoch(self):

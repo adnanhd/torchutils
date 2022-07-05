@@ -11,6 +11,9 @@ class TrainerDataLoader(pydantic.BaseModel):
     def __init__(self, dataloader: DataLoader):
         super().__init__(dataloader=dataloader)
 
+    def __iter__(self):
+        return self.dataloader.__iter__()
+
     @property
     def dataset(self):
         return self.dataloader.dataset

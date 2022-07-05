@@ -7,9 +7,9 @@ from .base import TrainerCallback
 from typing import Callable
 from ..models.utils import TrainerModel
 from ..trainer.utils import (
-    HandlerArguments,
-    TrainerStatus,
-    CurrentIterationStatus
+    IterationArguments,
+    IterationStatus,
+    IterationInterface
 )
 
 
@@ -54,7 +54,7 @@ class ModelCheckpoint(TrainerCallback):
     """
 
     def __init__(self,
-                 monitor="loss",
+                 monitor="Loss",
                  trainer_model: TrainerModel = None,
                  save_path='model_checkpoint.ckpt',
                  maximize_score: bool = False,
@@ -88,7 +88,7 @@ class ModelCheckpoint(TrainerCallback):
 
         if isinstance(self.load_back_per_epochs, int) \
                 and self.load_back_per_epochs > 0:
-            def on_training_epoch_begin(self, status: TrainerStatus):
+            def on_training_epoch_begin(self, status: IterationStatus):
                 if self._best_weights is not None and \
                         status.current_epoch % self.load_back_per_epochs == 0:
                     self._put_checkpoint_into_model()
@@ -167,30 +167,30 @@ class ModelCheckpoint(TrainerCallback):
                 "the current best checkpoint is reset with None."
             )
 
-    def on_initialization(self, args: HandlerArguments):
+    def on_initialization(self, args: IterationArguments):
         if self.model is None:
             self.model = args.model
         if self.init_from_checkpoint and os.path.isfile(self.save_path):
             self._load_from_filesystem()
 
-    def on_training_epoch_end(self, epoch: CurrentIterationStatus):
+    def on_training_epoch_end(self, epoch: IterationInterface):
         metric_value = epoch.get_current_scores(self.monitor)[self.monitor]
 
         if self.is_value_better(metric_value):
             self._get_checkpoint_from_model(metric_value)
 
-    def on_training_end(self, stat: TrainerStatus):
+    def on_training_end(self, stat: IterationStatus):
         if self._best_weights is not None:
             self._put_checkpoint_into_model()
 
-    def on_evaluation_begin(self, stat: TrainerStatus):
+    def on_evaluation_begin(self, stat: IterationStatus):
         if self.eval_with_best_model and self._best_weights is not None:
             self._put_checkpoint_into_model()
 
-    def on_termination(self, stat: TrainerStatus):
+    def on_termination(self, stat: IterationStatus):
         if self.halt_into_checkpoint and self._best_weights is not None:
             self._save_into_filesystem()
 
-    def on_stop_training_error(self, stat: TrainerStatus):
+    def on_stop_training_error(self, stat: IterationStatus):
         if self.halt_into_checkpoint and self._best_weights is not None:
             self._save_into_filesystem()

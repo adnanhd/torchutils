@@ -2,7 +2,7 @@
 import numpy as np
 import typing
 from .base import TrainerCallback, StopTrainingError
-from torchutils.trainer.utils import CurrentIterationStatus
+from torchutils.trainer.utils import IterationInterface
 
 
 class EarlyStopping(TrainerCallback):
@@ -42,7 +42,7 @@ class EarlyStopping(TrainerCallback):
         self.delta = delta
         self.trace_func = trace_func
 
-    def on_training_epoch_end(self, epoch: CurrentIterationStatus):
+    def on_training_epoch_end(self, epoch: IterationInterface):
         score = - epoch.get_current_scores(self.monitor)[self.monitor]
 
         if self.best_score is None:
