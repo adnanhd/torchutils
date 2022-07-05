@@ -7,8 +7,9 @@ import random
 import torch.nn as nn
 import torch.optim as optim
 from torchutils.trainer import Trainer
-from torchutils.utils.pydantic import TrainerModel
-from torchutils.callbacks import ProgressBar, ModelCheckpoint
+from torchutils.models import TrainerModel
+from torchutils.logging import ProgressBarLogger
+from torchutils.callbacks import ModelCheckpoint, ScoreLoggerCallback
 
 # Download ImageNet labels
 
@@ -68,8 +69,8 @@ model = TrainerModel(
     optimizer=optim.SGD(params_to_update, lr=0.005, momentum=0.80)
 )
 trainer = Trainer(model=model, device='cuda', ytype=torch.long)
-pbar = ProgressBar()
-trainer.compile(callbacks=[pbar, ModelCheckpoint()])
+trainer.compile_handlers(loggers=ProgressBarLogger.getLoggerGroup())
+trainer.compile_handlers(callbacks=[ScoreLoggerCallback(), ModelCheckpoint()])
 # trainer.compile(metrics=['loss'])
 # trainer.compile(loggers=[pbar._step_bar])
 

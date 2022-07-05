@@ -136,3 +136,4 @@
 - add accuracy and other metrics
 	- change Trainer.compile method so that we can chose which metrics to use, default loss only
 - change batch sampling mechanism https://pytorch.org/docs/stable/data.html#memory-pinning
+- when an exception occured close loggers
