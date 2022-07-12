@@ -32,7 +32,7 @@ def _foreach_callback_require_stat_(method):
     return wrapped_method
 
 
-def _foreach_callback_require_args_(method):
+def _foreach_callback_require_hparams_(method):
     def wrapped_method(self, args: IterationArguments, **kwargs):
         for callback in self.callbacks:
             self._callback = callback
@@ -111,9 +111,9 @@ class CallbackHandler:
     def __repr__(self):
         return "\n".join(cb.__class__.__name__ for cb in self.callbacks)
 
-    @_foreach_callback_require_args_
-    def on_initialization(self, args: IterationArguments):
-        self._callback.on_initialization(args=args)
+    @_foreach_callback_require_hparams_
+    def on_initialization(self, hparams: IterationArguments):
+        self._callback.on_initialization(hparams)
 
     @_foreach_callback_require_stat_
     def on_training_begin(self, stat: IterationStatus):
