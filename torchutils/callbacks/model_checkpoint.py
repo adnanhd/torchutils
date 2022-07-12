@@ -60,7 +60,7 @@ class ModelCheckpoint(TrainerCallback):
                  maximize_score: bool = False,
                  delta: float = 0.0,
                  # TODO: replace this param with TrainerLogger
-                 trace_func: Callable[[str], None] = print,
+                 trace_func: Callable[[str], None] = None,
                  verbose: bool = False,
                  load_back_per_epochs: int = 0,
                  init_from_checkpoint: bool = False,
@@ -68,13 +68,16 @@ class ModelCheckpoint(TrainerCallback):
                  save_only_best_model: bool = True,
                  eval_with_best_model: bool = False,
                  ):
+        super().__init__()
         self.monitor: str = monitor
         self.model: TrainerModel = trainer_model
         self.delta: float = delta
         self.verbose: bool = verbose
         self.maximize: bool = maximize_score
         self.save_path: str = save_path
-        self.trace_func: Callable[[str], None] = trace_func
+        self.trace_func: Callable[
+            [str], None
+        ] = self._log.log_string if trace_func is None else trace_func
 
         self.load_back_per_epochs: int = load_back_per_epochs
         self.init_from_checkpoint: bool = init_from_checkpoint
