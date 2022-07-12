@@ -1,5 +1,6 @@
 from .base import TrainerCallback
 from ..logging import LoggerHandler, LoggingEvent
+from ..metrics import MetricHandler
 from ..trainer.utils import (
     IterationArguments,
     IterationStatus,
@@ -17,7 +18,13 @@ class ScoreLoggerCallback(TrainerCallback):
         super().__init__()
         self._handler: LoggerHandler = LoggerHandler.getHandler()
         self._args: IterationArguments = None
-        self._score_names = score_names
+        if len(score_names) == 0:
+            self._score_names = list(
+                MetricHandler.MetricRegistrar.__score__.keys()
+            )
+            print(self._score_names)
+        else:
+            self._score_names = score_names
 
     def on_initialization(self, args: IterationArguments):
         self._args = args

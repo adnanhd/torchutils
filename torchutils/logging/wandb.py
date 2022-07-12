@@ -25,7 +25,7 @@ class WandbLogger(TrainerLogger):
         self.project = project
         self.username = username
         self.groupname = groupname
-        self._wandb = None
+        self._wandb: wandb.sdk.wandb_run.Run = None
 
     def open(self, args: IterationArguments):
         self._wandb = wandb.init(project=self.project,
@@ -48,7 +48,9 @@ class WandbLogger(TrainerLogger):
     def log_scores(self,
                    scores: typing.Dict[str, float],
                    status: IterationStatus):
-        self._wandb.log(scores)
+        # @TODO: pass step parameter as an argument otherwise,
+        # we don't know if it is current epoch or current step
+        self._wandb.log(scores, step=status.current_epoch)
 
     def log_hyperparams(self,
                         params: argparse.Namespace,
