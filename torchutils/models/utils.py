@@ -56,7 +56,12 @@ def _add_last_layer(self, output, choices=(None, ), *args, **kwargs):
 
 
 def init_avg_loss():
-    return AverageMeter("Loss")
+    try:
+        return AverageMeter("Loss")
+    except KeyError:
+        avg = MetricHandler.MetricRegistrar.__score__['Loss']
+        avg.reset()
+        return avg
 
 
 class TrainerModel(pydantic.BaseModel):

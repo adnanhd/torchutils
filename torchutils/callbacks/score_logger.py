@@ -43,7 +43,7 @@ class ScoreLoggerCallback(TrainerCallback):
 
     def on_training_step_end(self, batch: IterationInterface):
         # self._log.event = LoggingEvent.TRAINING_BATCH
-        self._log.log_scores(batch.get_current_scores(*self._score_names))
+        # self._log.log_scores(batch.get_current_scores(*self._score_names))
         self._log.update(1)
 
     # Validation
@@ -53,7 +53,11 @@ class ScoreLoggerCallback(TrainerCallback):
 
     def on_validation_step_end(self, batch: IterationInterface):
         # self._log.event = LoggingEvent.VALIDATION_RUN
-        self._log.log_scores(batch.get_current_scores())
+        # @TODO: run at validation run end
+        self._log.log_scores({
+            f'valid_{score}': value for score,
+            value in batch.get_current_scores(*self._score_names).items()
+        })
         self._log.update(1)
 
     def on_validation_run_end(self, epoch: IterationInterface):
@@ -80,7 +84,10 @@ class ScoreLoggerCallback(TrainerCallback):
 
     def on_evaluation_step_end(self, batch: IterationInterface):
         # self._log.event = LoggingEvent.EVALUATION_RUN
-        self._log.log_scores(batch.get_current_scores())
+        self._log.log_scores({
+            f'eval_{score}': value for score,
+            value in batch.get_current_scores(*self._score_names).items()
+        })
         self._log.update(1)
 
     def on_evaluation_run_end(self, stat: IterationStatus):

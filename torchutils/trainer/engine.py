@@ -203,10 +203,11 @@ class Trainer:
             self._run_training(handler)
         except StopTrainingError:
             handler.on_stop_training_error()
-        else:
-            return handler.interface.get_stored_scores(*history)
+        # else:
+        #     handler.on_termination()
         finally:
             handler.on_termination()
+        return handler.interface.get_stored_scores(*history)
 
     def evaluate(
         self,
@@ -267,13 +268,12 @@ class Trainer:
         for batch_idx, batch in enumerate(handler.hparams.train_dl):
             self._run_training_step(batch_idx, batch, handler)
 
+        handler.on_training_epoch_end()
         self._model.reset_backward()
         if handler.hparams.valid_dl is not None \
                 and (handler.interface.status.current_epoch + 1) % \
                 handler.interface.hparams.num_epochs_per_validation == 0:
             self._run_validating(handler)
-
-        handler.on_training_epoch_end()
 
     def _run_training_step(
         self,
