@@ -8,7 +8,7 @@ from ..trainer.utils import (
 from ..logging.pbar import (
     EpochProgressBar,
     BatchProgressBar,
-    SampleProgressBar
+    EvalProgressBar
 )
 
 
@@ -19,7 +19,7 @@ class ProgressBar(TrainerCallback):
     """
 
     def __init__(self, *score_names: str):
-        self._test_bar = SampleProgressBar()
+        self._test_bar = EvalProgressBar()
         self._epoch_bar = EpochProgressBar()
         self._step_bar = BatchProgressBar()
         self._score_names: List[str] = score_names

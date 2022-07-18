@@ -77,7 +77,7 @@ class ModelCheckpoint(TrainerCallback):
         self.save_path: str = save_path
         self.trace_func: Callable[
             [str], None
-        ] = self._log.log_string if trace_func is None else trace_func
+        ] = self._log.log if trace_func is None else trace_func
 
         self.load_back_per_epochs: int = load_back_per_epochs
         self.init_from_checkpoint: bool = init_from_checkpoint

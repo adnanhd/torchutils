@@ -151,3 +151,8 @@ class MetricRegistrar(object):
     def unregister_meter(cls, name: str):
         # name = to_capital(name)
         cls.__score__.pop(name)
+
+    @classmethod
+    def clear_meters(cls):
+        cls.__score__.clear()
+        cls.__functional__.clear()

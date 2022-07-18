@@ -131,6 +131,14 @@ class TrainerModel(pydantic.BaseModel):
             return object.__setattr__(self.optimizer, 'lr', value)
         return super().__setattr__(key, value)
 
+    def to(self, dtype=None, device=None):
+        kwargs = dict()
+        if dtype is not None:
+            kwargs['dtype'] = dtype
+        if device is not None:
+            kwargs['device'] = device
+        self.model.to(**kwargs)
+
     @property
     def dtype(self) -> torch.dtype:
         return next(self.model.parameters()).dtype
