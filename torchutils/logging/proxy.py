@@ -2,7 +2,7 @@ import abc
 import enum
 import argparse
 import warnings
-from .base import TrainerLogger
+from .base import ScoreLogger
 from ..trainer.utils import IterationStatus
 from typing import Dict, List, Any
 from .utils import LoggerMethodNotImplError, LoggingEvent, Image, DataFrame
@@ -22,13 +22,13 @@ class LoggerProxy(abc.ABC):
     __slots__ = ['__loggers__', '__event__', '__status__']
 
     def __init__(self,
-                 loggers: Dict[str, TrainerLogger],
+                 loggers: Dict[str, ScoreLogger],
                  _event_ptr: List[LoggingEvent],
                  _status_ptr: List[IterationStatus]):
         assert all(
-            all(isinstance(logger, TrainerLogger) for logger in logger_list)
+            all(isinstance(logger, ScoreLogger) for logger in logger_list)
             for logger_list in loggers.values()), (
-            f"{loggers.values()} must be a list of TrainerLogger"
+            f"{loggers.values()} must be a list of ScoreLogger"
         )
         # assert len(_status_ptr) == 1 and isinstance(
         #     _status_ptr[0], IterationStatus), f"{_status_ptr} is not IterationStatus"
