@@ -4,25 +4,6 @@ import torch
 import typing
 import warnings
 import numpy as np
-
-from torchutils.callbacks import (
-    TrainerCallback,
-    StopTrainingError,
-)
-
-from ..metrics import AverageMeter
-from .handler import TrainingHandler, EvaluatingHandler
-from ..models.utils import TrainerModel
-from .utils import (
-    IterationStatus,
-    TrainingArguments,
-    EvaluatingArguments
-)
-
-from torchutils.data.dataset import Dataset
-from torchutils.metrics import MetricHandler
-from torchutils.logging import LoggerHandler, TrainerLogger, LoggingEvent
-from torchutils.callbacks import CallbackHandler
 from typing import (
     Iterable,
     Mapping,
@@ -31,13 +12,40 @@ from typing import (
 )
 
 
+from .handler import TrainingHandler, EvaluatingHandler
+from .utils import (
+    TrainingArguments,
+    EvaluatingArguments
+)
+
+
+from ..models.utils import TrainerModel
+from ..data.dataset import Dataset
+from ..metrics import (
+    MetricHandler,
+    AverageMeter
+)
+from ..logging import (
+    LoggerHandler,
+    ScoreLogger,
+    ExperimentLogger,
+    ExperimentProfiler,
+    LoggingEvent
+)
+from ..callbacks import (
+    TrainerCallback,
+    StopTrainingError,
+    CallbackHandler
+)
+
+
 class Trainer:
     __slots__ = [
         '_model',
-        '_loggers',
+        '_profiler',
         '_metrics',
         '_callbacks',
-        # TODO: migrate xtype and ytype to TrainerModel
+        # @TODO: migrate xtype and ytype to TrainerModel
         'ytype',
     ]
 
@@ -62,9 +70,8 @@ class Trainer:
         # initializing handlers
         self._metrics = MetricHandler()
         self._callbacks = CallbackHandler()
-        # TODO: self._loggers = LoggerHandler()
-        self._loggers = LoggerHandler.getHandler()
-        self._loggers: LoggerHandler
+        # @TODO: self._loggers = LoggerHandler()
+        self._profiler = ExperimentProfiler()
 
     @property
     def xtype(self) -> torch.dtype:
@@ -127,28 +134,24 @@ class Trainer:
 
     def compile_handlers(
             self,
-            loggers: typing.Dict[TrainerLogger,
-                                 typing.Iterable[LoggingEvent]] = dict(),
+            loggers: typing.Iterable[ExperimentLogger] = list(),
             metrics: typing.Iterable[AverageMeter] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
-        self._loggers.add_loggers(loggers)
+        self._profiler.add_loggers(loggers)
         self._metrics.add_score_meters(metrics)
         self._callbacks.add_callbacks(callbacks)
 
     def decompile_handlers(
             self,
-            loggers: typing.Dict[TrainerLogger,
-                                 typing.Iterable[LoggingEvent]] = dict(),
+            loggers: typing.Iterable[ExperimentLogger] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
-        for logger, events in loggers.items():
-            for event in events:
-                self._loggers.remove_logger(event=event, logger=logger)
+        self._profiler.remove_loggers(loggers)
         self._callbacks.remove_callbacks(callbacks)
 
     def clear_handlers(self):
-        self._loggers.clear_loggers()
+        self._profiler.clear_loggers()
         self._callbacks.clear_callbacks()
 
     def train(
@@ -186,7 +189,7 @@ class Trainer:
 
         handler = TrainingHandler(
             metrics=self._metrics,
-            loggers=self._loggers,
+            profiler=self._profiler,
             callbacks=self._callbacks,
             history=history,
             arguments=TrainingArguments(
@@ -225,7 +228,7 @@ class Trainer:
 
         handler = EvaluatingHandler(
             metrics=self._metrics,
-            loggers=self._loggers,
+            profiler=self._profiler,
             callbacks=self._callbacks,
             history=history,
             arguments=EvaluatingArguments(
