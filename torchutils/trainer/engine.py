@@ -237,7 +237,7 @@ class Trainer:
 
         try:
             handler.on_initialization()
-            results = self._run_evaluating(eval_dl)
+            results = self._run_evaluating(handler)
         except StopTrainingError:
             handler.on_stop_training_error()
         else:
