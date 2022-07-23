@@ -212,7 +212,7 @@ class ModelCheckpoint(TrainerCallback):
         metric_value = epoch.get_current_scores(self.monitor)[self.monitor]
 
         self.logger.debug(f'Epoch {epoch.status.current_epoch} of '
-                          f'{epoch.hparams.num_epoch}: '
+                          f'{epoch.hparams.num_epochs}: '
                           f'current_value: {self._best_score} # '
                           f'compared value: {metric_value}')
 
