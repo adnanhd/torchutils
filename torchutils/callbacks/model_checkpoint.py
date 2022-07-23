@@ -5,7 +5,7 @@ import torch
 import logging
 import warnings
 from .base import TrainerCallback
-from typing import Callable, List
+from typing import List
 from ..models.utils import TrainerModel
 from ..trainer.utils import (
     IterationArguments,

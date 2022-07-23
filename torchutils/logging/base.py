@@ -6,14 +6,7 @@ from ..trainer.utils import IterationArguments, IterationStatus
 from .utils import DataFrame, Image, Module, LoggerMethodNotImplError
 
 
-class ExperimentLogger(abc.ABC):
-    __slots__ = ['config', 'handler']
-
-    def __init__(self, handler):
-        self.handler: logging.Handler = handler
-
-
-class ScoreLogger(abc.ABC):
+class TrainerLogger(abc.ABC):
     @abc.abstractmethod
     def open(self, args: IterationArguments):
         raise LoggerMethodNotImplError

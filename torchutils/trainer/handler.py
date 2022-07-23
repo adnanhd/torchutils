@@ -1,6 +1,6 @@
 # Import Handlers
 from torchutils.metrics import MetricHandler, AverageMeter
-from torchutils.logging import LoggerHandler, ScoreLogger, LoggingEvent, ExperimentProfiler
+from torchutils.logging import LoggerHandler, TrainerLogger, LoggingEvent, ExperimentProfiler
 from torchutils.callbacks import CallbackHandler, TrainerCallback
 
 import typing
@@ -23,19 +23,19 @@ class IterationHandler(object):
         'interface',
         'hparams',
         '_callbacks',
-        'profiler',
+        '_loggers',
         '_metrics',
         '_history',
     ]
 
     def __init__(self,
                  metrics: MetricHandler,
-                 profiler: ExperimentProfiler,
+                 loggers: LoggerHandler,
                  callbacks: CallbackHandler,
                  history: typing.Set[str] = set()):
         self.logger = logging.getLogger()
         self._metrics = metrics
-        self.profiler = profiler
+        self._loggers = loggers
         self._callbacks = callbacks
         self.hparams: IterationArguments
         # @TODO: current_epoch=self.hparams.resume_epochs
@@ -90,13 +90,11 @@ class TrainingHandler(IterationHandler):
                                   preds=y_pred,
                                   target=y)
         # @TODO: place event in this instance insead of loggers
-        self.profiler.set_event(LoggingEvent.TRAINING_BATCH)
         self._callbacks.on_training_step_end(self.interface)
 
     def on_training_epoch_end(self):
         # @TODO: call from _history
         self.interface.set_metric_scores()
-        self.profiler.set_event(LoggingEvent.TRAINING_EPOCH)
         self._callbacks.on_training_epoch_end(self.interface)
         self.interface.reset_metric_scores()
 
@@ -114,7 +112,6 @@ class TrainingHandler(IterationHandler):
         self.interface.collate_fn(input=x,
                                   preds=y_pred,
                                   target=y)
-        self.profiler.set_event(LoggingEvent.VALIDATION_RUN)
         self._callbacks.on_validation_step_end(self.interface)
 
     def on_validation_run_end(self):

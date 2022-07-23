@@ -1,10 +1,9 @@
 # Copyright © 2021 Chris Hughes
 import abc
 import logging
-from typing import Optional, Union
-from torchutils.logging import LoggerProxy, LoggerHandler
+from typing import Union
 from torchutils.trainer.utils import (
-    IterationArguments,
+    # IterationArguments,
     TrainingArguments,
     EvaluatingArguments,
     IterationStatus,

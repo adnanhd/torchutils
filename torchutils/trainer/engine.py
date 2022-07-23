@@ -13,7 +13,7 @@ from typing import (
 
 
 from .handler import TrainingHandler, EvaluatingHandler
-from .utils import (
+from .arguments import (
     TrainingArguments,
     EvaluatingArguments
 )
@@ -27,11 +27,10 @@ from ..metrics import (
 )
 from ..logging import (
     LoggerHandler,
-    ScoreLogger,
-    ExperimentLogger,
-    ExperimentProfiler,
-    LoggingEvent
+    TrainerLogger,
+    ExperimentProfiler
 )
+
 from ..callbacks import (
     TrainerCallback,
     StopTrainingError,
@@ -42,6 +41,7 @@ from ..callbacks import (
 class Trainer:
     __slots__ = [
         '_model',
+        '_loggers',
         '_profiler',
         '_metrics',
         '_callbacks',
@@ -59,7 +59,9 @@ class Trainer:
     ):
         assert isinstance(model, TrainerModel) or loss is not None
         if not isinstance(model, TrainerModel):
-            model = TrainerModel(model=model, criterion=loss)
+            # @TODO: add optimizer and scheduler and kwargs as
+            # arguments to pass it thrrough TrainerModel
+            model = TrainerModel(model=model, criterion=loss, optimizer='Adam')
 
         self._model: TrainerModel = model
         self._model.device = device
@@ -70,7 +72,7 @@ class Trainer:
         # initializing handlers
         self._metrics = MetricHandler()
         self._callbacks = CallbackHandler()
-        # @TODO: self._loggers = LoggerHandler()
+        self._loggers = LoggerHandler()
         self._profiler = ExperimentProfiler()
 
     @property
@@ -134,24 +136,24 @@ class Trainer:
 
     def compile_handlers(
             self,
-            loggers: typing.Iterable[ExperimentLogger] = list(),
+            loggers: typing.Iterable[TrainerLogger] = list(),
             metrics: typing.Iterable[AverageMeter] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
-        self._profiler.add_loggers(loggers)
+        self._loggers.add_loggers(loggers)
         self._metrics.add_score_meters(metrics)
         self._callbacks.add_callbacks(callbacks)
 
     def decompile_handlers(
             self,
-            loggers: typing.Iterable[ExperimentLogger] = list(),
+            loggers: typing.Iterable[TrainerLogger] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
-        self._profiler.remove_loggers(loggers)
+        self._loggers.remove_loggers(loggers)
         self._callbacks.remove_callbacks(callbacks)
 
     def clear_handlers(self):
-        self._profiler.clear_loggers()
+        self._loggers.clear_loggers()
         self._callbacks.clear_callbacks()
 
     def train(
@@ -189,7 +191,7 @@ class Trainer:
 
         handler = TrainingHandler(
             metrics=self._metrics,
-            profiler=self._profiler,
+            loggers=self._loggers,
             callbacks=self._callbacks,
             history=history,
             arguments=TrainingArguments(
@@ -228,7 +230,7 @@ class Trainer:
 
         handler = EvaluatingHandler(
             metrics=self._metrics,
-            profiler=self._profiler,
+            loggers=self._loggers,
             callbacks=self._callbacks,
             history=history,
             arguments=EvaluatingArguments(

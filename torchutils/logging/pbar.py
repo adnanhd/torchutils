@@ -1,12 +1,12 @@
 from torchutils.trainer.utils import TrainingArguments, IterationStatus
-from torchutils.logging import ScoreLogger
+from torchutils.logging import TrainerLogger
 from tqdm.autonotebook import tqdm
 from typing import Dict
 import warnings
 import os
 
 
-class ProgressBarLogger(ScoreLogger):
+class ProgressBarLogger(TrainerLogger):
     __slots__ = ['_pbar', '_log_dict_', 'config']
 
     def __init__(self, **config):
