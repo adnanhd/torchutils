@@ -126,12 +126,12 @@ class TrainingHandler(IterationHandler):
 class EvaluatingHandler(IterationHandler):
     def __init__(self, arguments: EvaluatingArguments, **kwargs):
         super().__init__(**kwargs)
+        self.hparams = arguments
         self.interface = IterationInterface(
             metrics=self._metrics,
             history=self._history,
             hparams=self.hparams
         )
-        self.hparams = arguments
 
     def on_evaluation_run_begin(self):
         self._callbacks.on_evaluation_run_begin(self.interface.status)
@@ -140,10 +140,13 @@ class EvaluatingHandler(IterationHandler):
         self._callbacks.on_evaluation_step_begin(self.interface.status)
 
     def on_evaluation_step_end(self, x, y, y_pred):
-        self.profiler.set_event(LoggingEvent.EVALUATION_RUN)
-        self.interface.set_current_scores(x=x, y_true=y, y_pred=y_pred)
+        self.interface.collate_fn(input=x,
+                                  preds=y_pred,
+                                  target=y)
+        self._loggers.set_event(LoggingEvent.EVALUATION_RUN)
         self._callbacks.on_evaluation_step_end(self.interface)
 
     def on_evaluation_run_end(self):
-        self.interface.average_current_scores()
+        self.interface.set_metric_scores()
         self._callbacks.on_evaluation_run_end(self.interface)
+        self.interface.reset_metric_scores()
