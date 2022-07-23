@@ -190,7 +190,7 @@ class ModelCheckpoint(TrainerCallback):
 
     @profiler
     def _put_checkpoint_into_model(self):
-        self.model.load_state_dict(self._best_weights)
+        self.model.load_state_dict(copy.deepcopy(self._best_weights))
         self.logger.info(
             f"the current checkpoint with score {self._best_score} "
             f"is loaded into the model {self._best_weights.keys()}."
