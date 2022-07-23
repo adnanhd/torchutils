@@ -1,12 +1,15 @@
 import abc
 import typing
-import logging
 import argparse
 from ..trainer.utils import IterationArguments, IterationStatus
 from .utils import DataFrame, Image, Module, LoggerMethodNotImplError
+from ..utils import Config as BaseConfig
 
 
 class TrainerLogger(abc.ABC):
+    class Config(BaseConfig):
+        pass
+
     @abc.abstractmethod
     def open(self, args: IterationArguments):
         raise LoggerMethodNotImplError

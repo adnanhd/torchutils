@@ -10,10 +10,11 @@ from .utils import hybridmethod, Version
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Union
 from .utils import _str2types, _types2str, config
-from .utils import INIObject
+from ..utils import Config
+
 
 @dataclass
-class Builder(INIObject):
+class Builder(Config):
     _DATASET = None
     """ A dataset preprocessor. 
     @brief Converts a metadata to a dataset by downloading/preprocessing etc. data
@@ -26,7 +27,7 @@ class Builder(INIObject):
     version: Optional[Union[str, Version]] = field(default=None)
 
     @dataclass
-    class Config(INIObject):
+    class Config(Config):
         # Set later by `download_and_prepare`
         splits: Optional[dict] = field(default=None)
         download_checksums: Optional[dict] = field(default=None)
@@ -34,16 +35,17 @@ class Builder(INIObject):
         post_processing_size: Optional[int] = field(default=None)
         dataset_size: Optional[int] = field(default=None)
         size_in_bytes: Optional[int] = field(default=None)
+
         def __post_init__(self):
             super().__init__('download')
 
-    _config: Optional[Config] = field(default_factory=Config) 
+    _config: Optional[Config] = field(default_factory=Config)
 
     def __post_init__(self):
         assert os.path.isdir(self.dataset_path), "Path must be valid"
-        #super().__init__('builder')
+        # super().__init__('builder')
         self._dlist: Optional[list] = None
-    
+
     @property
     def config(self):
         return self._config
@@ -63,9 +65,9 @@ class Builder(INIObject):
     def download(self):
         raise NotImplementedError()
 
-    def _generate(self, path: str): # generates one example at a call
+    def _generate(self, path: str):  # generates one example at a call
         raise NotImplementedError()
-    
+
     def __iter__(self):
         dirname = self.dataset_path
         self._dlist = self.listdir(dirname)
@@ -79,4 +81,3 @@ class Builder(INIObject):
         else:
             self._dlist = None
             raise StopIteration
-
