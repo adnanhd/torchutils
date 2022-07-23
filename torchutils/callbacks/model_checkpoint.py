@@ -142,6 +142,10 @@ class ModelCheckpoint(TrainerCallback):
         if save_model:
             checkpoint = {'state_dict': self._best_weights,
                           'scores': {self.monitor: self._best_score}}
+            self.logger.info(
+                f'the model with state_dicts {checkpoint["state_dict"].keys()} '
+                f'and with scores {checkpoint["scores"]} is saved into {self.save_path}.'
+            )
             torch.save(checkpoint, self.save_path)
 
     @profiler
@@ -166,6 +170,10 @@ class ModelCheckpoint(TrainerCallback):
                 self._best_weights = checkpoint['state_dict']
                 if best_score is not None:
                     self._best_score = best_score
+                self.logger.info(
+                    f'the model with the models {checkpoint["state_dict"].keys()} '
+                    f'and with scores {checkpoint["scores"]} is loaded from {self.save_path}.'
+                )
         else:
             warnings.warn(
                 "ModelCheckpoint._load_from_filesystem: file could not "
@@ -174,10 +182,10 @@ class ModelCheckpoint(TrainerCallback):
     @profiler
     def _get_checkpoint_from_model(self, model_score):
         self._best_score = model_score
-        self._best_weights = copy.deepcopy(self.model.state_dict())
+        self._best_weights = self.model.state_dict()
         self.logger.info(
             f"A newer checkpoint with score {model_score} "
-            "is obtained from the model."
+            f"is obtained from the model {self._best_weights.keys()}."
         )
 
     @profiler
@@ -185,7 +193,7 @@ class ModelCheckpoint(TrainerCallback):
         self.model.load_state_dict(self._best_weights)
         self.logger.info(
             f"the current checkpoint with score {self._best_score} "
-            "is loaded into the model."
+            f"is loaded into the model {self._best_weights.keys()}."
         )
 
     @profiler
@@ -221,9 +229,9 @@ class ModelCheckpoint(TrainerCallback):
 
     def on_training_end(self, stat: IterationStatus):
         if self._best_weights is not None:
-            self._put_checkpoint_into_model()
             if self.halt_into_checkpoint:
                 self._save_into_filesystem()
+            self._put_checkpoint_into_model()
 
     def on_evaluation_begin(self, stat: IterationStatus):
         self.logger.debug(
@@ -234,6 +242,6 @@ class ModelCheckpoint(TrainerCallback):
     @profiler
     def on_stop_training_error(self, stat: IterationStatus):
         if self._best_weights is not None:
-            self._put_checkpoint_into_model()
             if self.halt_into_checkpoint:
                 self._save_into_filesystem()
+            self._put_checkpoint_into_model()

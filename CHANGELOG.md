@@ -139,3 +139,10 @@
 - when an exception occured close loggers
 - Validation'da nanlarin cozulmesi, onun yerine valid ve trainde ayri loglama yapilmasi ScoreLoggerCallback icin
 - Hparameterlari vs initialization'da loglamak
+
+- Fix when history argument in Trainer.train is not given or empty set
+- make metric names lower-case, instead of Capitalized case
+- Event Handling mechanism as a Config inner class instead of syntaically cryptic LoggerEvent
+	- functionals
+	- logger
+	- score/metric
