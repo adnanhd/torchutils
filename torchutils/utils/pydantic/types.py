@@ -1,12 +1,12 @@
-from .pydantic_validators import validate_function
-from .pydantic_validators import validate_nn_scheduler
-from .pydantic_validators import validate_nn_optimizer
-from .pydantic_validators import validate_nn_module
-from .pydantic_validators import validate_torch_dataloader
-from .pydantic_validators import validate_torch_dataset
-from .pydantic_validators import validate_torch_tensor
-from .pydantic_validators import validate_np_array
-from .pydantic_validators import validate_np_scalar
+from .validators import validate_function
+from .validators import validate_nn_scheduler
+from .validators import validate_nn_optimizer
+from .validators import validate_nn_module
+from .validators import validate_torch_dataloader
+from .validators import validate_torch_dataset
+from .validators import validate_torch_tensor
+from .validators import validate_np_array
+from .validators import validate_np_scalar
 
 from abc import ABC
 

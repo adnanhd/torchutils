@@ -1,18 +1,20 @@
-from torchutils.utils.pydantic import TrainerModel, HandlerArguments, TrainerStatus
-from torchutils.logging import TrainerLogger
-from torch.nn import Module
+import warnings
 import argparse
 import wandb
 import typing
 import pandas as pd
-from .utils import LoggingEvent
-Image = typing.NewType(
-    'Image', typing.Iterable[typing.Iterable[typing.Iterable[float]]]
-)
+
+from .utils import LoggingEvent, Image, Module
+from .base import TrainerLogger
+
+from ..models.utils import TrainerModel
+from ..trainer.status import IterationStatus
+from ..trainer.arguments import IterationArguments
 
 
 class WandbLogger(TrainerLogger):
     __slots__ = ['_wandb', 'experiment', 'project', 'username', 'groupname']
+    __wandb_logger__ = None
 
     def __init__(self,
                  experiment: str,
@@ -24,41 +26,36 @@ class WandbLogger(TrainerLogger):
         self.project = project
         self.username = username
         self.groupname = groupname
-        self._wandb = None
+        self._wandb: wandb.sdk.wandb_run.Run = None
 
-    def open(self, args: HandlerArguments):
-        self._wandb = wandb.init(
-            project=self.project,
-            entity=self.username,
-            group=self.groupname,
-            name=self.experiment,
-            config=args.hparams.dict()
-        )
+    def open(self, args: IterationArguments):
+        if self._wandb is None:
+            self._wandb = wandb.init(project=self.project,
+                                     entity=self.username,
+                                     group=self.groupname,
+                                     name=self.experiment,
+                                     config=args.dict())
+        else:
+            warnings.warn(
+                "{self} is already opened", RuntimeWarning
 
-    @classmethod
-    def getLogger(cls, event: LoggingEvent,
-                  experiment: str,
-                  project: str,
-                  username: str,
-                  groupname: str = None,
-                  **kwargs) -> "TrainerLogger":
-        if event == LoggingEvent.TRAINING_EPOCH:
-            return cls(experiment=experiment, project=project,
-                       username=username, groupname=groupname)
+            )
 
     def log_scores(self,
                    scores: typing.Dict[str, float],
-                   status: TrainerStatus):
-        self._wandb.log(scores)
+                   status: IterationStatus):
+        # @TODO: pass step parameter as an argument otherwise,
+        # we don't know if it is current epoch or current step
+        self._wandb.log(scores, step=status.current_epoch)
 
     def log_hyperparams(self,
                         params: argparse.Namespace,
-                        status: TrainerStatus):
+                        status: IterationStatus):
         self._wandb.config.update(params.__dict__)
 
     def log_table(self,
                   tables: typing.Dict[str, pd.DataFrame],
-                  status: TrainerStatus):
+                  status: IterationStatus):
         to_log = dict()
 
         for table_name, data_frame in tables.items():
@@ -77,13 +74,13 @@ class WandbLogger(TrainerLogger):
 
     def log_image(self,
                   images: typing.Dict[str, Image],
-                  status: TrainerStatus):
+                  status: IterationStatus):
         self._wandb.log({name: [wandb.Image(img) for img in image]
                         for name, image in images.items()})
 
     def watch(self,
-              module: typing.Union[Module, TrainerModel],
-              status: TrainerStatus, **kwargs):
+              module: Module,
+              status: IterationStatus, **kwargs):
         if isinstance(module, TrainerModel):
             module = module.module
             self._wandb.watch(
@@ -97,9 +94,42 @@ class WandbLogger(TrainerLogger):
                 **kwargs
             )
 
-    def update(self, n, status: TrainerStatus):
+    def update(self, n, status: IterationStatus):
         pass
 
-    def close(self, status: TrainerStatus):
-        self._wandb.finish(quiet=True, exit_code=status.status_code)
-        self._wandb = None
+    def close(self, status: IterationStatus):
+        if self._wandb is not None:
+            # @TODO: add quiet=True
+            self._wandb.finish(exit_code=status.status_code)
+            self._wandb = None
+        else:
+            warnings.warn(
+                "{self} is already closed", RuntimeWarning
+
+            )
+
+
+class ReferenceWandbLogger(WandbLogger):
+    __slots__ = ['_ref_']
+
+    def __init__(self,
+                 reference: typing.Sequence[WandbLogger],
+                 experiment: str,
+                 project: str,
+                 username: str,
+                 groupname: typing.Optional[str] = None):
+        self.experiment = experiment
+        self.project = project
+        self.username = username
+        self.groupname = groupname
+        self._ref_ = reference
+
+    def open(self, args: IterationArguments):
+        pass
+
+    def close(self, status: IterationStatus):
+        pass
+
+    @property
+    def _wandb(self):
+        return self._ref_[0]._wandb

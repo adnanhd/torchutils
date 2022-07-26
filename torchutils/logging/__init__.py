@@ -1,11 +1,11 @@
 from .utils import LoggingEvent
 from .base import TrainerLogger
-from .proxy import LoggerProxy
 from .handler import LoggerHandler
-from .tty import SlurmLogger
 from .nop import NoneLogger
+from .interface import LoggerInterface
+from .profilers import FileProfiler, ConsoleProfiler, ExperimentProfiler
 
-import torchutils.logging.tty
+# import torchutils.logging.tty
 import torchutils.logging.pbar
 
 import importlib

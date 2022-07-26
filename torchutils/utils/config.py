@@ -1,60 +1,80 @@
+import yaml
+import json
+import os.path as osp
+from pydantic import BaseModel
 from configparser import ConfigParser
-from .mthdutils import hybridmethod
 
-def read(path):
-    config = ConfigParser()
-    config.read(path)
-    return config
 
-def write(config, path):
-    with open(path, 'w') as f:
-        config.write(f)
+class BaseConfig(BaseModel):
+    def to_cfg(self, path: str):
+        parser = ConfigParser()
+        parser.add_section(self.__class__.__qualname__)
+        for name, value in self.dict().items():
+            parser.set(self.__class__.__qualname__, name, str(value))
+        with open(path, 'w') as f:
+            parser.write(f)
 
-def set(config, section, keys, dataclass):
-    if not config.has_section(section): config.add_section(section)
-    for key in keys: config.set(section, key, str(getattr(dataclass, key))) 
+    @classmethod
+    def from_cfg(cls, path: str):
+        if not osp.isfile(path):
+            raise FileNotFoundError(
+                f'path {path} is not found by {cls.__qualname__}'
+            )
+        parser = ConfigParser()
+        parser.read(path)
+        # section not found error
+        if not parser.has_section(cls.__qualname__):
+            raise KeyError(
+                f'section {cls.__qualname__} is not found in file {path}'
+            )
+        return cls(**dict(parser.items(cls.__qualname__)))
 
-def get(config, section, keys, dataclass=None):
-    kwargs = dict() if dataclass is None else None
-    if not config.has_section(section): return None
-    for key in keys: 
-        if dataclass is None:
-            kwargs[key] = config.get(section, key)
+    def to_yaml(self, path: str):
+        if not osp.isfile(path):
+            data = dict()
         else:
-            setattr(dataclass, key, config.get(section, key))
-    return kwargs
+            data = None
+        with open(path, 'w') as file:
+            if data is None:
+                data = yaml.safe_load(file)
+            data[self.__class__.__qualname__] = self.dict()
+            yaml.safe_dump(data, file)
 
-class INIObject(object):
-    def __init__(self, section: str, public_only: bool =True):
-        self._section = section
-        self._public_only = public_only
-    
-    def keys(self):
-        public_fields = lambda s: not s.startswith('_')
-        keys = self._keys()
-        if self._public_only: keys = filter(public_fields, keys)
-        return tuple(keys)
+    @classmethod
+    def from_yaml(cls, path: str):
+        if not osp.isfile(path):
+            raise FileNotFoundError(
+                f'path {path} is not found by {cls.__qualname__}'
+            )
+        with open(path, 'r') as file:
+            data = yaml.safe_load(file)
+        if cls.__qualname__ not in data.keys():
+            raise KeyError(
+                f'key {cls.__qualname__} is not found in file {path}'
+            )
+        return cls(**data[cls.__qualname__])
 
-    def _keys(self):
-        if hasattr(self, '__slots__'): return self.__slots__
-        else: return self.__dataclass_fields__
+    def to_json(self, path: str):
+        if not osp.isfile(path):
+            data = dict()
+        else:
+            data = None
+        with open(path, 'w') as file:
+            if data is None:
+                data = json.load(file)
+            data[self.__class__.__qualname__] = self.dict()
+            json.dump(data, fp=file)
 
-    def load(self, path: str):
-        """ save into ini file """
-        #get(read(path), self._section, self.keys(), self)
-        config = read(path)
-        if not config.has_section(self._section): 
-            raise KeyError(f'{path} has no section {self._section}')
-        for key in self.keys(): 
-            setattr(self, key, config.get(self._section, key))
-
-    def save(self, path: str): 
-        """ load from ini file """
-        #set(read(path), self._section, self.keys(), self)
-        config = read(path)
-        if not config.has_section(self._section): 
-            config.add_section(self._section)
-        for key in self.keys(): 
-            config.set(self._section, key, str(getattr(self, key))) 
-        write(config, path)
-
+    @classmethod
+    def from_json(cls, path: str):
+        if not osp.isfile(path):
+            raise FileNotFoundError(
+                f'path {path} is not found by {cls.__qualname__}'
+            )
+        with open(path, 'r') as file:
+            data = json.load(file)
+        if cls.__qualname__ not in data.keys():
+            raise KeyError(
+                f'key {cls.__qualname__} is not found in file {path}'
+            )
+        return cls(**data[cls.__qualname__])

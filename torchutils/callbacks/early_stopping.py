@@ -2,7 +2,7 @@
 import numpy as np
 import typing
 from .base import TrainerCallback, StopTrainingError
-from torchutils.utils.pydantic import CurrentIterationStatus
+from torchutils.trainer.utils import IterationInterface
 
 
 class EarlyStopping(TrainerCallback):
@@ -32,6 +32,7 @@ class EarlyStopping(TrainerCallback):
             trace_func (function): trace print function.
                             Default: print
         """
+        super().__init__()
         self.monitor = monitor
         self.patience = patience
         self.verbose = verbose
@@ -40,9 +41,11 @@ class EarlyStopping(TrainerCallback):
         self.early_stop = False
         self.val_loss = np.Inf
         self.delta = delta
-        self.trace_func = trace_func
+        self.trace_func: typing.Callable[
+            [str], None
+        ] = self.logger.info if trace_func is None else trace_func
 
-    def on_training_epoch_end(self, epoch: CurrentIterationStatus):
+    def on_training_epoch_end(self, epoch: IterationInterface):
         score = - epoch.get_current_scores(self.monitor)[self.monitor]
 
         if self.best_score is None:

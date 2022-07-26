@@ -1,9 +1,10 @@
-from torchutils.callbacks.base import TrainerCallback
-from torchutils.logging import LoggerHandler, LoggingEvent
-from torchutils.utils.pydantic import (
-    HandlerArguments,
-    TrainerStatus,
-    CurrentIterationStatus
+from .base import TrainerCallback
+import logging
+from ..logging import LoggerInterface
+from ..trainer.utils import (
+    TrainingArguments,
+    EvaluatingArguments,
+    IterationInterface
 )
 
 
@@ -15,72 +16,27 @@ class ScoreLoggerCallback(TrainerCallback):
 
     def __init__(self, *score_names: str):
         super().__init__()
-        self._handler: LoggerHandler = LoggerHandler.getHandler()
-        self._args: HandlerArguments = None
+        self._handler: LoggerInterface = None
+        self._score_names = score_names
+        self._logger = logging.getLogger(__name__)
 
-    def on_initialization(self, args: HandlerArguments):
-        self._args = args
+    def on_initialization(self, handlers: LoggerInterface):
+        self._handler = handlers
 
-    # Training
-    def on_training_begin(self, stat: TrainerStatus):
-        self._args.status.set_status_code(
-            TrainerStatus.StatusCode.STARTED_SUCCESSFULLY
-        )
-        self._handler.initialize(args=self._args,
-                                 event=LoggingEvent.TRAINING_EPOCH)
+    def on_training_begin(self, hparams: TrainingArguments):
+        # self._handler.log_hparams(hparams)
+        pass
 
-    def on_training_epoch_begin(self, stat: TrainerStatus):
-        self._handler.initialize(args=self._args,
-                                 event=LoggingEvent.TRAINING_BATCH)
+    def on_training_epoch_end(self, epoch: IterationInterface):
+        self._handler.log_scores({
+            f'train_{score}': value for score,
+            value in epoch.get_current_scores(*self._score_names).items()
+        })
 
-    def on_training_step_end(self, batch: CurrentIterationStatus):
-        # self._log.event = LoggingEvent.TRAINING_BATCH
-        self._log.log_scores(batch.get_current_scores())
-        self._log.update(1)
-
-    # Validation
-    def on_validation_run_begin(self, stat: TrainerStatus):
-        self._handler.initialize(args=self._args,
-                                 event=LoggingEvent.VALIDATION_RUN)
-
-    def on_validation_step_end(self, batch: CurrentIterationStatus):
+    def on_validation_run_end(self, epoch: IterationInterface):
         # self._log.event = LoggingEvent.VALIDATION_RUN
-        self._log.log_scores(batch.get_current_scores())
-        self._log.update(1)
-
-    def on_validation_run_end(self, epoch: CurrentIterationStatus):
-        self._handler.terminate(stats=epoch.status,
-                                event=LoggingEvent.VALIDATION_RUN)
-
-    def on_training_epoch_end(self, epoch: CurrentIterationStatus):
-        self._handler.terminate(stats=epoch.status,
-                                event=LoggingEvent.TRAINING_BATCH)
-        # self._log.event = LoggingEvent.TRAINING_EPOCH
-        self._log.log_scores(epoch.get_current_scores())
-        self._log.update(1)
-
-    def on_training_end(self, stat: TrainerStatus):
-        self._handler.terminate(
-            stats=stat,
-            event=LoggingEvent.TRAINING_EPOCH
-        )
-
-    # Evaluation
-    def on_evaluation_run_begin(self, stat: TrainerStatus):
-        self._handler.initialize(args=self._args,
-                                 event=LoggingEvent.EVALUATION_RUN)
-
-    def on_evaluation_step_end(self, batch: CurrentIterationStatus):
-        # self._log.event = LoggingEvent.EVALUATION_RUN
-        self._log.log_scores(batch.get_current_scores())
-        self._log.update(1)
-
-    def on_evaluation_run_end(self, stat: TrainerStatus):
-        self._handler.terminate(stats=stat,
-                                event=LoggingEvent.EVALUATION_RUN)
-
-    def on_stop_training_error(self, stat: TrainerStatus):
-        self._handler.terminate(stats=stat, event=LoggingEvent.TRAINING_BATCH)
-        self._handler.terminate(stats=stat, event=LoggingEvent.TRAINING_EPOCH)
-        self._handler.terminate(stats=stat, event=LoggingEvent.EVALUATION_RUN)
-        self._handler.terminate(stats=stat, event=LoggingEvent.VALIDATION_RUN)
+        # @TODO: run at validation run end
+        self._handler.log_scores({
+            f'valid_{score}': value for score,
+            value in epoch.get_current_scores(*self._score_names).items()
+        })

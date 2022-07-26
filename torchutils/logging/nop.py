@@ -1,27 +1,23 @@
-from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
-from torchutils.logging import TrainerLogger
-from .utils import LoggingEvent
 from typing import Dict
+from .base import TrainerLogger
+from ..trainer.status import IterationStatus
+from ..trainer.arguments import IterationArguments
 
 
 class NoneLogger(TrainerLogger):
     def __init__(self):
         super(NoneLogger, self).__init__()
 
-    def open(self, args: HandlerArguments):
+    def open(self, args: IterationArguments):
         pass
-
-    @classmethod
-    def getLogger(cls, event: LoggingEvent):
-        return NoneLogger()
 
     def log_scores(self,
                    scores: Dict[str, float],
-                   status: TrainerStatus):
+                   status: IterationStatus):
         pass
 
-    def update(self, n, status: TrainerStatus):
+    def update(self, n, status: IterationStatus):
         pass
 
-    def close(self, status: TrainerStatus):
+    def close(self, status: IterationStatus):
         pass

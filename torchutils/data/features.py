@@ -1,6 +1,5 @@
 from collections import OrderedDict
-from hashlib import md5
-from .utils import INIObject, Hashable
+from ..utils import Hashable
 
 
 class Features(OrderedDict, Hashable):

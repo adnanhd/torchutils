@@ -1,16 +1,20 @@
 from abc import ABC, abstractmethod
 
+
 def profile(fn):
     def wrapped_fn(*args, **kwargs):
-        print(fn.__qualname__, *map(type, args), *map(lambda k,v: f'{k}={v}', kwargs.items()))
+        print(fn.__qualname__, *map(type, args), *
+              map(lambda k, v: f'{k}={v}', kwargs.items()))
         return fn(*args, **kwargs)
     return wrapped_fn
+
 
 """
 Caller is Event
 Callee is Hooker
 
 """
+
 
 class HookerClass:
     class Method:
@@ -23,7 +27,7 @@ class HookerClass:
     @profile
     def __init__(self, func):
         pass
-    
+
     @profile
     def __call__(self, *args, **kwargs):
         pass
@@ -57,6 +61,7 @@ def HookEvent(*hookMethods):
     @profile
     class HookInterface:
         __slots__ = ['_hookEvent']
+
         def __init__(self, hookEvent):
             self._hookEvent = hookEvent
 
@@ -68,7 +73,7 @@ def HookEvent(*hookMethods):
 
         def method(self, callback_fn):
             return HookerClass.Method(callback_fn)
-        
+
         def __call__(self, callback_fn):
             return self.function(callback_fn)
 

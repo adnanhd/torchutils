@@ -1,87 +1,73 @@
-from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
-from collections import defaultdict
-from typing import List, Dict
-from abc import ABC
+from typing import List, Any
+import warnings
 from .base import TrainerLogger
-from .proxy import LoggingEvent, LoggerProxy
+from .utils import LoggerMethodNotImplError, LoggerMethods
+from ..trainer.status import IterationStatus
+from ..trainer.arguments import Hyperparameter
 
 
-class LoggerHandler(ABC):
-    __slots__ = ['_logger_dict_', '_logger_list_', '_current_event_']
-    __handler__ = None
+class LoggerHandler(object):
+    __slots__ = ['__loggers__']
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validator
+
+    @classmethod
+    def validator(cls, other):
+        if isinstance(other, LoggerHandler):
+            return other
+        else:
+            raise ValueError
 
     def __init__(self):
-        self._logger_dict_: Dict[LoggingEvent,
-                                 List[TrainerLogger]] = defaultdict(list)
-        self._logger_list_: List[TrainerLogger] = list()
-        self._current_event_: List[LoggingEvent] = [None]
+        self.__loggers__: List[TrainerLogger] = list()
 
-    def add_logger(self,
-                   event: LoggingEvent,
-                   logger: TrainerLogger):
-        if not isinstance(event, LoggingEvent):
-            raise AssertionError(
-                f"{event} must be of LoggingEvent")
-        elif isinstance(logger, TrainerLogger):
-            self._logger_dict_[event].append(logger)
-            self._logger_list_.append(logger)
+    def add_loggers(self, loggers: List[TrainerLogger]):
+        for logger in loggers:
+            self.add_logger(logger)
+
+    def add_logger(self, logger: TrainerLogger):
+        assert isinstance(logger, TrainerLogger)
+        self.__loggers__.append(logger)
+
+    def remove_loggers(self, loggers: List[TrainerLogger]):
+        for logger in loggers:
+            self.remove_logger(logger)
+
+    def remove_logger(self, logger: TrainerLogger):
+        assert isinstance(logger, TrainerLogger)
+        if logger in self.__loggers__:
+            self.__loggers__.remove(logger)
         else:
-            raise AssertionError(f"{logger} must be of TrainerLogger")
-
-    def remove_logger(self,
-                      event: LoggingEvent,
-                      logger: TrainerLogger):
-        if not isinstance(event, LoggingEvent):
-            raise AssertionError(
-                f"{event} must be of LoggingEvent")
-        elif isinstance(logger, TrainerLogger):
-            self._logger_dict_[event].remove(logger)
-            self._logger_list_.remove(logger)
-        else:
-            raise AssertionError(f"{logger} must be of TrainerLogger")
-
-    def set_event(self, event):
-        assert isinstance(event, LoggingEvent)
-        self._current_event_[0] = event
-
-    def set_status(self, status: TrainerStatus) -> None:
-        assert isinstance(status, TrainerStatus)
-        self.setStatus(status)
+            warnings.warn(f"{logger} is not in loggers", UserWarning)
 
     def clear_loggers(self):
-        self._logger_dict_.clear()
-        self._logger_list_.clear()
+        self.__loggers__.clear()
 
-    def initialize(self, args: HandlerArguments, event: LoggingEvent = None):
-        if event is None:
-            loggers = self._logger_list_
-        else:
-            loggers = self._logger_dict_[event]
+    def log(self, method: LoggerMethods, message: Any, status: IterationStatus):
+        any_overwritten_method = False
+        for logger in self.__loggers__:
+            try:
+                log_fn = getattr(logger, method.name.lower())
+                log_fn(message, status=status)
+            except LoggerMethodNotImplError:
+                continue
+            else:
+                any_overwritten_method = True
+        if not any_overwritten_method:
+            warnings.warn(
+                f"No logger has an overriden method for {method.name.lower()}"
+            )
 
-        for logger in loggers:
-            logger.open(args)
+    def initialize_loggers(self, hparams: Hyperparameter):
+        for logger in self.__loggers__:
+            logger.open(hparams)
 
-    @classmethod
-    def getHandler(cls):
-        if cls.__handler__ is None:
-            cls.__handler__ = cls()
-        return cls.__handler__
+    def finalize_loggers(self, status: IterationStatus):
+        for logger in self.__loggers__:
+            logger.close(status)
 
-    @classmethod
-    def getProxy(cls) -> LoggerProxy:
-        handler: LoggerHandler = cls.getHandler()
-        return LoggerProxy(loggers=handler._logger_dict_,
-                           _event_ptr=handler._current_event_)
-
-    @classmethod
-    def setStatus(cls, status: TrainerStatus) -> None:
-        LoggerProxy.__status__[0] = status
-
-    def terminate(self, stats: TrainerStatus, event: LoggingEvent = None):
-        if event is None:
-            loggers = self._logger_list_
-        else:
-            loggers = self._logger_dict_[event]
-
-        for logger in loggers:
-            logger.close(stats)
+    def update_loggers(self, status: IterationStatus, n: int = 1):
+        for logger in self.__loggers__:
+            logger.update(n=n, status=status)

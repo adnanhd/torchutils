@@ -1,10 +1,10 @@
 from typing import Union, Optional
 from dataclasses import dataclass, field
-from configparser import ConfigParser
-from .utils import hybridmethod, INIObject, Version
+from ..utils import BaseConfig, Version
+
 
 @dataclass
-class Metadata(INIObject):
+class Metadata():
     from .dtypes import DType
     from .features import Features
 
@@ -33,6 +33,7 @@ class Metadata(INIObject):
     dataset_size: Optional[int] = None
     size_in_bytes: Optional[int] = None
     """
+
     def __post_init__(self):
         if not isinstance(self.features, self.Features):
             self.features = self.Features.new(self.features)
@@ -41,6 +42,6 @@ class Metadata(INIObject):
         super().__init__('metadata')
 
     def _keys(self):
-        ignore = lambda s: s not in ('features', 'labels')
+        def ignore(s): return s not in ('features', 'labels')
         keys = super()._keys()
         return filter(ignore, keys)
