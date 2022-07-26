@@ -1,7 +1,7 @@
-from torchutils.trainer.utils import IterationArguments
-from torchutils.trainer.utils import IterationStatus
-from .base import TrainerLogger
 from typing import Dict
+from .base import TrainerLogger
+from ..trainer.status import IterationStatus
+from ..trainer.arguments import IterationArguments
 
 
 class NoneLogger(TrainerLogger):
