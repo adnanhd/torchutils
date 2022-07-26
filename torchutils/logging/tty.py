@@ -4,7 +4,7 @@ import logging
 from .utils import DataFrame
 from .utils import LoggingEvent
 from torchutils.logging.base import TrainerLogger
-from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
+from torchutils.trainer.utils import IterationArguments, IterationStatus
 
 
 class SlurmLogger(TrainerLogger):
@@ -38,44 +38,44 @@ class SlurmLogger(TrainerLogger):
             kwargs.setdefault('level', logging.WARN)
             return BatchSlurmLogger(**kwargs)
 
-    def open(self, args: HandlerArguments):
+    def open(self, args: IterationArguments):
         self._logger = logging.getLogger()
         self._logger.addHandler(self._handler)
 
     def log_scores(self,
                    scores: typing.Dict[str, float],
-                   status: TrainerStatus):
+                   status: IterationStatus):
         self._log_dict_.update(scores)
 
-    def update(self, n, status: TrainerStatus):
+    def update(self, n, status: IterationStatus):
         pass
 
     def log_string(self,
                    string: str,
-                   status: TrainerStatus):
+                   status: IterationStatus):
         self._logger.log(self._level, string)
 
-    def close(self, status: TrainerStatus):
+    def close(self, status: IterationStatus):
         self._handler.close()
 
 
 class EpochSlurmLogger(SlurmLogger):
-    def open(self, args: HandlerArguments):
+    def open(self, args: IterationArguments):
         name = f'Epoch {args.status.current_epoch}'
         self._logger = logging.getLogger(name=name)
         self._logger.addHandler(self._handler)
 
     def log_hyperparams(self,
                         params: argparse.Namespace,
-                        status: TrainerStatus):
+                        status: IterationStatus):
         self._log_dict_.update(params.__dict__)
 
     def log_table(self,
                   tables: typing.Dict[str, DataFrame],
-                  status: TrainerStatus):
+                  status: IterationStatus):
         self._log_dict_.update(tables)
 
-    def update(self, n, status: TrainerStatus):
+    def update(self, n, status: IterationStatus):
         self._logger.log(self._level, self._log_dict_)
         self._log_dict_.clear()
 
@@ -83,5 +83,5 @@ class EpochSlurmLogger(SlurmLogger):
 class BatchSlurmLogger(SlurmLogger):
     def log_scores(self,
                    scores: typing.Dict[str, float],
-                   status: TrainerStatus):
+                   status: IterationStatus):
         pass

@@ -136,3 +136,13 @@
 - add accuracy and other metrics
 	- change Trainer.compile method so that we can chose which metrics to use, default loss only
 - change batch sampling mechanism https://pytorch.org/docs/stable/data.html#memory-pinning
+- when an exception occured close loggers
+- Validation'da nanlarin cozulmesi, onun yerine valid ve trainde ayri loglama yapilmasi ScoreLoggerCallback icin
+- Hparameterlari vs initialization'da loglamak
+
+- Fix when history argument in Trainer.train is not given or empty set
+- make metric names lower-case, instead of Capitalized case
+- Event Handling mechanism as a Config inner class instead of syntaically cryptic LoggerEvent
+	- functionals
+	- logger
+	- score/metric
