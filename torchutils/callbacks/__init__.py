@@ -10,5 +10,4 @@ from .handler import CallbackHandler
 
 from .early_stopping import EarlyStopping
 from .model_checkpoint import ModelCheckpoint
-from .progress_bar import ProgressBar
 from .score_logger import ScoreLoggerCallback
