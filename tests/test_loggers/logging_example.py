@@ -1,11 +1,20 @@
 # logging_example.py
 
+import yaml
 import logging
 import logging.config
-from .base import ExperimentLogger
+
+import abc
 
 
-class FileLogger(ExperimentLogger):
+class TrainerLogger(metaclass=abc.ABCMeta):
+    __slots__ = ['config', 'handler']
+
+    def __init__(self, handler):
+        self.handler = handler
+
+
+class FileLogger(TrainerLogger):
     def __init__(
             self,
             filename='experiment.log',
@@ -18,7 +27,7 @@ class FileLogger(ExperimentLogger):
         self.handler.setFormatter(self.formatter)
 
 
-class ConsoleLogger(ExperimentLogger):
+class ConsoleLogger(TrainerLogger):
     def __init__(
             self,
             level=logging.DEBUG,
@@ -30,15 +39,17 @@ class ConsoleLogger(ExperimentLogger):
         self.handler.setFormatter(self.formatter)
 
 
+class ScoreLogger(object):
+    pass
+
+
+# Create a custom logger
+logger = logging.getLogger(__name__)
+
+# Add handlers to the logger
+logger.addHandler(FileLogger().handler)
+logger.addHandler(ConsoleLogger().handler)
+
 if __name__ == '__main__':
-    # Create a custom logger
-    # @TODO: @Client i.e. Callback
-    logger = logging.getLogger(__name__)
-
-    # Add handlers to the logger
-    # @TODO: @Server i.e. IterationInterface
-    logger.addHandler(FileLogger('/tmp/logconfig.log').handler)
-    logger.addHandler(ConsoleLogger().handler)
-
     logger.warning('This is a warning')
     logger.error('This is an error')

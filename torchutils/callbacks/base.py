@@ -1,5 +1,6 @@
 # Copyright © 2021 Chris Hughes
-from abc import ABC
+import abc
+import logging
 from typing import Optional, Union
 from torchutils.logging import LoggerProxy, LoggerHandler
 from torchutils.trainer.utils import (
@@ -22,20 +23,22 @@ class CallbackMethodNotImplementedError(Exception):
     pass
 
 
-class TrainerCallback(ABC):
+class TrainerCallback(abc.ABC):
     """
     The abstract base class to be subclassed when creating new callbacks.
     """
-    __slots__ = ['__log__']
+    __slots__ = ['logger']
 
     def __init__(self):
-        self.__log__: Optional[LoggerProxy] = None
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger: logging.Logger
 
     @property
-    def _log(self) -> LoggerProxy:
-        if self.__log__ is None:
-            self.__log__ = LoggerHandler.getProxy()
-        return self.__log__
+    def _log(self) -> logging.Logger:
+        if hasattr(self, 'logger'):
+            return self.logger
+        else:
+            return logging.getLogger(self.__class__.__name__)
 
     def on_initialization(self, hparams: Union[TrainingArguments,
                                                EvaluatingArguments]):

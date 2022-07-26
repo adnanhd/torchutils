@@ -1,9 +1,10 @@
 # Import Handlers
 from torchutils.metrics import MetricHandler, AverageMeter
-from torchutils.logging import LoggerHandler, TrainerLogger, LoggingEvent
+from torchutils.logging import LoggerHandler, ScoreLogger, LoggingEvent, ExperimentProfiler
 from torchutils.callbacks import CallbackHandler, TrainerCallback
 
 import typing
+import logging
 
 # Import Arguments
 from ..metrics.history import DataFrameRunHistory
@@ -18,36 +19,41 @@ from .utils import (
 
 class IterationHandler(object):
     __slots__ = [
-        'log',
+        'logger',
         'interface',
         'hparams',
         '_callbacks',
-        '_loggers',
+        'profiler',
         '_metrics',
         '_history',
     ]
 
     def __init__(self,
                  metrics: MetricHandler,
-                 loggers: LoggerHandler,
+                 profiler: ExperimentProfiler,
                  callbacks: CallbackHandler,
                  history: typing.Set[str] = set()):
-        self.log = LoggerHandler.getProxy()
+        self.logger = logging.getLogger()
         self._metrics = metrics
-        self._loggers = loggers
+        self.profiler = profiler
         self._callbacks = callbacks
         self.hparams: IterationArguments
         # @TODO: current_epoch=self.hparams.resume_epochs
         self._history = DataFrameRunHistory(history)
+        self.interface: IterationInterface
 
     @property
     def status(self) -> IterationStatus:
         return self.interface.status
 
+    # @property
+    # def hparams(self) -> IterationArguments:
+    #     return self.interface.hparams
+
     def on_initialization(self):
-        self._callbacks.on_initialization(self.interface.hparams)
-        self._loggers.set_status(self.interface.status)
         self._metrics.reset_score_values()
+        # self.profiler.set_status(self.interface.status)
+        self._callbacks.on_initialization(self.interface.hparams)
 
     def on_stop_training_error(self):
         self._callbacks.on_stop_training_error(self.interface.status)
@@ -84,13 +90,13 @@ class TrainingHandler(IterationHandler):
                                   preds=y_pred,
                                   target=y)
         # @TODO: place event in this instance insead of loggers
-        self._loggers.set_event(LoggingEvent.TRAINING_BATCH)
+        self.profiler.set_event(LoggingEvent.TRAINING_BATCH)
         self._callbacks.on_training_step_end(self.interface)
 
     def on_training_epoch_end(self):
         # @TODO: call from _history
         self.interface.set_metric_scores()
-        self._loggers.set_event(LoggingEvent.TRAINING_EPOCH)
+        self.profiler.set_event(LoggingEvent.TRAINING_EPOCH)
         self._callbacks.on_training_epoch_end(self.interface)
         self.interface.reset_metric_scores()
 
@@ -108,7 +114,7 @@ class TrainingHandler(IterationHandler):
         self.interface.collate_fn(input=x,
                                   preds=y_pred,
                                   target=y)
-        self._loggers.set_event(LoggingEvent.VALIDATION_RUN)
+        self.profiler.set_event(LoggingEvent.VALIDATION_RUN)
         self._callbacks.on_validation_step_end(self.interface)
 
     def on_validation_run_end(self):

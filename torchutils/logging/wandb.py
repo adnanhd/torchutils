@@ -1,7 +1,7 @@
 import warnings
 from torchutils.trainer.utils import IterationArguments, IterationStatus
 from torchutils.models.utils import TrainerModel
-from torchutils.logging import TrainerLogger
+from torchutils.logging import ScoreLogger
 from torch.nn import Module
 import argparse
 import wandb
@@ -13,7 +13,7 @@ Image = typing.NewType(
 )
 
 
-class WandbLogger(TrainerLogger):
+class WandbLogger(ScoreLogger):
     __slots__ = ['_wandb', 'experiment', 'project', 'username', 'groupname']
     __wandb_logger__ = None
 
@@ -48,7 +48,7 @@ class WandbLogger(TrainerLogger):
                   project: str,
                   username: str,
                   groupname: str = None,
-                  **kwargs) -> "TrainerLogger":
+                  **kwargs) -> "ScoreLogger":
         if cls.__wandb_logger__ is None:
             cls.__wandb_logger__ = cls(experiment=experiment, project=project,
                                        username=username, groupname=groupname)

@@ -1,43 +1,29 @@
 import abc
 import typing
+import logging
 import argparse
-import collections
-from .utils import DataFrame, Image, Module
-from .utils import LoggerMethodNotImplError, LoggingEvent
-from torchutils.trainer.utils import IterationArguments, IterationStatus
+from ..trainer.utils import IterationArguments, IterationStatus
+from .utils import DataFrame, Image, Module, LoggerMethodNotImplError
 
 
-class TrainerLogger(abc.ABC):
-    """
-    A callback which visualises the state of each training
-    and evaluation epoch using a progress bar
-    """
-    @classmethod
-    def getLoggerGroup(cls, **kwargs
-                       ) -> typing.Dict["TrainerLogger",
-                                        typing.List[LoggingEvent]]:
-        result = collections.defaultdict(list)
-        for event in LoggingEvent.getAllEvents():
-            logger = cls.getLogger(event=event, **kwargs)
-            if isinstance(logger, TrainerLogger):
-                result[logger].append(event)
-        return dict(result)
+class ExperimentLogger(abc.ABC):
+    __slots__ = ['config', 'handler']
 
-    @classmethod
-    def setEvent(
-            cls,
-            *events: LoggingEvent
-        ) -> typing.Dict["TrainerLogger",
-                         typing.List[LoggingEvent]]:
-        return {cls: list(events)}
+    def __init__(self, handler):
+        self.handler: logging.Handler = handler
 
-    @abc.abstractclassmethod
-    def getLogger(cls, event: LoggingEvent,
-                  **kwargs) -> "TrainerLogger":
+
+class ScoreLogger(abc.ABC):
+    @abc.abstractmethod
+    def open(self, args: IterationArguments):
         raise LoggerMethodNotImplError
 
     @abc.abstractmethod
-    def open(self, args: IterationArguments):
+    def update(self, n, status: IterationStatus):
+        raise LoggerMethodNotImplError
+
+    @ abc.abstractmethod
+    def close(self, status: IterationStatus):
         raise LoggerMethodNotImplError
 
     @ abc.abstractmethod
@@ -46,9 +32,9 @@ class TrainerLogger(abc.ABC):
                    status: IterationStatus):
         raise LoggerMethodNotImplError
 
-    def log_hyperparams(self,
-                        params: argparse.Namespace,
-                        status: IterationStatus):
+    def log_hparams(self,
+                    params: argparse.Namespace,
+                    status: IterationStatus):
         raise LoggerMethodNotImplError
 
     def log_table(self,
@@ -61,20 +47,7 @@ class TrainerLogger(abc.ABC):
                   status: IterationStatus):
         raise LoggerMethodNotImplError
 
-    def log_string(self,
-                   string: str,
-                   status: IterationStatus):
-        raise LoggerMethodNotImplError
-
-    @abc.abstractmethod
-    def update(self, n, status: IterationStatus):
-        raise LoggerMethodNotImplError
-
-    def watch(self,
-              module: Module,
-              status: IterationStatus, **kwargs):
-        raise LoggerMethodNotImplError
-
-    @ abc.abstractmethod
-    def close(self, status: IterationStatus):
+    def log_module(self,
+                   module: Module,
+                   status: IterationStatus, **kwargs):
         raise LoggerMethodNotImplError

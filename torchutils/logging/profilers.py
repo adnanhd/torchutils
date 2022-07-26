@@ -1,19 +1,21 @@
-from torchutils.trainer.utils import IterationArguments, IterationStatus
-from collections import defaultdict
-from typing import List, Dict
+import typing
 import warnings
 from abc import ABC
 from .base import ExperimentLogger
-from .proxy import LoggingEvent, LoggerProxy
+import logging
 
 
-class LoggerHandler(ABC):
+class ExperimentProfiler(ABC):
     __slots__ = ['__loggers__']
 
     def __init__(self):
-        self.__loggers__ = list()
+        self.__loggers__: typing.List[ExperimentLogger] = list()
 
-    def add_loggers(self, loggers: List[ExperimentLogger]):
+    @property
+    def handlers(self) -> typing.List[logging.Handler]:
+        return [logger.handler for logger in self.__loggers__]
+
+    def add_loggers(self, loggers: typing.List[ExperimentLogger]):
         for logger in loggers:
             self.add_logger(logger)
 
@@ -21,7 +23,7 @@ class LoggerHandler(ABC):
         assert isinstance(logger, ExperimentLogger)
         self.__loggers__.append(logger)
 
-    def remove_loggers(self, loggers: List[ExperimentLogger]):
+    def remove_loggers(self, loggers: typing.List[ExperimentLogger]):
         for logger in loggers:
             self.remove_logger(logger)
 

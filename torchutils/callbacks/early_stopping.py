@@ -43,7 +43,7 @@ class EarlyStopping(TrainerCallback):
         self.delta = delta
         self.trace_func: typing.Callable[
             [str], None
-        ] = self._log.log_string if trace_func is None else trace_func
+        ] = self._log.log if trace_func is None else trace_func
 
     def on_training_epoch_end(self, epoch: IterationInterface):
         score = - epoch.get_current_scores(self.monitor)[self.monitor]

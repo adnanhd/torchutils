@@ -1,39 +1,18 @@
 from torchutils.trainer.utils import TrainingArguments, IterationStatus
-from torchutils.logging import TrainerLogger, LoggingEvent
+from torchutils.logging import ScoreLogger
 from tqdm.autonotebook import tqdm
-from typing import Dict, List
+from typing import Dict
 import warnings
 import os
 
 
-class ProgressBarLogger(TrainerLogger):
+class ProgressBarLogger(ScoreLogger):
     __slots__ = ['_pbar', '_log_dict_', 'config']
 
     def __init__(self, **config):
         self._pbar = None
         self.config = config
         self._log_dict_ = dict()
-
-    @classmethod
-    def getEvent(cls) -> Dict[TrainerLogger, List[LoggingEvent]]:
-        return {
-            BatchProgressBar(): [LoggingEvent.TRAINING_BATCH],
-            EpochProgressBar(): [LoggingEvent.TRAINING_EPOCH],
-            SampleProgressBar(): [LoggingEvent.EVALUATION_RUN,
-                                  LoggingEvent.VALIDATION_RUN]
-        }
-
-    @classmethod
-    def getLogger(cls, event: LoggingEvent, **kwargs) -> LoggingEvent:
-        assert isinstance(event, LoggingEvent)
-        if event == LoggingEvent.TRAINING_BATCH:
-            return BatchProgressBar(**kwargs)
-        elif event == LoggingEvent.TRAINING_EPOCH:
-            return EpochProgressBar(**kwargs)
-        elif event == LoggingEvent.VALIDATION_RUN:
-            return SampleProgressBar(is_valid=True, **kwargs)
-        else:
-            return SampleProgressBar(is_valid=False, **kwargs)
 
     def open(self, args: TrainingArguments = None):
         if self._pbar is None:
@@ -98,9 +77,7 @@ class BatchProgressBar(ProgressBarLogger):
         super().open()
 
 
-class SampleProgressBar(ProgressBarLogger):
-    __slots__ = ['__is_valid__']
-
+class ValidProgressBar(ProgressBarLogger):
     def __init__(self, is_valid: bool = True, **config):
         config.setdefault("unit", "sample")
         config.setdefault("initial", 0)
@@ -110,12 +87,25 @@ class SampleProgressBar(ProgressBarLogger):
         config.setdefault("dynamic_ncols", True)
         config.setdefault("desc", "Evaluating")
         config.setdefault("colour", "YELLOW")
-        super(SampleProgressBar, self).__init__(**config)
-        self.__is_valid__ = is_valid
+        super(ValidProgressBar, self).__init__(**config)
 
     def open(self, args: TrainingArguments):
-        if self.__is_valid__:
-            self.config['total'] = args.valid_dl.num_steps
-        else:
-            self.config['total'] = args.eval_dl.num_steps
+        self.config['total'] = args.valid_dl.num_steps
+        super().open()
+
+
+class EvalProgressBar(ProgressBarLogger):
+    def __init__(self, is_valid: bool = True, **config):
+        config.setdefault("unit", "sample")
+        config.setdefault("initial", 0)
+        config.setdefault("position", 0)
+        config.setdefault('leave', False)
+        config.setdefault("file", os.sys.stdout)
+        config.setdefault("dynamic_ncols", True)
+        config.setdefault("desc", "Evaluating")
+        config.setdefault("colour", "YELLOW")
+        super(EvalProgressBar, self).__init__(**config)
+
+    def open(self, args: TrainingArguments):
+        self.config['total'] = args.eval_dl.num_steps
         super().open()
