@@ -3,7 +3,7 @@ from torchutils.data import Dataset
 import torch
 from torch.nn import Linear
 from torchutils.utils.pydantic import (
-    TrainerStatus, TrainerModel, HandlerArguments
+    TrainerStatus, TrainerModel, IterationArguments
 )
 
 loader = Dataset(
@@ -21,7 +21,7 @@ def __delay__(fn):
 
 class Pipeline():
     def __init__(self, epoch, batch, sample):
-        self.args = HandlerArguments(
+        self.args = IterationArguments(
             model=TrainerModel(model=Linear(42, 1),
                                criterion='MSELoss',
                                optimizer='Adam',

@@ -1,4 +1,4 @@
-from torchutils.utils.pydantic import HandlerArguments, TrainerStatus
+from torchutils.trainer.utils import TrainingArguments, IterationStatus
 from torchutils.logging import TrainerLogger, LoggingEvent
 from tqdm.autonotebook import tqdm
 from typing import Dict, List
@@ -35,7 +35,7 @@ class ProgressBarLogger(TrainerLogger):
         else:
             return SampleProgressBar(is_valid=False, **kwargs)
 
-    def open(self, args: HandlerArguments = None):
+    def open(self, args: TrainingArguments = None):
         if self._pbar is None:
             self._pbar = tqdm(**self.config)
         else:
@@ -45,14 +45,14 @@ class ProgressBarLogger(TrainerLogger):
 
     def log_scores(self,
                    scores: Dict[str, float],
-                   status: TrainerStatus):
+                   status: IterationStatus):
         self._log_dict_.update(scores)
 
-    def update(self, n, status: TrainerStatus):
+    def update(self, n, status: IterationStatus):
         self._pbar.set_postfix(self._log_dict_)
         self._pbar.update(n=n)
 
-    def close(self, status: TrainerStatus):
+    def close(self, status: IterationStatus):
         if self._pbar is not None:
             self._pbar.close()
         else:
@@ -75,9 +75,9 @@ class EpochProgressBar(ProgressBarLogger):
         config.setdefault("colour", "GREEN")
         super(EpochProgressBar, self).__init__(**config)
 
-    def open(self, args: HandlerArguments):
-        self.config['initial'] = args.hparams.resume_epochs
-        self.config['total'] = args.hparams.num_epochs
+    def open(self, args: TrainingArguments):
+        self.config['initial'] = args.resume_epochs
+        self.config['total'] = args.num_epochs
         super().open()
 
 
@@ -92,10 +92,9 @@ class BatchProgressBar(ProgressBarLogger):
         config.setdefault("colour", "CYAN")
         super(BatchProgressBar, self).__init__(**config)
 
-    def open(self, args: HandlerArguments):
-        epochs = args.status.current_epoch
-        self.config["desc"] = f"Epoch {epochs}"
-        self.config['total'] = args.train_dl.num_steps
+    def open(self, hparams: TrainingArguments, status: IterationStatus):
+        self.config["desc"] = f"Epoch {status.current_epoch}"
+        self.config['total'] = hparams.train_dl.num_steps
         super().open()
 
 
@@ -114,7 +113,7 @@ class SampleProgressBar(ProgressBarLogger):
         super(SampleProgressBar, self).__init__(**config)
         self.__is_valid__ = is_valid
 
-    def open(self, args: HandlerArguments):
+    def open(self, args: TrainingArguments):
         if self.__is_valid__:
             self.config['total'] = args.valid_dl.num_steps
         else:

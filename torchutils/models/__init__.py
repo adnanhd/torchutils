@@ -3,6 +3,7 @@ import torch.nn as nn
 from .mlp import FeedForward
 from .cnn import Convolution, Encoder, Decoder
 from .autoencoders import AutoencoderCNN, AutoencoderMLP
+from .utils import TrainerModel
 #from .ausm_model import CFD_CNN as AUSM_CFD_CNN
 
 

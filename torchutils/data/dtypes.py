@@ -3,7 +3,7 @@ import numpy as np
 from typing import Union
 from pydantic import BaseModel, validator
 from torchutils.utils import string_to_types, Hashable
-from torchutils.utils.pydantic.pydantic_types import NpScalarType, NpTorchType
+from torchutils.utils.pydantic.types import NpScalarType, NpTorchType
 
 
 class DType(BaseModel, Hashable):

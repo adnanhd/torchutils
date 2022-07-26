@@ -1,0 +1,7 @@
+#!/bin/sh
+
+docker run -d \
+	--volume $PWD/docs/html:/var/www/html \
+	-p 7890:80 \
+	--detach-keys=ctrl-x \
+	php:7.3-apache

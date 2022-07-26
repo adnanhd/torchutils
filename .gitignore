@@ -1,5 +1,6 @@
-dist
 log
+dist
+docs
 envs
 build
 torchutils.egg-info

@@ -1,4 +1,4 @@
-# Examples
+# PyTorch-Utils Metric Examples
 
 ## An Example with TrainerMetric inheritance
 ```python
