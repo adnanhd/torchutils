@@ -1,80 +1,135 @@
-from abc import ABC, abstractmethod
+import typing
+import logging
+import inspect
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 
-def profile(fn):
-    def wrapped_fn(*args, **kwargs):
-        print(fn.__qualname__, *map(type, args), *
-              map(lambda k, v: f'{k}={v}', kwargs.items()))
-        return fn(*args, **kwargs)
-    return wrapped_fn
+def get_non_default_args(func):
+    signature = inspect.signature(func)
+    return {
+        k: v.default
+        for k, v in signature.parameters.items()
+        if v.default is inspect.Parameter.empty
+    }
 
 
-"""
-Caller is Event
-Callee is Hooker
+class hookermethod:
+    """ a decorator for creating a callback list """
+    __slots__ = ['_name', 'callbacks', '_parameters']
 
-"""
-
-
-class HookerClass:
-    class Method:
-        def __init__(self, fn):
-            self.__call__ = fn
-
-    # TODO: hooker class
-    """Decorator to create a HookerClas."""
-
-    @profile
-    def __init__(self, func):
-        pass
-
-    @profile
-    def __call__(self, *args, **kwargs):
-        pass
-
-
-class HookMethod:
-    """Decorator to create a hook."""
-
-    @profile
     def __init__(self, func):
         self._name = func.__name__
-        self.callbacks = []
+        self.callbacks = list()
+        self._parameters = inspect.signature(func).parameters
+        logger.debug(f'{self.__class__.__qualname__}.__init__ '
+                     f'{func.__qualname__} parameters: '
+                     f'{inspect.signature(func).parameters}')
 
-    @profile
+    def append_callback(self, callback):
+        logger.debug(f'{self.__call__.__qualname__}.append_callback'
+                     f'{callback.__qualname__} with parameters'
+                     f'{inspect.signature(callback).parameters}')
+        self.callbacks.append(callback)
+
     def __call__(self, *args, **kwargs):
+        logger.debug(
+            f'{self.__class__.__qualname__}.__call__ is called {args} {kwargs}')
         for callback in self.callbacks:
-            print('callback is', callback, args, kwargs)
+            logger.debug(f'callback is {callback}')
             callback(*args, **kwargs)
 
-    @profile
     def __repr__(self):
         return f"<HookMethod(Hook={self._name})>"
 
 
-def HookEvent(*hookMethods):
-    """Decorator to create an interface to a hook.
+def eventmethod(*hookmethods: hookermethod):
+    logger.debug(
+        f'{eventmethod.__qualname__} {hookmethods}'
+    )
 
-    Requires a target hook as only argument.
+    class interfacemethod:
+        pass
 
-    """
-    @profile
-    class HookInterface:
-        __slots__ = ['_hookEvent']
+    class interface:
+        """Decorator to create an interface to a hook.
 
-        def __init__(self, hookEvent):
-            self._hookEvent = hookEvent
+        Requires a target hook as only argument.
 
-        @profile
-        def function(self, callback_fn):
-            for hookMethod in hookMethods:
-                hookMethod.callbacks.append(callback_fn)
-            return callback_fn
+        """
+        __slots__ = []
 
-        def method(self, callback_fn):
-            return HookerClass.Method(callback_fn)
+        def __init__(self, event: callable):
+            logger.debug(
+                f'{self.__class__.__qualname__}.__init__ {event.__qualname__}'
+            )
 
-        def __call__(self, callback_fn):
-            return self.function(callback_fn)
+        def __call__(self, fn):
+            return self.function(fn)
 
-    return HookInterface
+        def function(self, fn):
+            logger.debug(f'{self.__class__.__qualname__}.function {fn}')
+            for hook in hookmethods:
+                hook.append_callback(fn)
+            return fn
+
+        def method(self, mthd):
+            logger.debug(f'{self.__class__.__qualname__}.method {fn}')
+            return interfacemethod(mthd)
+
+    return interface
+
+
+class autocall:
+    pass
+
+###############################################################################
+
+
+class Handler:
+    @hookermethod
+    def on_validation_end(self, foo: bool):
+        pass
+
+    @hookermethod
+    def on_training_step_end(self, bar: int):
+        pass
+
+    @eventmethod(on_training_step_end, on_validation_end)
+    def OnStep(self):
+        pass
+
+
+@Handler.OnStep
+def function(foo):
+    logger.info('i am called')
+
+
+class WandbLogger:
+    @Handler.OnStep.function
+    def log_scale(self, foo, bar):
+        pass
+
+# class Handler(object):
+#     class OnStepEnd():
+#         @hookmethod
+#         def log_score(self):
+#             pass
+#
+#     class OnValidStep:
+#         @hookmethod
+#         def log_score(self):
+#             pass
+#
+#
+# @Handler.OnStepEnd.log_score
+# @Handler.OnValidStep.log_score
+# def OnStepEnd():
+#     pass
+#
+#
+# class WandbLogger():
+#     @OnStepEnd
+#     def log_score(self):
+#         pass
