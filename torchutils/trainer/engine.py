@@ -13,10 +13,7 @@ from typing import (
 
 
 from .handler import TrainingHandler, EvaluatingHandler
-from .arguments import (
-    TrainingArguments,
-    EvaluatingArguments
-)
+from .arguments import TrainingArguments, EvaluatingArguments
 
 
 from ..models.utils import TrainerModel
