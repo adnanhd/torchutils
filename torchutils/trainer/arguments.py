@@ -136,3 +136,7 @@ class EvaluatingArguments(IterationArguments):
     @property
     def eval_dl_batch_size(self):
         return self._eval_dl.batch_size
+
+
+Hyperparameter = typing.NewType('Arguments', typing.Union[TrainingArguments,
+                                                          EvaluatingArguments])
