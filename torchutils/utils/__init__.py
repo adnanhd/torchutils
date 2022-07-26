@@ -9,7 +9,7 @@ from .mappings import (
 )
 from .debug import PrintOnce
 from .hash import Hashable, digest_numpy, digest_torch
-from .config import Config
+from .config import BaseConfig
 from .decorators import verbose, profile
 from .mthdutils import hybridmethod
 from .fnctutils import overload, obtain_registered_kwargs

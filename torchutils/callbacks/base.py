@@ -1,7 +1,6 @@
 # Copyright © 2021 Chris Hughes
 import abc
 import logging
-from typing import Union
 from ..logging import LoggerInterface
 from torchutils.trainer.utils import (
     # IterationArguments,

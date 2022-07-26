@@ -11,6 +11,14 @@ class LoggerMethodNotImplError(Exception):
     pass
 
 
+class LoggerMethods(enum.Enum):
+    LOG_SCORES = 0
+    LOG_HPARAMS = 1
+    LOG_TABLE = 2
+    LOG_IMAGE = 3
+    LOG_MODULE = 4
+
+
 class LoggingEvent(enum.Enum):
     TRAINING_BATCH = 0
     TRAINING_EPOCH = 1

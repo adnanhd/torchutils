@@ -2,6 +2,7 @@ from .utils import LoggingEvent
 from .base import TrainerLogger
 from .handler import LoggerHandler
 from .nop import NoneLogger
+from .interface import LoggerInterface
 from .profilers import FileProfiler, ConsoleProfiler, ExperimentProfiler
 
 # import torchutils.logging.tty
