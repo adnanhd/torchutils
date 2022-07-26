@@ -1,14 +1,15 @@
 import abc
 import typing
 import argparse
-from ..trainer.utils import IterationArguments, IterationStatus
+from ..trainer.status import IterationStatus
+from ..trainer.arguments import IterationArguments
 from .utils import DataFrame, Image, Module, LoggerMethodNotImplError
-from ..utils import Config as BaseConfig
+from ..utils import BaseConfig
 
 
 class TrainerLogger(abc.ABC):
     class Config(BaseConfig):
-        pass
+        foo = 1
 
     @abc.abstractmethod
     def open(self, args: IterationArguments):
