@@ -1,17 +1,22 @@
 import pydantic
 import torch
 import typing
-from ..metrics.handler import MetricHandler
-from ..metrics.history import RunHistory
+
 from .batch import IterationBatch
 from .status import IterationStatus
-from .arguments import IterationArguments
+from .arguments import Hyperparameter
+
+from ..metrics.handler import MetricHandler
+from ..metrics.history import RunHistory
+from ..logging.interface import LoggerInterface
+from ..logging.handler import LoggerHandler
 
 
 class IterationInterface(pydantic.BaseModel):
+    logger: LoggerInterface
+    hparams: Hyperparameter
+    status: IterationStatus
     batch: IterationBatch = IterationBatch()
-    status: IterationStatus = IterationStatus()
-    hparams: IterationArguments = pydantic.Field(None)
 
     _at_epoch_end: bool = pydantic.PrivateAttr(False)
     _metric_handler: MetricHandler = pydantic.PrivateAttr()
@@ -19,16 +24,18 @@ class IterationInterface(pydantic.BaseModel):
     _score_names: typing.Set[str] = pydantic.PrivateAttr()
 
     def __init__(self,
+                 handler: LoggerHandler,
                  metrics: MetricHandler,
                  history: RunHistory,
-                 hparams: IterationArguments):
-        super().__init__()
-        self.hparams = hparams
+                 hparams: Hyperparameter):
+        status = IterationStatus()
+        logger = LoggerInterface(handler=handler, status=[status])
+        super().__init__(logger=logger, hparams=hparams, status=status)
         self._metric_handler = metrics
         self._metric_history = history
-        score_names = self._metric_history.get_score_names()
-        self._score_names = score_names
+        self._score_names = history.get_score_names()
 
+    # @TODO: hide these function rom iterface
     # functions for IterationHandler
     def collate_fn(self, input, preds, target):
         self._at_epoch_end = False
