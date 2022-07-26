@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from configparser import ConfigParser
 
 
-class Config(BaseModel):
+class BaseConfig(BaseModel):
     def to_cfg(self, path: str):
         parser = ConfigParser()
         parser.add_section(self.__class__.__qualname__)
