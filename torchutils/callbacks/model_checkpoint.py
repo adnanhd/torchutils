@@ -143,8 +143,8 @@ class ModelCheckpoint(TrainerCallback):
             checkpoint = {'state_dict': self._best_weights,
                           'scores': {self.monitor: self._best_score}}
             self.logger.info(
-                f'the model with state_dicts {checkpoint["state_dict"].keys()} '
-                f'and with scores {checkpoint["scores"]} is saved into {self.save_path}.'
+                f'the model {checkpoint["state_dict"].keys()} with scores '
+                f'{checkpoint["scores"]} is saved into {self.save_path}.'
             )
             torch.save(checkpoint, self.save_path)
 
@@ -171,8 +171,8 @@ class ModelCheckpoint(TrainerCallback):
                 if best_score is not None:
                     self._best_score = best_score
                 self.logger.info(
-                    f'the model with the models {checkpoint["state_dict"].keys()} '
-                    f'and with scores {checkpoint["scores"]} is loaded from {self.save_path}.'
+                    f'the model {checkpoint["state_dict"].keys()} with scores '
+                    f'{checkpoint["scores"]} is loaded from {self.save_path}.'
                 )
         else:
             warnings.warn(
@@ -190,11 +190,11 @@ class ModelCheckpoint(TrainerCallback):
 
     @profiler
     def _put_checkpoint_into_model(self):
-        self.model.load_state_dict(copy.deepcopy(self._best_weights))
         self.logger.info(
             f"the current checkpoint with score {self._best_score} "
             f"is loaded into the model {self._best_weights.keys()}."
         )
+        self.model.load_state_dict(copy.copy(self._best_weights))
 
     @profiler
     def _reset_checkpoints(self):
@@ -215,6 +215,7 @@ class ModelCheckpoint(TrainerCallback):
             f'{self.save_path} existence is {os.path.isfile(self.save_path)}')
         if self.init_from_checkpoint and os.path.isfile(self.save_path):
             self._load_from_filesystem()
+            self._put_checkpoint_into_model()
 
     def on_training_epoch_end(self, epoch: IterationInterface):
         metric_value = epoch.get_current_scores(self.monitor)[self.monitor]

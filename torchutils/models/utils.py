@@ -176,9 +176,11 @@ class TrainerModel(pydantic.BaseModel):
         for key in self.__getstate__():
             module = getattr(self, key)
             if module is None or key not in state_dict:
-                continue
+                warnings.warn(
+                    f"{key} either absent in the state_dict or None."
+                )
             elif hasattr(module, 'load_state_dict'):
-                module.load_state_dict(state_dict.pop(key))
+                module.load_state_dict(state_dict[key])
             else:
                 warnings.warn(
                     f"{key} exits in the state_dict but that "
