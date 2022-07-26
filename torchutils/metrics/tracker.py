@@ -60,16 +60,18 @@ class AverageMeter(object):
         return fmtstr.format(name=to_capital(self._name), average=self.average)
 
 
-class AverageMeterFunction(AverageMeter):
+class AverageMeterFunctional(AverageMeter):
     def __init__(self, name: str,
-                 fn: typing.Callable[[NpTorchType, NpTorchType], NpTorchType]):
+                 fn: typing.Callable[[NpTorchType, NpTorchType], NpTorchType],
+                 **hparams):
         assert callable(fn) and has_allowed_arguments(fn)
         assert isinstance(name, str)
         super().__init__(name=name)
         self.fn = fn
+        self.kwargs = hparams
 
     def update(self, preds: NpTorchType, target: NpTorchType, n: int = 1) -> None:
-        super().update(float(self.fn(preds=preds, target=target)), n=n)
+        super().update(float(self.fn(preds=preds, target=target, **self.kwargs)), n=n)
 
     def __add__(self, value):
         ...
@@ -80,7 +82,7 @@ class AverageMeterFunction(AverageMeter):
                              average=self.average)
 
 
-class AverageMeterModule_Base(object):
+class AverageMeterModule(object):
     def __init__(self, *meters: str):
         assert all(isinstance(name, str) for name in meters)
         scores = {name: AverageMeter(name) for name in meters}
