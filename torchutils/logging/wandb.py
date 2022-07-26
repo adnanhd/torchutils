@@ -1,19 +1,18 @@
 import warnings
-from torchutils.trainer.utils import IterationArguments, IterationStatus
-from torchutils.models.utils import TrainerModel
-from torchutils.logging import ScoreLogger
-from torch.nn import Module
 import argparse
 import wandb
 import typing
 import pandas as pd
-from .utils import LoggingEvent
-Image = typing.NewType(
-    'Image', typing.Iterable[typing.Iterable[typing.Iterable[float]]]
-)
+
+from .utils import LoggingEvent, Image, Module
+from .base import TrainerLogger
+
+from ..models.utils import TrainerModel
+from ..trainer.status import IterationStatus
+from ..trainer.arguments import IterationArguments
 
 
-class WandbLogger(ScoreLogger):
+class WandbLogger(TrainerLogger):
     __slots__ = ['_wandb', 'experiment', 'project', 'username', 'groupname']
     __wandb_logger__ = None
 
@@ -41,23 +40,6 @@ class WandbLogger(ScoreLogger):
                 "{self} is already opened", RuntimeWarning
 
             )
-
-    @classmethod
-    def getLogger(cls, event: LoggingEvent,
-                  experiment: str,
-                  project: str,
-                  username: str,
-                  groupname: str = None,
-                  **kwargs) -> "ScoreLogger":
-        if cls.__wandb_logger__ is None:
-            cls.__wandb_logger__ = cls(experiment=experiment, project=project,
-                                       username=username, groupname=groupname)
-        if event == LoggingEvent.TRAINING_EPOCH:
-            return cls.__wandb_logger__
-        elif event == LoggingEvent.VALIDATION_RUN:
-            return ReferenceWandbLogger(reference=[cls.__wandb_logger__],
-                                        experiment=experiment, project=project,
-                                        username=username, groupname=groupname)
 
     def log_scores(self,
                    scores: typing.Dict[str, float],
@@ -97,7 +79,7 @@ class WandbLogger(ScoreLogger):
                         for name, image in images.items()})
 
     def watch(self,
-              module: typing.Union[Module, TrainerModel],
+              module: Module,
               status: IterationStatus, **kwargs):
         if isinstance(module, TrainerModel):
             module = module.module
@@ -117,7 +99,8 @@ class WandbLogger(ScoreLogger):
 
     def close(self, status: IterationStatus):
         if self._wandb is not None:
-            self._wandb.finish(quiet=True, exit_code=status.status_code)
+            # @TODO: add quiet=True
+            self._wandb.finish(exit_code=status.status_code)
             self._wandb = None
         else:
             warnings.warn(

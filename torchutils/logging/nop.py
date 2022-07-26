@@ -1,10 +1,10 @@
-from torchutils.trainer.utils import IterationArguments
-from torchutils.trainer.utils import IterationStatus
-from .base import ScoreLogger
 from typing import Dict
+from .base import TrainerLogger
+from ..trainer.status import IterationStatus
+from ..trainer.arguments import IterationArguments
 
 
-class NoneLogger(ScoreLogger):
+class NoneLogger(TrainerLogger):
     def __init__(self):
         super(NoneLogger, self).__init__()
 

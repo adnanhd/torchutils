@@ -1,10 +1,10 @@
 from typing import Union, Optional
 from dataclasses import dataclass, field
-from ..utils import INIObject, Version
+from ..utils import BaseConfig, Version
 
 
 @dataclass
-class Metadata(INIObject):
+class Metadata():
     from .dtypes import DType
     from .features import Features
 

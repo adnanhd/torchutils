@@ -9,13 +9,12 @@ from .mappings import (
 )
 from .debug import PrintOnce
 from .hash import Hashable, digest_numpy, digest_torch
-from .config import INIObject
+from .config import BaseConfig
 from .decorators import verbose, profile
 from .mthdutils import hybridmethod
 from .fnctutils import overload, obtain_registered_kwargs
 from .version_v2 import Version
 from .inspect_ import isiterable, islistlike, issubscriptable
-from .profilers import FileProfiler, ConsoleProfiler
 import torch
 import numpy as np
 

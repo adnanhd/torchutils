@@ -5,7 +5,7 @@ import torch
 import logging
 import warnings
 from .base import TrainerCallback
-from typing import Callable, List
+from typing import List
 from ..models.utils import TrainerModel
 from ..trainer.utils import (
     IterationArguments,
@@ -82,7 +82,6 @@ class ModelCheckpoint(TrainerCallback):
         self.delta: float = delta
         self.maximize: bool = maximize_score
         self.save_path: str = save_path
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.verbose: bool = verbose
         if verbose:
             logging.basicConfig(level=logging.DEBUG)
@@ -205,9 +204,9 @@ class ModelCheckpoint(TrainerCallback):
         )
 
     @profiler
-    def on_initialization(self, args: IterationArguments):
+    def on_training_begin(self, hparams: IterationArguments):
         if self.model is None:
-            self.model = args.model
+            self.model = hparams.model
             self.logger.debug('self.model is set')
         self.logger.debug(
             f'init from checkpoint is {self.init_from_checkpoint}')
@@ -234,7 +233,7 @@ class ModelCheckpoint(TrainerCallback):
                 self._save_into_filesystem()
             self._put_checkpoint_into_model()
 
-    def on_evaluation_begin(self, stat: IterationStatus):
+    def on_evaluation_begin(self, hparams: IterationArguments):
         self.logger.debug(
             f'best weights absence is {self._best_weights is None}')
         if self.eval_with_best_model and self._best_weights is not None:

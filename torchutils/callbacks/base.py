@@ -1,10 +1,9 @@
 # Copyright © 2021 Chris Hughes
 import abc
 import logging
-from typing import Optional, Union
-from torchutils.logging import LoggerProxy, LoggerHandler
+from ..logging import LoggerInterface
 from torchutils.trainer.utils import (
-    IterationArguments,
+    # IterationArguments,
     TrainingArguments,
     EvaluatingArguments,
     IterationStatus,
@@ -27,27 +26,27 @@ class TrainerCallback(abc.ABC):
     """
     The abstract base class to be subclassed when creating new callbacks.
     """
-    __slots__ = ['logger']
+    __slots__ = ['__logger__']
 
     def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger: logging.Logger
+        self.__logger__: logging.Logger = logging.getLogger(
+            self.__class__.__name__
+        )
 
     @property
-    def _log(self) -> logging.Logger:
-        if hasattr(self, 'logger'):
-            return self.logger
-        else:
+    def logger(self) -> logging.Logger:
+        if not hasattr(self, '__logger__'):
             return logging.getLogger(self.__class__.__name__)
+        else:
+            return self.__logger__
 
-    def on_initialization(self, hparams: Union[TrainingArguments,
-                                               EvaluatingArguments]):
+    def on_initialization(self, loggers: LoggerInterface):
         """
         Event called at the end of trainer initialisation.
         """
         raise CallbackMethodNotImplementedError
 
-    def on_training_begin(self, status: IterationStatus):
+    def on_training_begin(self, hparams: TrainingArguments):
         """
         Event called at the start of training run.
         :param num_epochs total number of epochs at the most 
@@ -121,7 +120,7 @@ class TrainerCallback(abc.ABC):
         """
         raise CallbackMethodNotImplementedError
 
-    def on_evaluation_run_begin(self, stat: IterationStatus):
+    def on_evaluation_run_begin(self, hparams: EvaluatingArguments):
         """
         Event called at the start of an evaluation run.
         """

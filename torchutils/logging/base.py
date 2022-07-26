@@ -1,19 +1,16 @@
 import abc
 import typing
-import logging
 import argparse
-from ..trainer.utils import IterationArguments, IterationStatus
+from ..trainer.status import IterationStatus
+from ..trainer.arguments import IterationArguments
 from .utils import DataFrame, Image, Module, LoggerMethodNotImplError
+from ..utils import BaseConfig
 
 
-class ExperimentLogger(abc.ABC):
-    __slots__ = ['config', 'handler']
+class TrainerLogger(abc.ABC):
+    class Config(BaseConfig):
+        foo = 1
 
-    def __init__(self, handler):
-        self.handler: logging.Handler = handler
-
-
-class ScoreLogger(abc.ABC):
     @abc.abstractmethod
     def open(self, args: IterationArguments):
         raise LoggerMethodNotImplError

@@ -1,20 +1,19 @@
 # Import Handlers
-from torchutils.metrics import MetricHandler, AverageMeter
-from torchutils.logging import LoggerHandler, ScoreLogger, LoggingEvent, ExperimentProfiler
-from torchutils.callbacks import CallbackHandler, TrainerCallback
-
-import typing
 import logging
+import typing
+
+from .arguments import TrainingArguments, EvaluatingArguments, IterationArguments
+from .interface import IterationInterface
+from .status import IterationStatus
+
+from ..callbacks import CallbackHandler
+from ..logging import LoggerHandler, LoggingEvent
+from ..metrics import MetricHandler, DataFrameRunHistory
+
+StatusCode = IterationStatus.StatusCode
+
 
 # Import Arguments
-from ..metrics.history import DataFrameRunHistory
-from .utils import (
-    TrainingArguments,
-    EvaluatingArguments,
-    IterationArguments,
-    IterationInterface,
-    IterationStatus
-)
 
 
 class IterationHandler(object):
@@ -23,19 +22,19 @@ class IterationHandler(object):
         'interface',
         'hparams',
         '_callbacks',
-        'profiler',
+        '_loggers',
         '_metrics',
         '_history',
     ]
 
     def __init__(self,
                  metrics: MetricHandler,
-                 profiler: ExperimentProfiler,
+                 loggers: LoggerHandler,
                  callbacks: CallbackHandler,
                  history: typing.Set[str] = set()):
         self.logger = logging.getLogger()
         self._metrics = metrics
-        self.profiler = profiler
+        self._loggers = loggers
         self._callbacks = callbacks
         self.hparams: IterationArguments
         # @TODO: current_epoch=self.hparams.resume_epochs
@@ -51,15 +50,21 @@ class IterationHandler(object):
     #     return self.interface.hparams
 
     def on_initialization(self):
+        self.interface.status.status_code = StatusCode.STARTED
         self._metrics.reset_score_values()
+        self._loggers.initialize_loggers(self.hparams)
         # self.profiler.set_status(self.interface.status)
-        self._callbacks.on_initialization(self.interface.hparams)
+        self._callbacks.on_initialization(self.interface.logger)
 
     def on_stop_training_error(self):
+        self.interface.status.status_code = StatusCode.STOPPED
         self._callbacks.on_stop_training_error(self.interface.status)
+        self._loggers.finalize_loggers(self.status)
 
     def on_termination(self):
+        self.interface.status.status_code = StatusCode.FINISHED
         self._callbacks.on_termination(self.interface.status)
+        self._loggers.finalize_loggers(self.status)
 
 
 class TrainingHandler(IterationHandler):
@@ -69,17 +74,20 @@ class TrainingHandler(IterationHandler):
         self.interface = IterationInterface(
             metrics=self._metrics,
             history=self._history,
-            hparams=self.hparams
+            hparams=self.hparams,
+            handler=self._loggers
         )
 
     def on_training_begin(self):
-        self._callbacks.on_training_begin(self.interface.status)
+        self._callbacks.on_training_begin(self.hparams)
 
     def on_training_epoch_begin(self, epoch_idx):
         self.interface.status.current_epoch = epoch_idx
         self._callbacks.on_training_epoch_begin(self.interface.status)
 
     def on_training_step_begin(self, batch_idx):
+        self.interface.status.status_code = StatusCode.TRAINING_BATCH
+
         self.interface.status.current_batch = batch_idx
         self._callbacks.on_training_step_begin(self.interface.status)
 
@@ -90,20 +98,22 @@ class TrainingHandler(IterationHandler):
                                   preds=y_pred,
                                   target=y)
         # @TODO: place event in this instance insead of loggers
-        self.profiler.set_event(LoggingEvent.TRAINING_BATCH)
         self._callbacks.on_training_step_end(self.interface)
 
     def on_training_epoch_end(self):
+        self.interface.status.status_code = StatusCode.TRAINING_EPOCH_FINISHED
+
         # @TODO: call from _history
         self.interface.set_metric_scores()
-        self.profiler.set_event(LoggingEvent.TRAINING_EPOCH)
         self._callbacks.on_training_epoch_end(self.interface)
         self.interface.reset_metric_scores()
+        self._loggers.update_loggers(self.status)
 
     def on_training_end(self):
         self._callbacks.on_training_end(self.interface.status)
 
     def on_validation_run_begin(self):
+        self.interface.status.status_code = StatusCode.VALIDATION
         self._callbacks.on_validation_run_begin(self.interface.status)
 
     def on_validation_step_begin(self, batch_idx=-1):
@@ -114,10 +124,11 @@ class TrainingHandler(IterationHandler):
         self.interface.collate_fn(input=x,
                                   preds=y_pred,
                                   target=y)
-        self.profiler.set_event(LoggingEvent.VALIDATION_RUN)
+        self._loggers.update_loggers(self.status, n=0)
         self._callbacks.on_validation_step_end(self.interface)
 
     def on_validation_run_end(self):
+        self.interface.status.status_code = StatusCode.VALIDATION_RUN_FINISHED
         self.interface.set_metric_scores()
         self._callbacks.on_validation_run_end(self.interface)
         self.interface.reset_metric_scores()
@@ -130,11 +141,13 @@ class EvaluatingHandler(IterationHandler):
         self.interface = IterationInterface(
             metrics=self._metrics,
             history=self._history,
-            hparams=self.hparams
+            hparams=self.hparams,
+            handler=self._loggers
         )
 
     def on_evaluation_run_begin(self):
-        self._callbacks.on_evaluation_run_begin(self.interface.status)
+        self.interface.status.status_code = StatusCode.EVALUATION
+        self._callbacks.on_evaluation_run_begin(self.hparams)
 
     def on_evaluation_step_begin(self):
         self._callbacks.on_evaluation_step_begin(self.interface.status)
@@ -144,9 +157,11 @@ class EvaluatingHandler(IterationHandler):
                                   preds=y_pred,
                                   target=y)
         self._loggers.set_event(LoggingEvent.EVALUATION_RUN)
+        self._loggers.update_loggers(self.status)
         self._callbacks.on_evaluation_step_end(self.interface)
 
     def on_evaluation_run_end(self):
+        self.interface.status.status_code = StatusCode.EVALUATION_RUN_FINISHED
         self.interface.set_metric_scores()
-        self._callbacks.on_evaluation_run_end(self.interface)
         self.interface.reset_metric_scores()
+        self._callbacks.on_evaluation_run_end(self.interface)
