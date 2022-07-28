@@ -1,3 +1,4 @@
+import logging
 import pydantic
 import torch
 import warnings
@@ -70,6 +71,7 @@ class TrainerModel(pydantic.BaseModel):
     optimizer: OptimizerType
     scheduler: typing.Optional[SchedulerType]
     _loss: AverageMeter = pydantic.PrivateAttr(default_factory=init_avg_loss)
+    _logger: logging.Logger = pydantic.PrivateAttr()
     _backward_hooks: typing.List[GradTensorType] = pydantic.PrivateAttr(
         default_factory=list)
 
@@ -118,6 +120,7 @@ class TrainerModel(pydantic.BaseModel):
 
         super().__init__(model=model, criterion=criterion, **kwargs,
                          optimizer=optimizer, scheduler=scheduler)
+        self._logger = logging.getLogger(model.__class__.__qualname__)
 
     def __setattr__(self, key, value):
         if key == 'device':
