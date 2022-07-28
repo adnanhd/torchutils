@@ -1,7 +1,10 @@
-from .tracker import AverageMeter, AverageMeterFunction, AverageMeterModule_Base
-from collections import OrderedDict
 import warnings
 import typing
+from .tracker import (
+    AverageMeter,
+    AverageMeterModule,
+    AverageMeterFunctional
+)
 
 
 class MetricHandler(object):
@@ -25,9 +28,9 @@ class MetricHandler(object):
     def add_score_meters(self, meters: typing.Iterable[AverageMeter]):
         for meter in meters:
             assert isinstance(meter, AverageMeter)
-            if isinstance(meter, AverageMeterModule_Base):
+            if isinstance(meter, AverageMeterModule):
                 self._callbacks.append(meter)
-            elif isinstance(meter, AverageMeterFunction):
+            elif isinstance(meter, AverageMeterFunctional):
                 self._callbacks.append(meter)
             elif meter.name not in self.__scores__:
                 self.MetricRegistrar.register_meter(meter)

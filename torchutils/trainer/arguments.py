@@ -6,6 +6,7 @@ import pydantic
 import numpy as np
 from torch.utils.data.dataset import Dataset as TorchDataset
 from torch.utils.data.dataloader import DataLoader
+
 from ..data.dataset import Dataset as NumpyDataset
 from ..data.utils import TrainerDataLoader
 from ..models.utils import TrainerModel
