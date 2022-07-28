@@ -23,6 +23,14 @@ class IterationInterface(pydantic.BaseModel):
     _metric_history: RunHistory = pydantic.PrivateAttr()
     _score_names: typing.Set[str] = pydantic.PrivateAttr()
 
+    class Config:
+        smart_union = True
+
+    @pydantic.validator('hparams')
+    @classmethod
+    def validate_params(cls, value):
+        return value
+
     def __init__(self,
                  handler: LoggerHandler,
                  metrics: MetricHandler,
