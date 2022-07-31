@@ -28,13 +28,13 @@ class WandbLogger(TrainerLogger):
         self.groupname = groupname
         self._wandb: wandb.sdk.wandb_run.Run = None
 
-    def open(self, args: IterationArguments):
+    def open(self, hparams: IterationArguments):
         if self._wandb is None:
             self._wandb = wandb.init(project=self.project,
                                      entity=self.username,
                                      group=self.groupname,
                                      name=self.experiment,
-                                     config=args.dict())
+                                     config=hparams.dict())
         else:
             warnings.warn(
                 "{self} is already opened", RuntimeWarning

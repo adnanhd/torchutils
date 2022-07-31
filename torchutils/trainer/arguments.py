@@ -20,6 +20,10 @@ class IterationArguments(pydantic.BaseModel):
     def is_training_hparams(self) -> bool:
         raise NotImplementedError
 
+    @typing.overload
+    def dict(self) -> typing.Dict[str, typing.Any]:
+        raise NotImplementedError
+
     def create_dataloader(
         self,
         dataset: TorchDataset,
@@ -83,16 +87,22 @@ class TrainingArguments(IterationArguments):
     def is_training_hparams(self) -> bool:
         return True
 
+    def dict(self) -> typing.Dict[str, typing.Any]:
+        fields = ('num_epochs', 'learning_rate',
+                  'resume_epochs', 'num_epochs_per_validation',
+                  'train_dl_batch_size', 'valid_dl_batch_size')
+        return dict(zip(fields, map(self.__getattribute__, fields)))
+
     @property
     def train_dl_batch_size(self) -> int:
-        return self._train_dl.batch_size
+        return self.train_dl.batch_size
 
     @property
     def valid_dl_batch_size(self) -> typing.Optional[int]:
-        if self._valid_dl is None:
+        if self.valid_dl is None:
             return None
         else:
-            return self._valid_dl.batch_size
+            return self.valid_dl.batch_size
 
     @pydantic.validator('train_dl')
     @classmethod
@@ -134,9 +144,13 @@ class EvaluatingArguments(IterationArguments):
     def is_training_hparams(self) -> bool:
         return False
 
+    def dict(self) -> typing.Dict[str, typing.Any]:
+        fields = ('eval_dl_batch_size')
+        return dict(zip(fields, map(self.__getattribute__, fields)))
+
     @property
     def eval_dl_batch_size(self):
-        return self._eval_dl.batch_size
+        return self.eval_dl.batch_size
 
 
 Hyperparameter = typing.NewType('Arguments', typing.Union[TrainingArguments,

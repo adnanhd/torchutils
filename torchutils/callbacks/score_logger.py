@@ -24,8 +24,8 @@ class ScoreLoggerCallback(TrainerCallback):
         self._handler = handlers
 
     def on_training_begin(self, hparams: TrainingArguments):
-        # self._handler.log_hparams(hparams)
-        pass
+        self._handler.log_hparams(hparams.dict)
+        self._handler.log_module(hparams.model)
 
     def on_training_epoch_end(self, epoch: IterationInterface):
         self._handler.log_scores({
