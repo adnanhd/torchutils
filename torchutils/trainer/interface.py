@@ -23,8 +23,8 @@ class IterationInterface(pydantic.BaseModel):
     _metric_history: RunHistory = pydantic.PrivateAttr()
     _score_names: typing.Set[str] = pydantic.PrivateAttr()
 
-    class Config:
-        smart_union = True
+    # class Config:
+    #     smart_union = True
 
     @pydantic.validator('hparams')
     @classmethod
