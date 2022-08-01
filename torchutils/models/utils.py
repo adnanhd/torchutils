@@ -224,12 +224,11 @@ class TrainerModel(pydantic.BaseModel):
             pass
         elif isinstance(self.scheduler,
                         torch.optim.lr_scheduler.ReduceLROnPlateau):
-            self.scheduler.step(self.loss)
+            pass  # self.scheduler.step(self.loss)
         else:
             self.scheduler.step()
 
     def reset_backward(self):
-        self.scheduler_step()
         if self._backward_hooks.__len__() != 0:
             warnings.warn(
                 "BackwardHook is not empty", RuntimeWarning

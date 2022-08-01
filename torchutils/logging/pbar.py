@@ -29,7 +29,7 @@ class ProgressBarLogger(TrainerLogger):
         elif isinstance(args, EvaluatingArguments):
             args: EvaluatingArguments
             self.config['unit'] = 'benchmark'
-            self.config['initia'] = 0
+            self.config['initial'] = 0
             self.config['desc'] = 'Evaluating'
             self.config['total'] = args.eval_dl.num_steps
             self._is_training_ = False

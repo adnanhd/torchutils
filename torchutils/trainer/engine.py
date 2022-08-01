@@ -272,6 +272,8 @@ class Trainer:
 
         handler.on_training_epoch_end()
         self._model.reset_backward()
+        self._model.scheduler_step()
+
         if handler.hparams.valid_dl is not None \
                 and (handler.interface.status.current_epoch + 1) % \
                 handler.interface.hparams.num_epochs_per_validation == 0:

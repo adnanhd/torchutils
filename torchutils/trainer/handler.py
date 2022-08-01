@@ -149,19 +149,19 @@ class EvaluatingHandler(IterationHandler):
         self.interface.status.status_code = StatusCode.EVALUATION
         self._callbacks.on_evaluation_run_begin(self.hparams)
 
-    def on_evaluation_step_begin(self):
+    def on_evaluation_step_begin(self, batch_idx=-1):
+        self.interface.status.current_batch = batch_idx
         self._callbacks.on_evaluation_step_begin(self.interface.status)
 
     def on_evaluation_step_end(self, x, y, y_pred):
         self.interface.collate_fn(input=x,
                                   preds=y_pred,
                                   target=y)
-        self._loggers.set_event(LoggingEvent.EVALUATION_RUN)
         self._loggers.update_loggers(self.status)
         self._callbacks.on_evaluation_step_end(self.interface)
 
     def on_evaluation_run_end(self):
         self.interface.status.status_code = StatusCode.EVALUATION_RUN_FINISHED
         self.interface.set_metric_scores()
-        self.interface.reset_metric_scores()
         self._callbacks.on_evaluation_run_end(self.interface)
+        self.interface.reset_metric_scores()
