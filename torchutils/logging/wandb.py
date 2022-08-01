@@ -78,21 +78,14 @@ class WandbLogger(TrainerLogger):
         self._wandb.log({name: [wandb.Image(img) for img in image]
                         for name, image in images.items()})
 
-    def watch(self,
-              module: Module,
-              status: IterationStatus, **kwargs):
-        if isinstance(module, TrainerModel):
-            module = module.module
-            self._wandb.watch(
-                models=module.module,
-                criterion=module.criterion,
-                **kwargs
-            )
-        else:
-            self._wandb.watch(
-                models=module,
-                **kwargs
-            )
+    def log_module(self,
+                   module: TrainerModel,
+                   status: IterationStatus, **kwargs):
+        self._wandb.watch(
+            models=module.model,
+            criterion=module.criterion,
+            **kwargs
+        )
 
     def update(self, n, status: IterationStatus):
         pass
@@ -130,6 +123,6 @@ class ReferenceWandbLogger(WandbLogger):
     def close(self, status: IterationStatus):
         pass
 
-    @property
+    @ property
     def _wandb(self):
         return self._ref_[0]._wandb
