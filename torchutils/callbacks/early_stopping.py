@@ -44,9 +44,19 @@ class EarlyStopping(TrainerCallback):
         self.trace_func: typing.Callable[
             [str], None
         ] = self.logger.info if trace_func is None else trace_func
+        self._check_flag_ = None
 
-    def on_training_epoch_end(self, epoch: IterationInterface):
+    def on_training_begin(self, hparams):
+        self._check_flag_ = True
+
+    def on_training_end(self, stat):
+        if self._check_flag_:
+            self.logger.warn(f'{self.__class__.__name__}.on_validation_run_end'
+                             'method never called while training.')
+
+    def on_validation_run_end(self, epoch: IterationInterface):
         score = - epoch.get_current_scores(self.monitor)[self.monitor]
+        self._check_flag_ = False
 
         if self.best_score is None:
             self.best_score = score
