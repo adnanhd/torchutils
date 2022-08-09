@@ -15,6 +15,7 @@ from ..logging.handler import LoggerHandler
 class IterationInterface(pydantic.BaseModel):
     logger: LoggerInterface
     hparams: Hyperparameter
+
     status: IterationStatus
     batch: IterationBatch = IterationBatch()
 
@@ -23,8 +24,8 @@ class IterationInterface(pydantic.BaseModel):
     _metric_history: RunHistory = pydantic.PrivateAttr()
     _score_names: typing.Set[str] = pydantic.PrivateAttr()
 
-    # class Config:
-    #     smart_union = True
+    class Config:
+        smart_union = True
 
     @pydantic.validator('hparams')
     @classmethod

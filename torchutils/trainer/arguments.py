@@ -11,10 +11,14 @@ from ..data.dataset import Dataset as NumpyDataset
 from ..data.utils import TrainerDataLoader
 from ..models.utils import TrainerModel
 from ..utils.pydantic.types import DataLoaderType
+__DataLoaderUnion__ = typing.Union[TrainerDataLoader, DataLoaderType]
 
 
 class IterationArguments(pydantic.BaseModel):
     model: TrainerModel
+
+    class Config:
+        allow_mutation = False
 
     @typing.overload
     def is_training_hparams(self) -> bool:
@@ -71,17 +75,13 @@ class IterationArguments(pydantic.BaseModel):
 
 
 class TrainingArguments(IterationArguments):
-    class Config:
-        allow_mutation = False
-
     num_epochs: int = pydantic.Field(ge=0, description="Number of epochs")
     learning_rate: float = pydantic.Field(ge=0.0, le=1.0)
-    resume_epochs: int = 0
-    num_epochs_per_validation: int = 1
+    resume_epochs: int = pydantic.Field(default=0, ge=0)
+    num_epochs_per_validation: int = pydantic.Field(default=1, ge=1)
 
-    train_dl: typing.Union[TrainerDataLoader, DataLoaderType]
-    valid_dl: typing.Optional[typing.Union[TrainerDataLoader,
-                                           DataLoaderType]] = None
+    train_dl: __DataLoaderUnion__
+    valid_dl: typing.Optional[__DataLoaderUnion__] = None
 
     @property
     def is_training_hparams(self) -> bool:
@@ -106,7 +106,7 @@ class TrainingArguments(IterationArguments):
 
     @pydantic.validator('train_dl')
     @classmethod
-    def validate_train_dataloader(
+    def validate_required_dataloader(
             cls, field_type
     ) -> TrainerDataLoader:
         if isinstance(field_type, TrainerDataLoader):
@@ -119,33 +119,31 @@ class TrainingArguments(IterationArguments):
 
     @pydantic.validator('valid_dl')
     @classmethod
-    def validate_valid_dataloader(
-            cls, field_type) -> typing.Optional[TrainerDataLoader]:
+    def validate_optional_dataloader(
+            cls, field_type
+    ) -> typing.Optional[TrainerDataLoader]:
         if field_type is None:
             return field_type
         else:
-            return cls.validate_train_dataloader(field_type)
+            return cls.validate_required_dataloader(field_type)
 
 
 class EvaluatingArguments(IterationArguments):
-    class Config:
-        allow_mutation = False
-
-    eval_dl: typing.Union[TrainerDataLoader, DataLoaderType]
+    eval_dl: __DataLoaderUnion__
 
     @pydantic.validator('eval_dl')
     @classmethod
     def validate_eval_dataloader(
             cls, field_type
     ) -> TrainerDataLoader:
-        return TrainingArguments.validate_train_dataloader(field_type)
+        return TrainingArguments.validate_required_dataloader(field_type)
 
     @property
     def is_training_hparams(self) -> bool:
         return False
 
     def dict(self) -> typing.Dict[str, typing.Any]:
-        fields = ('eval_dl_batch_size')
+        fields = ('eval_dl_batch_size',)
         return dict(zip(fields, map(self.__getattribute__, fields)))
 
     @property
