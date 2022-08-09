@@ -21,9 +21,9 @@ class Hashable:
         return int(self.md5, 16)
 
 
-def digest_numpy(arr):
+def digest_numpy(arr) -> str:
     return md5(arr.tobytes()).hexdigest()
 
 
-def digest_torch(arr):
+def digest_torch(arr) -> str:
     return md5(arr.cpu().numpy().tobytes()).hexdigest()

@@ -75,6 +75,17 @@ class TrainerModel(pydantic.BaseModel):
     _backward_hooks: typing.List[GradTensorType] = pydantic.PrivateAttr(
         default_factory=list)
 
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, value):
+        if isinstance(value, TrainerModel):
+            return value
+        else:
+            raise ValueError(f'{value} is not a TrainerModel')
+
     def __init__(
         self,
         model: Module,
