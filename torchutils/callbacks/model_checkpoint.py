@@ -5,6 +5,8 @@ import torch
 import logging
 import warnings
 from .base import TrainerCallback
+from ..utils.hash import digest_torch, md5
+from collections import OrderedDict
 from typing import List
 from ..models.utils import TrainerModel
 from ..trainer.utils import (
@@ -12,6 +14,27 @@ from ..trainer.utils import (
     IterationStatus,
     IterationInterface
 )
+
+
+def old_digest(state_dict: OrderedDict) -> str:
+    def concat(arr):
+        result = 0
+        for a in arr:
+            result ^= a
+        return hex(result)[2:]
+
+    return concat(int(digest_torch(state_array), 16)
+                  for state_array in state_dict.values())
+
+
+def digest(state_dict: OrderedDict) -> str:
+    if state_dict is None:
+        return 'None'
+    else:
+        state_dict = state_dict['model']
+    return md5("#<@_@>#".join(
+        map(digest_torch, state_dict.values())
+    ).encode()).hexdigest()
 
 
 def profiler(fn):
@@ -142,8 +165,8 @@ class ModelCheckpoint(TrainerCallback):
             checkpoint = {'state_dict': self._best_weights,
                           'scores': {self.monitor: self._best_score}}
             self.logger.info(
-                f'the model {checkpoint["state_dict"].keys()} with scores '
-                f'{checkpoint["scores"]} is saved into {self.save_path}.'
+                f'the model {digest(checkpoint["state_dict"])} with '
+                f'scores {checkpoint["scores"]} is saved into {self.save_path}'
             )
             torch.save(checkpoint, self.save_path)
 
@@ -170,8 +193,8 @@ class ModelCheckpoint(TrainerCallback):
                 if best_score is not None:
                     self._best_score = best_score
                 self.logger.info(
-                    f'the model {checkpoint["state_dict"].keys()} with scores '
-                    f'{checkpoint["scores"]} is loaded from {self.save_path}.'
+                    f'the model {digest(checkpoint["state_dict"])} with scores'
+                    f' {checkpoint["scores"]} is loaded from {self.save_path}.'
                 )
         else:
             warnings.warn(
@@ -184,16 +207,16 @@ class ModelCheckpoint(TrainerCallback):
         self._best_weights = self.model.state_dict()
         self.logger.info(
             f"A newer checkpoint with score {model_score} "
-            f"is obtained from the model {self._best_weights.keys()}."
+            f"is obtained from the model {digest(self._best_weights)}"
         )
 
     @profiler
     def _put_checkpoint_into_model(self):
         self.logger.info(
             f"the current checkpoint with score {self._best_score} "
-            f"is loaded into the model {self._best_weights.keys()}."
+            f"is loaded into the model {digest(self._best_weights)}."
         )
-        self.model.load_state_dict(copy.copy(self._best_weights))
+        self.model.load_state_dict(copy.deepcopy(self._best_weights))
 
     @profiler
     def _reset_checkpoints(self):
@@ -233,11 +256,21 @@ class ModelCheckpoint(TrainerCallback):
                 self._save_into_filesystem()
             self._put_checkpoint_into_model()
 
-    def on_evaluation_begin(self, hparams: IterationArguments):
-        self.logger.debug(
-            f'best weights absence is {self._best_weights is None}')
-        if self.eval_with_best_model and self._best_weights is not None:
+    def on_evaluation_run_begin(self, hparams: IterationArguments):
+        self.model = hparams.model
+        self.logger.info(
+            f'model weights are {digest(self.model.state_dict())}).'
+        )
+        if self.eval_with_best_model:
+            self._load_from_filesystem()
+        if self._best_weights is not None:
             self._put_checkpoint_into_model()
+            self.logger.info(
+                f'model weights are updated with {digest(self._best_weights)}.'
+            )
+        else:
+            self.logger.warn('there is no best weight to be '
+                             'loaded before evaluation.')
 
     @profiler
     def on_stop_training_error(self, stat: IterationStatus):
