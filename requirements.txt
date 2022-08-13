@@ -1,5 +1,6 @@
-torch>=1.8.0
+torch>=1.7.1
 torchsummary
+torchmetrics
 torchvision
 sklearn
 pandas
