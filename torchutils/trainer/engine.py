@@ -315,7 +315,7 @@ class Trainer:
         handler.on_evaluation_run_end()
         return preds
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def _run_evaluating_step(
         self,
         batch_idx: int,
@@ -348,7 +348,7 @@ class Trainer:
         self._model.reset_backward()
         handler.on_validation_run_end()
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def _run_validating_step(
         self,
         batch_idx: int,

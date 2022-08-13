@@ -1,10 +1,11 @@
-import warnings
-import argparse
 import wandb
 import typing
 import pandas as pd
+import pdb
+import warnings
+import argparse
 
-from .utils import LoggingEvent, Image, Module
+from .utils import Image
 from .base import TrainerLogger
 
 from ..models.utils import TrainerModel
@@ -20,12 +21,14 @@ class WandbLogger(TrainerLogger):
                  experiment: str,
                  project: str,
                  username: str,
-                 groupname: typing.Optional[str] = None):
+                 groupname: typing.Optional[str] = None,
+                 finish_on_close: bool = True):
         wandb.login()
         self.experiment = experiment
         self.project = project
         self.username = username
         self.groupname = groupname
+        self.finish_on_close = finish_on_close
         self._wandb: wandb.sdk.wandb_run.Run = None
 
     def open(self, hparams: IterationArguments):
@@ -36,10 +39,8 @@ class WandbLogger(TrainerLogger):
                                      name=self.experiment,
                                      config=hparams.dict())
         else:
-            warnings.warn(
-                "{self} is already opened", RuntimeWarning
-
-            )
+            warnings.warn(f"{self.__class__.__name__} is already opened. "
+                          f"@{pdb.traceback.extract_stack()}", RuntimeWarning)
 
     def log_scores(self,
                    scores: typing.Dict[str, float],
@@ -48,10 +49,16 @@ class WandbLogger(TrainerLogger):
         # we don't know if it is current epoch or current step
         self._wandb.log(scores, step=status.current_epoch)
 
-    def log_hyperparams(self,
-                        params: argparse.Namespace,
-                        status: IterationStatus):
-        self._wandb.config.update(params.__dict__)
+    def log_hparams(self,
+                    params: argparse.Namespace,
+                    status: IterationStatus):
+        if not isinstance(params, dict):
+            if hasattr(params, 'dict') and callable(params.dict):
+                self._wandb.config.update(params.dict())
+            else:
+                self._wandb.config.update(params.__dict__)
+        else:
+            self._wandb.config.update(params)
 
     def log_table(self,
                   tables: typing.Dict[str, pd.DataFrame],
@@ -93,36 +100,9 @@ class WandbLogger(TrainerLogger):
     def close(self, status: IterationStatus):
         if self._wandb is not None:
             # @TODO: add quiet=True
-            self._wandb.finish(exit_code=status.status_code)
+            if self.finish_on_close:
+                self._wandb.finish(exit_code=status.status_code)
             self._wandb = None
         else:
-            warnings.warn(
-                "{self} is already closed", RuntimeWarning
-
-            )
-
-
-class ReferenceWandbLogger(WandbLogger):
-    __slots__ = ['_ref_']
-
-    def __init__(self,
-                 reference: typing.Sequence[WandbLogger],
-                 experiment: str,
-                 project: str,
-                 username: str,
-                 groupname: typing.Optional[str] = None):
-        self.experiment = experiment
-        self.project = project
-        self.username = username
-        self.groupname = groupname
-        self._ref_ = reference
-
-    def open(self, args: IterationArguments):
-        pass
-
-    def close(self, status: IterationStatus):
-        pass
-
-    @ property
-    def _wandb(self):
-        return self._ref_[0]._wandb
+            warnings.warn(f"{self.__class__.__name__} is already closed. "
+                          f"@{pdb.traceback.extract_stack()}", RuntimeWarning)

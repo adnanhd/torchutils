@@ -169,6 +169,8 @@ class ModelCheckpoint(TrainerCallback):
                 f'scores {checkpoint["scores"]} is saved into {self.save_path}'
             )
             torch.save(checkpoint, self.save_path)
+        else:
+            self.logger.debug('the model is not saved.')
 
     @profiler
     def _load_from_filesystem(self):
