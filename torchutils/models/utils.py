@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from torchutils.metrics import AverageMeter, MetricHandler
+from torchutils.metrics import AverageScore, MetricHandler
 from collections import OrderedDict
 from torchutils.utils.pydantic.types import (
     # NpScalarType,
@@ -58,7 +58,7 @@ def _add_last_layer(self, output, choices=(None, ), *args, **kwargs):
 
 def init_avg_loss():
     try:
-        return AverageMeter("Loss")
+        return AverageScore("Loss")
     except KeyError:
         avg = MetricHandler.MetricRegistrar.__score__['Loss']
         avg.reset()
@@ -70,7 +70,7 @@ class TrainerModel(pydantic.BaseModel):
     criterion: typing.Union[ModuleType, FunctionType]
     optimizer: OptimizerType
     scheduler: typing.Optional[SchedulerType]
-    _loss: AverageMeter = pydantic.PrivateAttr(default_factory=init_avg_loss)
+    _loss: AverageScore = pydantic.PrivateAttr(default_factory=init_avg_loss)
     _logger: logging.Logger = pydantic.PrivateAttr()
     _backward_hooks: typing.List[GradTensorType] = pydantic.PrivateAttr(
         default_factory=list)

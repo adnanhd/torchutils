@@ -58,7 +58,7 @@ class ProgressBarLogger(TrainerLogger):
 
     def update(self, n, status: IterationStatus):
         self._logger_.debug(f'{self.__class__.__name__}.update called')
-        self._log_dict_.clear()
+        # self._log_dict_.clear()
         self._pbar.set_postfix(self._log_dict_)
         self._pbar.update(n=n)
 

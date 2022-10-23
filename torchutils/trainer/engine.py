@@ -20,7 +20,7 @@ from ..models.utils import TrainerModel
 from ..data.dataset import Dataset
 from ..metrics import (
     MetricHandler,
-    AverageMeter
+    AverageScore
 )
 from ..logging import (
     LoggerHandler,
@@ -127,14 +127,16 @@ class Trainer:
 
     def compile_model_and_hparams(self,
                                   ** hparams) -> None:
-        for field_name in set(self._model.__fields__):
-            hparams.setdefault(field_name, getattr(self._model, field_name))
+        if self._model is not None:
+            for field_name in set(self._model.__fields__):
+                hparams.setdefault(field_name,
+                                   getattr(self._model, field_name))
         self._model = TrainerModel(**hparams)
 
     def compile_handlers(
             self,
             loggers: typing.Iterable[TrainerLogger] = list(),
-            metrics: typing.Iterable[AverageMeter] = list(),
+            metrics: typing.Iterable[AverageScore] = list(),
             callbacks: typing.Iterable[TrainerCallback] = list(),
     ):
         self._loggers.add_loggers(loggers)
@@ -163,6 +165,7 @@ class Trainer:
         train_dataloader_kwargs: Optional[Mapping] = dict(),
         valid_dataloader_kwargs: Optional[Mapping] = dict(),
         history: typing.Set[str] = set(),
+        metrics: typing.Set[str] = set(),
         **hparams
     ):
         if learning_rate is not None:
@@ -186,6 +189,8 @@ class Trainer:
             )
             hparams['valid_dl_batch_size'] = valid_dl.batch_size
 
+        metrics.update(history)
+        self._metrics.set_score_names(metrics)
         handler = TrainingHandler(
             metrics=self._metrics,
             loggers=self._loggers,
@@ -215,6 +220,7 @@ class Trainer:
         self,
         dataset,
         dataloader_kwargs=dict(),
+        metrics: typing.Set[str] = set(),
         history: typing.Set[str] = set(),
         **hparams
     ):
@@ -225,6 +231,8 @@ class Trainer:
             **dataloader_kwargs,
         )
 
+        metrics.update(history)
+        self._metrics.set_score_names(metrics)
         handler = EvaluatingHandler(
             metrics=self._metrics,
             loggers=self._loggers,
@@ -293,7 +301,8 @@ class Trainer:
         y_pred = self._model.forward_pass(x, y, batch_idx)
         self._model.backward_pass()
 
-        handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
+        with torch.no_grad():
+            handler.on_training_step_end(x=x, y=y, y_pred=y_pred)
 
         return y_pred.detach()
 

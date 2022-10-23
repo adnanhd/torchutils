@@ -1,3 +1,4 @@
+import abc
 import typing
 import warnings
 import numpy as np
@@ -9,7 +10,7 @@ class NanValueWarning(Warning):
     pass
 
 
-class AverageMeter(object):
+class AverageScore(object):
     """Computes and stores the average and current value"""
     __slots__ = ['_name', '_sum', '_count', 'value', 'fmt']
 
@@ -18,7 +19,7 @@ class AverageMeter(object):
         self._name = name  # to_capital(name)
         self.fmt = fmt
         self.reset()
-        MetricRegistrar.register_meter(self)
+        MetricRegistrar.register_score(self)
 
     @property
     def name(self) -> str:
@@ -39,12 +40,15 @@ class AverageMeter(object):
 
     def update(self, value, n=1) -> None:
         if np.isnan(value):
-            warnings.warn(f"Metric({self._name}) receiveed a nan value)")
+            if self._name == 'ld_score':
+                import pdb
+                pdb.set_trace()
+            warnings.warn(f"Metric({self._name}) received NaN value)")
         self.value = value
         self._sum += value * n
         self._count += n
 
-    def __add__(self, value) -> "AverageMeter":
+    def __add__(self, value) -> "AverageScore":
         self.update(value)
         return self
 
@@ -60,7 +64,7 @@ class AverageMeter(object):
         return fmtstr.format(name=to_capital(self._name), average=self.average)
 
 
-class AverageMeterFunctional(AverageMeter):
+class AverageScoreFunctional(AverageScore):
     def __init__(self, name: str,
                  fn: typing.Callable[[NpTorchType, NpTorchType], NpTorchType],
                  **hparams):
@@ -82,15 +86,23 @@ class AverageMeterFunctional(AverageMeter):
                              average=self.average)
 
 
-class AverageMeterModule(object):
-    def __init__(self, *meters: str):
-        assert all(isinstance(name, str) for name in meters)
-        scores = {name: AverageMeter(name) for name in meters}
+class AverageScoreModule(AverageScore):
+    def __init__(self, *names: str):
+        assert all(isinstance(name, str) for name in names)
+        scores = {name: AverageScore(name) for name in names}
         super().__setattr__("__scores__", scores)
+
+    @property
+    def _names(self) -> typing.Set[str]:
+        return set(super().__getattribute__('__scores__').keys())
+
+    @property
+    def _name(self) -> str:
+        return self.__class__.__name__
 
     def __setattr__(self, name, value):
         if name in super().__getattribute__("__scores__"):
-            if not isinstance(value, AverageMeter) or value.name != name:
+            if not isinstance(value, AverageScore) or value.name != name:
                 raise AttributeError(
                     f"Cannot set the initialized meter {name} to {value}"
                 )
@@ -116,17 +128,19 @@ class AverageMeterModule(object):
         return f"{self.__class__.__name__}({self.__str__()})"
 
 
+FunctionalOrModule = typing.Union[AverageScoreFunctional, AverageScoreModule]
+
+
 class MetricRegistrar(object):
-    __functional__: typing.Dict[str, typing.Callable] = {
-        # name.lower(): fn for name, fn in vars(f).items()
-        # if callable(fn) and has_allowed_arguments(fn)
-    }
-    __score__: typing.Dict[str, AverageMeter] = {
-    }
+    __metrics__: typing.Dict[str, FunctionalOrModule] = dict()
+    # name.lower(): fn for name, fn in vars(f).items()
+    # if callable(fn) and has_allowed_arguments(fn)
+    __score__: typing.Dict[str, AverageScore] = dict()
+    __score_to_metric__: typing.Dict[str, str] = dict()
 
     @classmethod
-    def register_meter(cls, meter: AverageMeter) -> None:
-        assert isinstance(meter, AverageMeter)
+    def register_score(cls, meter: AverageScore) -> None:
+        assert isinstance(meter, AverageScore)
         # if not name.istitle():
         # name = to_capital(name)
         if meter._name in cls.__score__:
@@ -137,24 +151,45 @@ class MetricRegistrar(object):
             cls.__score__.__setitem__(meter._name, meter)
 
     @classmethod
-    def register_functional(cls, name: str, fn: typing.Callable) -> None:
-        assert callable(fn) and has_allowed_arguments(fn)
-        assert isinstance(name, str)
+    def register_functional(cls, meter_fn: FunctionalOrModule) -> None:
+        assert isinstance(meter_fn, AverageScoreFunctional) \
+            or isinstance(meter_fn, AverageScoreModule)
         # name = to_lower(name)
-        if name in cls.__functional__:
+        if meter_fn._name in cls.__metrics__:
             raise KeyError(
-                f"{name} is already registered."
+                f"{meter_fn._name} is already registered."
+            )
+        cls.__metrics__.__setitem__(meter_fn._name, meter_fn)
+        if isinstance(meter_fn, AverageScoreFunctional):
+            cls.__score_to_metric__[meter_fn._name] = meter_fn._name
+        elif isinstance(meter_fn, AverageScoreModule):
+            for score_name in meter_fn._names:
+                cls.__score_to_metric__[score_name] = meter_fn._name
+
+    @classmethod
+    def unregister_score(cls, name: str) -> AverageScore:
+        # name = to_capital(name)
+        if name not in cls.__score__:
+            raise KeyError(
+                f"{name} is not registered."
             )
         else:
-            cls.__functional__.__setitem__(
-                name, AverageMeterFunction(name, fn))
+            # @TODO: pop or __delitem__
+            return cls.__score__.pop(name)
 
     @classmethod
-    def unregister_meter(cls, name: str):
-        # name = to_capital(name)
-        cls.__score__.pop(name)
+    def unregister_functional(cls, name) -> FunctionalOrModule:
+        # name = to_lower(name)
+        if name not in cls.__metrics__:
+            raise KeyError(
+                f"{name} is not registered."
+            )
+        else:
+            cls.__score_to_metric__.pop(name)
+            return cls.__metrics__.pop(name)
 
     @classmethod
-    def clear_meters(cls):
+    def clear(cls):
         cls.__score__.clear()
-        cls.__functional__.clear()
+        cls.__metrics__.clear()
+        cls.__score_to_metric__.clear()

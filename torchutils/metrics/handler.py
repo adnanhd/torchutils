@@ -1,39 +1,46 @@
 import warnings
 import typing
 from .tracker import (
-    AverageMeter,
-    AverageMeterModule,
-    AverageMeterFunctional
+    AverageScore,
+    AverageScoreModule,
+    AverageScoreFunctional,
+    FunctionalOrModule
 )
 
 
 class MetricHandler(object):
     from .tracker import MetricRegistrar
-    __slots__ = ['_score_names', '_callbacks']
+    __slots__ = ['_score_names']
 
-    def __init__(self):
+    def __init__(self, *score_names: str):
         self._score_names: typing.Set[str] = set()
-        self._callbacks: typing.List = list()
-        # self.set_score_names(score_names)
+        self.set_score_names(score_names)
 
     @property
-    def __scores__(self) -> typing.Dict[str, AverageMeter]:
-        # Older version is here
-        # {score_name: score_meter
-        #  for score_name, score_meter in
-        #  self.MetricRegistrar.__score__.items()
-        #  if score_name in self._score_names}
-        return self.MetricRegistrar.__score__
+    def __scores__(self) -> typing.Dict[str, AverageScore]:
+        return {
+            score_name: self.MetricRegistrar.__score__[score_name]
+            for score_name in self._score_names
+        }
+        # return self.MetricRegistrar.__score__
 
-    def add_score_meters(self, meters: typing.Iterable[AverageMeter]):
+    @property
+    def __callbacks__(self) -> typing.Set[FunctionalOrModule]:
+        return {
+            self.MetricRegistrar.__metrics__[
+                self.MetricRegistrar.__score_to_metric__[score_name]
+            ] for score_name in self._score_names
+            if score_name in self.MetricRegistrar.__score_to_metric__
+        }
+
+    def add_score_meters(self, meters: typing.Iterable[AverageScore]):
         for meter in meters:
-            assert isinstance(meter, AverageMeter)
-            if isinstance(meter, AverageMeterModule):
-                self._callbacks.append(meter)
-            elif isinstance(meter, AverageMeterFunctional):
-                self._callbacks.append(meter)
+            assert isinstance(meter, AverageScore)
+            if isinstance(meter, AverageScoreModule) \
+                    or isinstance(meter, AverageScoreFunctional):
+                self.MetricRegistrar.register_functional(meter)
             elif meter.name not in self.__scores__:
-                self.MetricRegistrar.register_meter(meter)
+                self.MetricRegistrar.register_score(meter)
             else:
                 raise KeyError(f"{meter.name} is already registered.")
 
@@ -58,26 +65,12 @@ class MetricHandler(object):
         # self._history.set_score_names([])
         self._score_names.clear()
 
-    # def add_score_meters(self, *scores: AverageMeter) -> None:
-    #     """ Append a score meter to the score list """
-    #     warnings.warn(
-    #         "this method is no longer used, use "
-    #         "MetricRegistrar.register_meter instead", DeprecationWarning
-    #     )
-
-    # def remove_score_meters(self, *scores: str) -> None:
-    #     """ Removes a score meter from the score list """
-    #     warnings.warn(
-    #         "this method is no longer used, use "
-    #         "MetricRegistrar.unregister_meter instead", DeprecationWarning
-    #     )
-
     def run_score_functional(self, preds, target):
         """ Runs callbacks hooked by add_score_group method """
-        for cb in self._callbacks:
+        for cb in self.__callbacks__:
             cb.update(preds=preds, target=target)
 
-    # AverageMeter functions
+    # AverageScore functions
     def set_scores_values(self, **kwargs: float) -> None:
         """ Sets score values of the latest step """
         for score_name, score_value in kwargs.items():
@@ -105,34 +98,3 @@ class MetricHandler(object):
         """ Resets score values of the step tracker """
         for score_meter in self.__scores__.values():
             score_meter.reset()
-
-    # # RunHistory functions
-    # def init_score_history(self, *score_names: str, fmt=':f') -> None:
-    #     """ Sets score names of the epoch history """
-    #     if len(score_names) == 0:
-    #         score_names = self.get_score_names()
-    #     self._history.set_score_names(score_names)
-
-    # def push_score_values(self, index: int = None) -> None:
-    #     """ Stamps the score values of the latest epoch """
-    #     for name in self._history.get_score_names():
-    #         self._history.set_latest_score(name, self.__scores__[name].average)
-    #     self._history._increment_epoch()
-
-    # def seek_score_history(self, *score_names: str) -> typing.Dict[str, float]:
-    #     """ Returns the score values of the latest epoch """
-    #     return {score_name: self._history.get_latest_score(score_name)
-    #             for score_name in score_names}
-
-    # def get_score_history(
-    #     self, *score_names: str
-    # ) -> typing.Dict[str, typing.Iterable[float]]:
-    #     """ Returns the score values of all epochs """
-    #     if len(score_names) == 0:
-    #         score_names = self.get_score_names()
-    #     return {score_name: self._history.get_score_values(score_name)
-    #             for score_name in score_names}
-
-    # def reset_score_history(self) -> None:
-    #     """ Clears all score values in the epoch history """
-    #     self._history.reset_scores()

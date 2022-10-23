@@ -8,4 +8,4 @@ import torchutils.data.datasets
 import torchutils.data.transform
 
 from .dataset import Dataset
-
+from .np_dataset import NumpyDataset

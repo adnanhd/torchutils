@@ -102,7 +102,31 @@ class WandbLogger(TrainerLogger):
             # @TODO: add quiet=True
             if self.finish_on_close:
                 self._wandb.finish(exit_code=status.status_code)
-            self._wandb = None
+                self._wandb = None
         else:
             warnings.warn(f"{self.__class__.__name__} is already closed. "
                           f"@{pdb.traceback.extract_stack()}", RuntimeWarning)
+
+
+class ExtWandbLogger(WandbLogger):
+    __slots__ = ['_wandb']
+
+    def __init__(self, wandb: wandb.sdk.wandb_run.Run):
+        self._wandb = wandb
+        self.finish_on_close = False
+
+    @property
+    def experiment(self) -> str:
+        return self._wandb.name
+
+    @property
+    def project(self) -> str:
+        return self._wandb.project
+
+    @property
+    def username(self) -> str:
+        return self._wandb.entity
+
+    @property
+    def groupname(self) -> str:
+        return self._wandb.group

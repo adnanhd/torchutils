@@ -14,4 +14,5 @@ if importlib.util.find_spec('tqdm') is not None:
 
 if importlib.util.find_spec('wandb') is not None:
     from .wandb import WandbLogger as WandBLogger
+    from .wandb import ExtWandbLogger as ExtWandBLogger
 del importlib
