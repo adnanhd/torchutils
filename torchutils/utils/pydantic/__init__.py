@@ -3,8 +3,9 @@ from .types import (
     NpTorchType,
     DatasetType,
     DataLoaderType,
-    LossType,
-    FunctionType,
+    CriterionType,
+    ModuleType,
+    FunctionalType,
     OptimizerType,
     SchedulerType
 )

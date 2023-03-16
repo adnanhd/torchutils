@@ -1,4 +1,5 @@
 from hashlib import md5, sha256, blake2b
+from collections import OrderedDict
 
 
 class Hashable:
@@ -27,3 +28,24 @@ def digest_numpy(arr) -> str:
 
 def digest_torch(arr) -> str:
     return md5(arr.cpu().numpy().tobytes()).hexdigest()
+
+
+def old_digest(state_dict: OrderedDict) -> str:
+    def concat(arr):
+        result = 0
+        for a in arr:
+            result ^= a
+        return hex(result)[2:]
+
+    return concat(int(digest_torch(state_array), 16)
+                  for state_array in state_dict.values())
+
+
+def digest(state_dict: OrderedDict) -> str:
+    if state_dict is None:
+        return 'None'
+    else:
+        state_dict = state_dict['model']
+    return md5("#<@_@>#".join(
+        map(digest_torch, state_dict.values())
+    ).encode()).hexdigest()

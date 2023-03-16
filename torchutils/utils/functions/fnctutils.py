@@ -41,8 +41,9 @@ def overload(*arg_types, **kwarg_types):
                 func = named_func[determine_types(_args, _kwargs)]
             except KeyError:
                 func_types = [*_args, *tuple(f"{k}:{v}" for k, v in _kwargs)]
-                raise ArgumentError('No such overloading whose types to be of the form: ',
-                                    f'{func_name}({", ".join(map(str, func_types))})')
+                raise ArgumentError(
+                    'No such overloading whose types to be of the form: ',
+                    f'{func_name}({", ".join(map(str, func_types))})')
             else:
                 return func(*args, **kwargs)
         return call_function_by_signature

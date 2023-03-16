@@ -1,4 +1,3 @@
-
 class PrintOnce(object):
     def __init__(self):
         self._printed = False

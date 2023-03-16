@@ -1,16 +1,16 @@
 import torch
 import numpy as np
+
 from torch.functional import F
-import torch.optim as optim
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import _LRScheduler as Scheduler
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch.nn.modules.loss as criterion
-import torch.optim.lr_scheduler as sched
 
 
 string_to_optimizer_class = {
-    name: optimizer_class
-    for name, optimizer_class in vars(optim).items()
-    if hasattr(optimizer_class, 'mro')
-    and optim.Optimizer in optimizer_class.mro()
+    optimizer_class.__name__: optimizer_class
+    for optimizer_class in Optimizer.__subclasses__()
 }
 
 string_to_criterion_class = {
@@ -27,14 +27,20 @@ string_to_functionals = {
     if callable(loss_func)
 }
 
+# string_to_scheduler_class = {
+#     name: scheduler_class
+#     for name, scheduler_class in vars(sched).items()
+#     if hasattr(scheduler_class, 'mro')
+#     and Scheduler in scheduler_class.mro()
+#     and scheduler_class is not Scheduler
+#     or scheduler_class is sched.ReduceLROnPlateau
+# }
+
 string_to_scheduler_class = {
-    name: scheduler_class
-    for name, scheduler_class in vars(sched).items()
-    if hasattr(scheduler_class, 'mro')
-    and sched._LRScheduler in scheduler_class.mro()
-    and scheduler_class is not sched._LRScheduler
-    or scheduler_class is sched.ReduceLROnPlateau
+    scheduler.__name__: scheduler
+    for scheduler in Scheduler.__subclasses__()
 }
+
 
 # initialize default types
 string_to_types = {
@@ -57,30 +63,40 @@ string_to_types.update({
     if isinstance(tensorType, torch.dtype)
 })
 
-# TODO: remove
-_str2types = {
-    'string': str, 'str': str,
-    'integer': int, 'int': int,
-    'boolean': bool, 'bool': bool,
-    'float': float,
-    'torch.float16': torch.float16,
-    'torch.float32': torch.float32,
-    'torch.float64': torch.float64,
-    'torch.int8': torch.int8,
-    'torch.uint8': torch.uint8,
-    'torch.int16': torch.int16,
-    'torch.int32': torch.int32,
-    'torch.int64': torch.int64,
-    'np.float16': np.float16,
-    'np.float32': np.float32,
-    'np.float64': np.float64,
-    'np.float128': np.float128,
-    'np.int8':  np.int8,
-    'np.int16': np.int16,
-    'np.int32': np.int32,
-    'np.int64': np.int64,
-    'np.uint8':  np.uint8,
-    'np.uint16': np.uint16,
-    'np.uint32': np.uint32,
-    'np.uint64': np.uint64,
-}
+
+def reverse_dict(d: dict):
+    return {v: k for k, v in d.items()}
+
+
+# reverse types
+types_to_string = reverse_dict(string_to_types)
+functionals_to_string = reverse_dict(string_to_functionals)
+criterion_class_to_string = reverse_dict(string_to_criterion_class)
+optimizer_class_to_string = reverse_dict(string_to_optimizer_class)
+scheduler_class_to_string = reverse_dict(string_to_scheduler_class)
+
+# registary modules
+
+
+def _register_criterion(criterion):
+    global string_to_criterion_class
+    global criterion_class_to_string
+    string_to_criterion_class[criterion.__name__] = criterion
+    criterion_class_to_string[criterion] = criterion.__name__
+
+
+def _register_optimizer(optimizer: Optimizer):
+    global string_to_optimizer_class
+    global optimizer_class_to_string
+    string_to_optimizer_class[optimizer.__name__] = optimizer
+    optimizer_class_to_string[optimizer] = optimizer.__name__
+
+
+def _register_scheduler(scheduler: Scheduler):
+    global string_to_scheduler_class
+    global scheduler_class_to_string
+    string_to_scheduler_class[scheduler.__name__] = scheduler
+    scheduler_class_to_string[scheduler] = scheduler.__name__
+
+
+_register_scheduler(ReduceLROnPlateau)

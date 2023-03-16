@@ -1,4 +1,7 @@
-from .validators import validate_function
+from abc import ABC
+import typing
+
+from .validators import validate_criterion
 from .validators import validate_nn_scheduler
 from .validators import validate_nn_optimizer
 from .validators import validate_nn_module
@@ -8,12 +11,10 @@ from .validators import validate_torch_tensor
 from .validators import validate_np_array
 from .validators import validate_np_scalar
 
-from abc import ABC
-
 
 class NpScalarType(ABC):
     """
-    A generic array/tensor type that returns true for every 
+    A generic array/tensor type that returns true for every
     f. call isinstance() with any torch.tensor and np.ndarray
     """
     @classmethod
@@ -23,7 +24,7 @@ class NpScalarType(ABC):
 
 class NpTorchType(ABC):
     """
-    A generic array/tensor type that returns true for every 
+    A generic array/tensor type that returns true for every
     f. call isinstance() with any torch.tensor and np.ndarray
     """
     @classmethod
@@ -45,7 +46,7 @@ class NpTorchType(ABC):
 
 class GradTensorType(ABC):
     """
-    A generic array/tensor type that returns true for every 
+    A generic array/tensor type that returns true for every
     f. call isinstance() with any torch.tensor and np.ndarray
     """
     @classmethod
@@ -76,7 +77,7 @@ class DataLoaderType(ABC):
 
 class ModuleType(ABC):
     """
-    A generic array/tensor type that returns true for every 
+    A generic array/tensor type that returns true for every
     f. call isinstance() with any torch.tensor and np.ndarray
     """
     @classmethod
@@ -84,22 +85,20 @@ class ModuleType(ABC):
         yield validate_nn_module
 
 
-class LossType(ModuleType):
-    pass
-
-
-class FunctionType(ABC):
+class FunctionalType(ABC):
     @classmethod
     def __get_validators__(cls):
-        yield validate_function
+        yield validate_criterion
+
+
+CriterionType = typing.Union[ModuleType, FunctionalType]
 
 
 class OptimizerType(ABC):
     """
-    A generic array/tensor type that returns true for every 
+    A generic array/tensor type that returns true for every
     f. call isinstance() with any torch.tensor and np.ndarray
     """
-
     @classmethod
     def __get_validators__(cls):
         yield validate_nn_optimizer
@@ -107,7 +106,7 @@ class OptimizerType(ABC):
 
 class SchedulerType(ABC):
     """
-    A generic array/tensor type that returns true for every 
+    A generic array/tensor type that returns true for every
     f. call isinstance() with any torch.tensor and np.ndarray
     """
 

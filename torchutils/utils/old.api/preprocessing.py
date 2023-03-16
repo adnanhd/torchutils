@@ -3,6 +3,7 @@ from typing import Tuple
 import numpy as np
 import torch
 import warnings
+# preprocessing
 
 
 def _obtain_shape(dim, arr_shape):
@@ -60,13 +61,13 @@ def l1_norm_key(arr, dim, shape=-1):
 
 def to_key_tensor(key_shape, **kwargs):
     key, shape = key_shape
-    _to_tensor = lambda k: torch.from_numpy(k) if isinstance(k, np.ndarray) else torch.Tensor(k)
+    def _to_tensor(k): return torch.from_numpy(
+        k) if isinstance(k, np.ndarray) else torch.Tensor(k)
     if isinstance(key, tuple):
         key = tuple(_to_tensor(k).to(**kwargs) for k in key)
     else:
         key = _to_tensor(key).to(**kwargs)
     return key, shape
-
 
 
 def l1_norm(arr, dim=None) -> Tuple[int, int]:
