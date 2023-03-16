@@ -1,3 +1,4 @@
+import inspect
 import logging
 import pydantic
 import torch
@@ -10,6 +11,7 @@ from torch.nn import Module
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchutils.metrics import AverageScore, MetricHandler
+from torchutils.utils import digest
 from collections import OrderedDict
 from torchutils.utils.pydantic.types import (
     # NpScalarType,
@@ -18,7 +20,7 @@ from torchutils.utils.pydantic.types import (
     ModuleType,
     OptimizerType,
     SchedulerType,
-    FunctionType,
+    CriterionType,
     # DatasetType
 )
 from torchutils.utils import (
@@ -26,6 +28,7 @@ from torchutils.utils import (
     string_to_optimizer_class,
     string_to_scheduler_class,
     string_to_functionals,
+    criterion_class_to_string,
     obtain_registered_kwargs
 )
 
@@ -67,13 +70,18 @@ def init_avg_loss():
 
 class TrainerModel(pydantic.BaseModel):
     model: ModuleType
-    criterion: typing.Union[ModuleType, FunctionType]
+    criterion: CriterionType
     optimizer: OptimizerType
     scheduler: typing.Optional[SchedulerType]
+    arguments: typing.Dict = pydantic.Field(default_factory=dict)
     _loss: AverageScore = pydantic.PrivateAttr(default_factory=init_avg_loss)
-    _logger: logging.Logger = pydantic.PrivateAttr()
+    _logger: logging.Logger = pydantic.PrivateAttr(
+        default_factory=logging.getLogger)
     _backward_hooks: typing.List[GradTensorType] = pydantic.PrivateAttr(
         default_factory=list)
+
+    class Config:
+        validate_assignment = True
 
     @classmethod
     def __get_validators__(cls):
@@ -84,7 +92,7 @@ class TrainerModel(pydantic.BaseModel):
         if isinstance(value, TrainerModel):
             return value
         else:
-            raise ValueError(f'{value} is not a TrainerModel')
+            raise ValueError(f'{value} is not a {cls.__qualname__}')
 
     def __init__(
         self,
@@ -96,42 +104,85 @@ class TrainerModel(pydantic.BaseModel):
         scheduler: typing.Union[str, _LRScheduler, None] = None,
         ** kwargs,
     ):
-        if isinstance(criterion, str):
-            if criterion in string_to_criterion_class:
-                criterion_class = string_to_criterion_class[criterion]
-            elif criterion in string_to_functionals:
-                criterion_class = string_to_functionals[criterion]
-            else:
-                raise KeyError(
-                    f"{criterion} is not a registered function or Module"
-                )
-            criterion_params = obtain_registered_kwargs(
-                criterion_class, kwargs)
-            criterion = criterion_class(**criterion_params)
-
-        if isinstance(optimizer, str):
-            if optimizer in string_to_optimizer_class:
-                optimizer = string_to_optimizer_class[optimizer]
-                params = obtain_registered_kwargs(optimizer, kwargs)
-                optimizer = optimizer(model.parameters(), **params)
-            else:
-                raise KeyError(
-                    f"{optimizer} is not a registered Optimizer"
-                )
-
-        if isinstance(scheduler, str):
-            if scheduler in string_to_scheduler_class:
-                scheduler = string_to_scheduler_class[scheduler]
-                params = obtain_registered_kwargs(scheduler, kwargs)
-                scheduler = scheduler(optimizer, **params)
-            else:
-                raise KeyError(
-                    f"{scheduler} is not a registered Scheduler"
-                )
-
-        super().__init__(model=model, criterion=criterion, **kwargs,
-                         optimizer=optimizer, scheduler=scheduler)
+        super().__init__(model=model, arguments=kwargs,
+                         criterion=criterion, optimizer=optimizer,
+                         scheduler=scheduler)
         self._logger = logging.getLogger(model.__class__.__qualname__)
+
+    @classmethod
+    def _validate_criterion(
+        cls,
+        criterion: typing.Union[nn.Module,
+                                typing.Callable[[NpTorchType, NpTorchType],
+                                                NpTorchType]],
+        ** kwargs,
+    ):
+        if criterion in string_to_criterion_class.values():
+            criterion_params = obtain_registered_kwargs(criterion, kwargs)
+            criterion = criterion(**criterion_params)
+        return criterion
+
+    @classmethod
+    def _validate_optimizer(
+        cls,
+        model: nn.Module,
+        optimizer: Optimizer,
+        ** kwargs,
+    ):
+        if optimizer in string_to_optimizer_class.values():
+            params = obtain_registered_kwargs(optimizer, kwargs)
+            optimizer = optimizer(model.parameters(), **params)
+        return optimizer
+
+    @classmethod
+    def _validate_scheduler(
+        cls,
+        optimizer: Optimizer,
+        scheduler: typing.Optional[_LRScheduler] = None,
+        ** kwargs,
+    ):
+        if scheduler in string_to_scheduler_class.values():
+            params = obtain_registered_kwargs(scheduler, kwargs)
+            scheduler = scheduler(optimizer, **params)
+        return scheduler
+
+    @pydantic.root_validator
+    def compile_all_modules(cls, modules):
+        model = modules['model']
+        kwargs = modules['arguments']
+        criterion = modules['criterion']
+        optimizer = modules['optimizer']
+        scheduler = modules['scheduler']
+
+        if 'verbose' in kwargs and kwargs['verbose']:
+            print('compiling components...')
+
+        if inspect.isclass(criterion):
+            criterion = cls._validate_criterion(criterion, **kwargs)
+
+        if inspect.isclass(optimizer):
+            optimizer = cls._validate_optimizer(model, optimizer, **kwargs)
+        else:
+            try:
+                params = obtain_registered_kwargs(optimizer.__class__, kwargs)
+                optimizer.add_param_group(
+                    {'params': model.parameters(), **params})
+            except ValueError:
+                # model params are already in the model
+                pass  # i.e. model is not changed yet
+
+        if inspect.isclass(scheduler):
+            scheduler = cls._validate_scheduler(model, scheduler, **kwargs)
+        elif scheduler is not None:
+            scheduler.optimizer = optimizer
+
+        return dict(
+            model=model,
+            criterion=criterion,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            arguments=kwargs,
+        )
 
     def __setattr__(self, key, value):
         if key == 'device':
@@ -141,7 +192,9 @@ class TrainerModel(pydantic.BaseModel):
             self.model = self.model.to(dtype=value)
             return object.__setattr__(self.model, 'dtype', value)
         if key == 'learning_rate':
-            self.optimizer.param_groups[0]['lr'] = value
+            param_groups = self.optimizer.param_groups
+            for idx in range(param_groups.__len__()):
+                param_groups[idx]['lr'] = value
             return object.__setattr__(self.optimizer, 'lr', value)
         return super().__setattr__(key, value)
 
@@ -168,6 +221,23 @@ class TrainerModel(pydantic.BaseModel):
     @property
     def loss(self) -> float:
         return self._loss.average
+
+    def reset_parameters(self):
+        def fn(m: nn.Module):
+            if isinstance(m, nn.Module) and hasattr(m, 'reset_parameters'):
+                m.reset_parameters()
+
+        self.model.apply(fn)
+
+    def init_parameters(self, fn):
+        self.model.apply(fn)
+
+    def __hash__(self) -> int:
+        return int(digest(self.state_dict()), 16)
+
+    @property
+    def checksum(self) -> str:
+        return digest(self.state_dict())
 
     def __call__(self, input):
         return self.model(input)
@@ -214,7 +284,7 @@ class TrainerModel(pydantic.BaseModel):
         torchsummary.summary(
             self.model, input_size,
             batch_size=batch_size,
-            device=self.device)
+            device=self.device.type)
 
     def train(self) -> None:
         self.model.train()
@@ -245,6 +315,7 @@ class TrainerModel(pydantic.BaseModel):
                 "BackwardHook is not empty", RuntimeWarning
             )
             self._backward_hooks.clear()
+        self._loss.reset()
 
     def _push_for_backward(self, tensor: torch.Tensor) -> None:
         if hasattr(tensor, 'requires_grad') and tensor.requires_grad:
@@ -268,18 +339,3 @@ class TrainerModel(pydantic.BaseModel):
         while self._backward_hooks.__len__() != 0:
             self._backward_hooks.pop().backward()
         self.optimizer.step()
-
-    def compile(
-            self,
-            model: Module = None,
-            loss: typing.Union[Module, callable] = None,
-            optimizer: Optimizer = None,
-            scheduler: _LRScheduler = None):
-        if model is not None:
-            self.model = model
-        if loss is not None:
-            self.criterion = loss
-        if optimizer is not None:
-            self.optimizer = optimizer
-        if scheduler is not None:
-            self.scheduler = scheduler

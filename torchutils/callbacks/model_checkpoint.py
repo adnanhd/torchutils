@@ -5,7 +5,7 @@ import torch
 import logging
 import warnings
 from .base import TrainerCallback
-from ..utils.hash import digest_torch, md5
+from ..utils import digest_torch, digest
 from collections import OrderedDict
 from typing import List
 from ..models.utils import TrainerModel
@@ -14,27 +14,6 @@ from ..trainer.utils import (
     IterationStatus,
     IterationInterface
 )
-
-
-def old_digest(state_dict: OrderedDict) -> str:
-    def concat(arr):
-        result = 0
-        for a in arr:
-            result ^= a
-        return hex(result)[2:]
-
-    return concat(int(digest_torch(state_array), 16)
-                  for state_array in state_dict.values())
-
-
-def digest(state_dict: OrderedDict) -> str:
-    if state_dict is None:
-        return 'None'
-    else:
-        state_dict = state_dict['model']
-    return md5("#<@_@>#".join(
-        map(digest_torch, state_dict.values())
-    ).encode()).hexdigest()
 
 
 def profiler(fn):

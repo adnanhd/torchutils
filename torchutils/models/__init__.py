@@ -18,10 +18,13 @@ def SurfaceMLP(li=70, l1=128, l2=512, lo=1000):
 class Reshape(nn.Module):
     def __init__(self, *args):
         super(Reshape, self).__init__()
-        self.shape = args
+        self.shape = tuple(args)
 
     def forward(self, x):
         return x.view(x.shape[0], *self.shape)
+
+    def __repr__(self):
+        return self.__class__.__name__ + str((None,) + self.shape)
 
 
 __version__ = "1.0.0"

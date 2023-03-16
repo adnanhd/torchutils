@@ -1,24 +1,18 @@
 import os
-import math
-import copy
-import torch
-import numpy as np
-import pandas as pd
 
-from .utils import hybridmethod, Version
+from .utils import Version
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Union
-from .utils import _str2types, _types2str, config
+from typing import Optional, Union
 from ..utils import Config
 
 
 @dataclass
 class Builder(Config):
     _DATASET = None
-    """ A dataset preprocessor. 
-    @brief Converts a metadata to a dataset by downloading/preprocessing etc. data
-    
+    """ A dataset preprocessor.
+    @brief Converts a metadata to a dataset by downloading and
+    preprocessing etc. data
     """
     # Set later by the builder
     dataset_path: str = field(default=None)

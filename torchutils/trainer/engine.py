@@ -54,11 +54,11 @@ class Trainer:
         xtype: Union[torch.dtype, np.dtype, type] = torch.float32,
         ytype: Union[torch.dtype, np.dtype, type] = torch.float32,
     ):
-        assert isinstance(model, TrainerModel) or loss is not None
-        if not isinstance(model, TrainerModel):
-            # @TODO: add optimizer and scheduler and kwargs as
-            # arguments to pass it thrrough TrainerModel
-            model = TrainerModel(model=model, criterion=loss, optimizer='Adam')
+        #assert isinstance(model, TrainerModel) or loss is not None
+        #if not isinstance(model, TrainerModel):
+        #    # @TODO: add optimizer and scheduler and kwargs as
+        #    # arguments to pass it thrrough TrainerModel
+        #    model = TrainerModel(model=model, criterion=loss, optimizer='Adam')
 
         self._model: TrainerModel = model
         self._model.device = device
@@ -115,10 +115,7 @@ class Trainer:
         kwargs.setdefault('pin_memory', not torch.cuda.is_available())
         kwargs.setdefault('num_workers',
                           0 if torch.cuda.is_available() else os.cpu_count())
-        if not train_mode or batch_size is None:
-            kwargs['batch_size'] = dataset.__len__()
-        else:
-            kwargs['batch_size'] = batch_size
+        kwargs['batch_size'] = batch_size
 
         if isinstance(dataset, Dataset):
             return dataset.dataloader(**kwargs)
@@ -181,12 +178,12 @@ class Trainer:
 
         valid_dl = None
         if valid_dataset is not None:
+            valid_dataloader_kwargs.setdefault(
+                'batch_size', valid_dataset.__len__())
             valid_dl = self.create_dataloader(
                 dataset=valid_dataset,
                 train_mode=False,
-                **valid_dataloader_kwargs,
-                batch_size=hparams.setdefault('valid_dl_batch_size', -1)
-            )
+                **valid_dataloader_kwargs)
             hparams['valid_dl_batch_size'] = valid_dl.batch_size
 
         metrics.update(history)
@@ -224,10 +221,10 @@ class Trainer:
         history: typing.Set[str] = set(),
         **hparams
     ):
+        dataloader_kwargs.setdefault('batch_size', dataset.__len__())
         eval_dl = self.create_dataloader(
             dataset=dataset,
             train_mode=False,
-            batch_size=dataset.__len__(),
             **dataloader_kwargs,
         )
 
