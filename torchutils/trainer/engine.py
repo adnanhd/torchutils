@@ -74,42 +74,38 @@ class Trainer:
                     callback.on_training_step_begin()
                     begin_time = time.time()
                     output = self.model.forward_pass(batch_idx=index, batch=batch)
-                    ## finish computing train metrics ##
+                    # finish computing train metrics ##
                     timer.update(time.time() - begin_time)
                     logger.log(TRAIN_STEP, {"epoch": epoch, 'batch_index': index, **MetricHandler.score_values()})
                     callback.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
+                    del batch, output
                     self.model.backward_pass()
 
                 epoch_timer.update(time.time() - begin_epoch_time)
                 logger.log(TRAIN_EPOCH, MetricHandler.score_averages())
                 self.model.scheduler_step(epoch_idx=epoch)
                 callback.on_training_epoch_end()
-                ## reset computed step-metrics ##
+                # reset computed step-metrics ##
                 timer.reset()
 
                 with torch.no_grad():
                     callback.on_validation_run_begin()
-                    
                     for index, batch in enumerate(dataloader):
                         callback.on_training_step_begin()
                         begin_time = time.time()
                         output = self.model.forward_pass(batch_idx=index, batch=batch)
-                        ## finish computing valid metrics ##
+                        # finish computing valid metrics ##
                         timer.update(time.time() - begin_time)
                         logger.log(VALID_STEP, {"epoch": epoch, "batch_index": index, **MetricHandler.score_values()} )
                         callback.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
-                        
+                        del batch, output
                     logger.log(VALID_RUN, MetricHandler.score_averages())
                     self.model.reset_backward()
                     callback.on_validation_run_end()
-                    ## reset computed step-metrics ##
+                    # reset computed step-metrics ##
                     timer.reset()
-                
         except StopTraining:
             callback.on_stop_training_error()
         finally:
             callback.on_termination()
             epoch_timer.reset()
-
-        
-    
