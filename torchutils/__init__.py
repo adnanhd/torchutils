@@ -41,9 +41,9 @@
 # import torchutils.data
 import torchutils.models
 import torchutils.callbacks
-# import torchutils.trainer
+import torchutils.trainer
 # import torchutils.logging
 import torchutils.metrics
 import torchutils.utils
 
-__version__ = torchutils.utils.Version('1.6.0')
+__version__ = torchutils.utils.Version('2.0.0')
