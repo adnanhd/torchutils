@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name=cfg.get('metadata', 'name'),
+    name='torchutils',
     version='2.0.0',
     description=open('README.md').read(),
     author='adnanharundogan',
