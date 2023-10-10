@@ -10,7 +10,7 @@ __email__ = cfg.get('metadata', 'maintainer_email')
 __url__ = cfg.get('metadata', 'url')
 
 with open('README.md') as f:
-    long_description = f.readlines()
+    long_description = "\n".join(f.readlines())
 
 with open('requirements.txt') as f:
     required_packages = f.readlines()

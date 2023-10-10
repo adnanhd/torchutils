@@ -1,57 +1,46 @@
-import inspect
-from torchutils.utils import(
-    string_to_criterion_class,
-    string_to_optimizer_class,
-    string_to_scheduler_class,
-    string_to_functionals,
-    obtain_registered_kwargs,
-    optimizer_class_to_string,
-    scheduler_class_to_string
-)
+from abc import ABC
+import warnings
+
+
+def reverse_dict(d: dict) -> dict:
+    assert isinstance(d, dict)
+    if d.__len__() == 0: return dict()
+    return dict(map(lambda k, v: (v, k), *zip(*d.items())))
+
+
+class _BaseValidator(ABC):
+    TYPE = None
+    __typedict__ = None
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.class_validator
+    
+    @classmethod
+    def __get_component__(cls, name):
+        if name not in cls.__typedict__:
+            warnings.warn(f"{cls.__qualname__}: {name} not registered", Warning)
+            #raise KeyError()
+        return cls.__typedict__[name]
+    
+    @classmethod
+    def __set_component__(cls, type):
+        name = type.__name__
+        if name in cls.__typedict__:
+            warnings.warn(f"{cls.__qualname__}: {name} yet registered", Warning)
+            #raise KeyError(f"{cls.__qualname__}: {name} yet registered")
+        cls.__typedict__[name] = type
+
+    @classmethod
+    def isinstance(cls, obj):
+        return isinstance(obj, cls.TYPE)
+
+    @classmethod
+    def class_validator(cls, field_type, info):
+        raise NotImplementedError()
+
+"""
 from typing import Optional, Any, Callable
-import numpy as np
-from torch import Tensor
-from torch.utils.data.dataloader import DataLoader
-from torch.utils.data.dataset import Dataset
-from torch.nn import Module
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
-
-
-def validate_torch_dataloader(other: Any) -> DataLoader:
-    if isinstance(other, DataLoader):
-        return other
-    else:
-        raise ValueError()
-
-
-def validate_torch_dataset(other: Any) -> Dataset:
-    if isinstance(other, Dataset):
-        return other
-    else:
-        raise ValueError()
-
-
-def validate_np_scalar(dtype) -> np.generic:
-    if isinstance(dtype, np.generic):
-        return dtype
-    else:
-        raise ValueError()
-
-
-def validate_np_array(arr) -> np.ndarray:
-    if isinstance(arr, np.ndarray):
-        return arr
-    else:
-        raise ValueError()
-
-
-def validate_torch_tensor(arr) -> Tensor:
-    if isinstance(arr, Tensor):
-        return arr
-    else:
-        raise ValueError()
-
 
 def validate_nn_module(other: Any) -> Optional[Module]:
     if isinstance(other, Module):
@@ -101,3 +90,4 @@ def validate_nn_scheduler(other) -> Optional[_LRScheduler]:
         return string_to_scheduler_class[other]
     else:
         raise ValueError(f"{other} not registered Scheduler")
+"""

@@ -38,10 +38,12 @@
 # Copyright (c) 2020 Woolsey Workshop.  All rights reserved.
 # Imports
 
-import torchutils.data
+# import torchutils.data
 import torchutils.models
-import torchutils.trainer
-import torchutils.logging
+import torchutils.callbacks
+# import torchutils.trainer
+# import torchutils.logging
 import torchutils.metrics
+import torchutils.utils
 
-__version__ = torchutils.utils.Version('1.5.0')
+__version__ = torchutils.utils.Version('1.6.0')

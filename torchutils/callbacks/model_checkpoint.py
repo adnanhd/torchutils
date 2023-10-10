@@ -5,7 +5,9 @@ import torch
 import logging
 import warnings
 from .base import TrainerCallback
-from typing import Callable, List
+from ..utils import digest_torch, digest
+from collections import OrderedDict
+from typing import List
 from ..models.utils import TrainerModel
 from ..trainer.utils import (
     IterationArguments,
@@ -82,7 +84,6 @@ class ModelCheckpoint(TrainerCallback):
         self.delta: float = delta
         self.maximize: bool = maximize_score
         self.save_path: str = save_path
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.verbose: bool = verbose
         if verbose:
             logging.basicConfig(level=logging.DEBUG)
@@ -143,10 +144,12 @@ class ModelCheckpoint(TrainerCallback):
             checkpoint = {'state_dict': self._best_weights,
                           'scores': {self.monitor: self._best_score}}
             self.logger.info(
-                f'the model with state_dicts {checkpoint["state_dict"].keys()} '
-                f'and with scores {checkpoint["scores"]} is saved into {self.save_path}.'
+                f'the model {digest(checkpoint["state_dict"])} with '
+                f'scores {checkpoint["scores"]} is saved into {self.save_path}'
             )
             torch.save(checkpoint, self.save_path)
+        else:
+            self.logger.debug('the model is not saved.')
 
     @profiler
     def _load_from_filesystem(self):
@@ -171,8 +174,8 @@ class ModelCheckpoint(TrainerCallback):
                 if best_score is not None:
                     self._best_score = best_score
                 self.logger.info(
-                    f'the model with the models {checkpoint["state_dict"].keys()} '
-                    f'and with scores {checkpoint["scores"]} is loaded from {self.save_path}.'
+                    f'the model {digest(checkpoint["state_dict"])} with scores'
+                    f' {checkpoint["scores"]} is loaded from {self.save_path}.'
                 )
         else:
             warnings.warn(
@@ -185,16 +188,16 @@ class ModelCheckpoint(TrainerCallback):
         self._best_weights = self.model.state_dict()
         self.logger.info(
             f"A newer checkpoint with score {model_score} "
-            f"is obtained from the model {self._best_weights.keys()}."
+            f"is obtained from the model {digest(self._best_weights)}"
         )
 
     @profiler
     def _put_checkpoint_into_model(self):
-        self.model.load_state_dict(copy.deepcopy(self._best_weights))
         self.logger.info(
             f"the current checkpoint with score {self._best_score} "
-            f"is loaded into the model {self._best_weights.keys()}."
+            f"is loaded into the model {digest(self._best_weights)}."
         )
+        self.model.load_state_dict(copy.deepcopy(self._best_weights))
 
     @profiler
     def _reset_checkpoints(self):
@@ -205,9 +208,9 @@ class ModelCheckpoint(TrainerCallback):
         )
 
     @profiler
-    def on_initialization(self, args: IterationArguments):
+    def on_training_begin(self, hparams: IterationArguments):
         if self.model is None:
-            self.model = args.model
+            self.model = hparams.model
             self.logger.debug('self.model is set')
         self.logger.debug(
             f'init from checkpoint is {self.init_from_checkpoint}')
@@ -215,6 +218,7 @@ class ModelCheckpoint(TrainerCallback):
             f'{self.save_path} existence is {os.path.isfile(self.save_path)}')
         if self.init_from_checkpoint and os.path.isfile(self.save_path):
             self._load_from_filesystem()
+            self._put_checkpoint_into_model()
 
     def on_training_epoch_end(self, epoch: IterationInterface):
         metric_value = epoch.get_current_scores(self.monitor)[self.monitor]
@@ -233,11 +237,21 @@ class ModelCheckpoint(TrainerCallback):
                 self._save_into_filesystem()
             self._put_checkpoint_into_model()
 
-    def on_evaluation_begin(self, stat: IterationStatus):
-        self.logger.debug(
-            f'best weights absence is {self._best_weights is None}')
-        if self.eval_with_best_model and self._best_weights is not None:
+    def on_evaluation_run_begin(self, hparams: IterationArguments):
+        self.model = hparams.model
+        self.logger.info(
+            f'model weights are {digest(self.model.state_dict())}).'
+        )
+        if self.eval_with_best_model:
+            self._load_from_filesystem()
+        if self._best_weights is not None:
             self._put_checkpoint_into_model()
+            self.logger.info(
+                f'model weights are updated with {digest(self._best_weights)}.'
+            )
+        else:
+            self.logger.warn('there is no best weight to be '
+                             'loaded before evaluation.')
 
     @profiler
     def on_stop_training_error(self, stat: IterationStatus):
