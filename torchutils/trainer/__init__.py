@@ -1,2 +1,2 @@
 from .engine import Trainer
-from ..models.utils import TrainerModel
+from .logging import CSVHandler, WandbHandler, formatter

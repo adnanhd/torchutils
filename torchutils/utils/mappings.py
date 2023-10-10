@@ -53,7 +53,7 @@ string_to_types = {
 # Add numpy types
 string_to_types.update({
     f'np.{name}': NpType
-    for name, NpType in np.typeDict.items()
+    for name, NpType in np.sctypeDict.items()
 })
 
 # Add tensor types
