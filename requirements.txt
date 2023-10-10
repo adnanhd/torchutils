@@ -1,10 +1,5 @@
 torch>=1.7.0
 torchsummary
-torchmetrics
 torchvision
-sklearn
-pandas
-numpy
-pydantic
-tqdm
+pydantic==2.4.2
 wandb
