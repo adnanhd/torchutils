@@ -3,7 +3,6 @@ import logging
 from ..logging import LoggerInterface
 from ..trainer.utils import (
     TrainingArguments,
-    EvaluatingArguments,
     IterationInterface
 )
 
@@ -29,7 +28,7 @@ class ScoreLoggerCallback(TrainerCallback):
 
     def on_training_epoch_end(self, epoch: IterationInterface):
         self._handler.log_scores({
-            f'train_{score}': value for score,
+            f'train/{score}': value for score,
             value in epoch.get_current_scores(*self._score_names).items()
         })
 
@@ -37,6 +36,6 @@ class ScoreLoggerCallback(TrainerCallback):
         # self._log.event = LoggingEvent.VALIDATION_RUN
         # @TODO: run at validation run end
         self._handler.log_scores({
-            f'valid_{score}': value for score,
+            f'valid/{score}': value for score,
             value in epoch.get_current_scores(*self._score_names).items()
         })
