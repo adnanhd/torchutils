@@ -25,7 +25,7 @@ logging.addLevelName(EVAL_STEP, "EVAL_STEP")
 
 
 def scoreFilter(record):
-    return record.levelname in ("TRAIN_EPOCH", "TRAIN_STEP", "VALID_RUN", 
+    return record.levelname in ("TRAIN_EPOCH", "TRAIN_STEP", "VALID_RUN",
                                 "VALID_STEP", "EVAL_RUN", "EVAL_STEP")
 
 
@@ -78,9 +78,10 @@ class CSVHandler(logging.FileHandler):
 
 
 class WandbHandler(logging.Handler):
-    def __init__(self, project, entity, experiment_name):
+    def __init__(self, project, entity, experiment_name, **kwds):
         assert wandb_imported, "install wandb package"
-        self.wandb = wandb.init(project=project, entity=entity, name=experiment_name)
+        self.wandb = wandb.init(project=project, entity=entity,
+                                name=experiment_name, **kwds)
         super().__init__()
         self.addFilter(scoreFilter)
 
