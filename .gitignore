@@ -3,5 +3,7 @@ dist
 docs
 envs
 build
+torchutils/**/__pycache__
+torchutils/**/.vscode
 torchutils.egg-info
 torchutils.backup
