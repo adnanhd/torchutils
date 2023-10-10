@@ -7,7 +7,7 @@ import torch
 from collections import OrderedDict
 
 from torchutils.metrics import AverageScore
-from torchutils.utils import digest
+from .hashs import digest
 from .typing import (
     NeuralNet,
     Criterion,
