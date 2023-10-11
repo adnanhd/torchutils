@@ -6,6 +6,9 @@ class RegisterationWarning(Warning):
     pass
 
 
+warnings.filterwarnings('ignore', category=RegisterationWarning)
+
+
 def reverse_dict(d: dict) -> dict:
     assert isinstance(d, dict)
     if d.__len__() == 0:
@@ -36,7 +39,10 @@ class _BaseValidator(ABC):
 
     @classmethod
     def isinstance(cls, obj):
-        return isinstance(obj, cls.TYPE)
+        try:
+            return all(lambda validator: not validator(obj) is None, cls.__get_validators__())
+        except ValueError:
+            return False
 
     @classmethod
     def class_validator(cls, field_type, info):

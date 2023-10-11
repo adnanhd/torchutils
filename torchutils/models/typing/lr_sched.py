@@ -2,10 +2,15 @@ import typing
 import torch
 from .utils import _BaseValidator, reverse_dict, obtain_registered_kwargs
 
+try:
+    LRScheduler = torch.optim.lr_scheduler.LRScheduler
+except AttributeError:
+    LRScheduler = torch.optim.lr_scheduler._LRScheduler
+
+
 
 class Scheduler(_BaseValidator):
-    TYPE = typing.Union[torch.optim.lr_scheduler.LRScheduler,
-                        torch.optim.lr_scheduler.ReduceLROnPlateau]
+    TYPE = typing.Union[LRScheduler, torch.optim.lr_scheduler.ReduceLROnPlateau]
     __typedict__ = dict()
 
     @classmethod
@@ -20,6 +25,6 @@ class Scheduler(_BaseValidator):
         return field_type
     
 
-for scheduler in torch.optim.lr_scheduler.LRScheduler.__subclasses__():
+for scheduler in LRScheduler.__subclasses__():
     Scheduler.__set_component__(scheduler)
 Scheduler.__set_component__(torch.optim.lr_scheduler.ReduceLROnPlateau)
