@@ -26,7 +26,7 @@ class CSVHandler(logging.FileHandler):
 class WandbHandler(logging.Handler):
     def __init__(self, project, username, experiment_name, n=1, **kwds):
         assert wandb_imported, "install wandb package"
-        self.wandb = wandb.init(project=project, username=username,
+        self.wandb = wandb.init(project=project, entity=username,
                                 name=experiment_name, **kwds)
         super().__init__()
         self.addFilter(scoreFilter)
