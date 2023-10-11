@@ -42,7 +42,7 @@
 import torchutils.models
 import torchutils.callbacks
 import torchutils.trainer
-# import torchutils.logging
+import torchutils.logging
 import torchutils.metrics
 # import torchutils.utils
 
