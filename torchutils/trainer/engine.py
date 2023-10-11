@@ -54,7 +54,7 @@ class Trainer:
         try:
             callback.on_initialization()
             dataloader = self.train_dataset.dataloader(batch_size, cuda=self.model.device.type == 'cuda', train=True)
-            valid_dataloader = self.valid_dataset.dataloader(batch_size=-1, train=False) if not self.valid_dataset.dataset is None else None
+            valid_dataloader = self.valid_dataset.dataloader(batch_size=None, train=False) if not self.valid_dataset.dataset is None else None
 
             callback.on_training_begin()
 
