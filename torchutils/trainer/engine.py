@@ -5,24 +5,16 @@ import torch
 import logging
 import typing
 import warnings
-import numpy as np
-from typing import (
-    Iterable,
-    Mapping,
-    Optional,
-    Union,
-)
 
 from ..models import TrainerModel
 from ..datasets import TrainerDataset
 from ..metrics import AverageScore, MetricHandler
 from ..callbacks import CallbackHandler, StopTraining
-
-
-from .logging import (
+from ..logging import (
     TRAIN_EPOCH, VALID_RUN, EVAL_RUN,
     TRAIN_STEP, VALID_STEP, EVAL_STEP
 )
+
 
 class Trainer:
     __slots__ = [
@@ -36,7 +28,7 @@ class Trainer:
         self,
         model: TrainerModel,
         train_dataset: torch.utils.data.Dataset,
-        valid_dataset: Optional[torch.utils.data.Dataset] = None,
+        valid_dataset: typing.Optional[torch.utils.data.Dataset] = None,
     ):
         self.model: TrainerModel = model
         self.train_dataset: TrainerDataset = TrainerDataset(train_dataset)
@@ -52,60 +44,74 @@ class Trainer:
     ):
         callback = CallbackHandler([])
         logger = logging.getLogger(self.__class__.__name__)
-        logger.setLevel(15)
-        timer = AverageScore('Iteration Duration')
-        epoch_timer = AverageScore('Epoch Duration')
+        mhandler = MetricHandler()
+        timer = AverageScore('Duration', reset_on='epoch_end')
 
         for hdlr in handlers:
             logger.addHandler(hdlr)
-            hdlr.setLevel(15)
+            mhandler.logger.addHandler(hdlr)
 
         try:
             callback.on_initialization()
             dataloader = self.train_dataset.dataloader(batch_size, cuda=self.model.device.type == 'cuda', train=True)
-            
+            valid_dataloader = self.valid_dataset.dataloader(batch_size=-1, train=False) if not self.valid_dataset.dataset is None else None
+
             callback.on_training_begin()
 
             for epoch in range(num_epochs):
+                # Epoch preperation
                 callback.on_training_epoch_begin()
-                begin_epoch_time = time.time()
 
                 for index, batch in enumerate(dataloader):
+                    # Step preperation
                     callback.on_training_step_begin()
+
+                    # Step execution
                     begin_time = time.time()
                     output = self.model.forward_pass(batch_idx=index, batch=batch)
-                    # finish computing train metrics ##
-                    timer.update(time.time() - begin_time)
-                    logger.log(TRAIN_STEP, {"epoch": epoch, 'batch_index': index, **MetricHandler.score_values()})
-                    callback.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
-                    del batch, output
                     self.model.backward_pass()
+                    timer.update(time.time() - begin_time)
 
-                epoch_timer.update(time.time() - begin_epoch_time)
-                logger.log(TRAIN_EPOCH, MetricHandler.score_averages())
+                    # Step finishing
+                    # finish computing train metrics ##
+                    mhandler.log_values(TRAIN_STEP, epoch, index)
+                    callback.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
+                    mhandler.reset_on_step_end.trigger()
+                    del batch, output, begin_time
+
+                # Epoch finishing
                 self.model.scheduler_step(epoch_idx=epoch)
+                mhandler.log_averages(TRAIN_EPOCH, epoch, index)
                 callback.on_training_epoch_end()
-                # reset computed step-metrics ##
-                timer.reset()
+                mhandler.reset_on_epoch_end.trigger()
+
+                if valid_dataloader is None:
+                    continue
 
                 with torch.no_grad():
                     callback.on_validation_run_begin()
                     for index, batch in enumerate(dataloader):
+                        # Step Preperation
                         callback.on_training_step_begin()
+
+                        # Step execution
                         begin_time = time.time()
                         output = self.model.forward_pass(batch_idx=index, batch=batch)
-                        # finish computing valid metrics ##
+                        self.model.reset_backward()
                         timer.update(time.time() - begin_time)
-                        logger.log(VALID_STEP, {"epoch": epoch, "batch_index": index, **MetricHandler.score_values()} )
+
+                        # Step finishing
+                        # finish computing valid metrics ##
+                        mhandler.log_values(VALID_STEP, epoch, index)
                         callback.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
-                        del batch, output
-                    logger.log(VALID_RUN, MetricHandler.score_averages())
-                    self.model.reset_backward()
+                        mhandler.reset_on_step_end.trigger()
+                        del batch, output, begin_time
+
+                    # Epoch finishing
+                    mhandler.log_averages(VALID_RUN, epoch, index)
                     callback.on_validation_run_end()
-                    # reset computed step-metrics ##
-                    timer.reset()
+                    mhandler.reset_on_epoch_end.trigger()
         except StopTraining:
             callback.on_stop_training_error()
         finally:
             callback.on_termination()
-            epoch_timer.reset()
