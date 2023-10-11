@@ -12,8 +12,8 @@ class Functional(_BaseValidator):
 
     @classmethod
     def class_validator(cls, field_type, info):
-        if inspect.isfunction(loss_func) and keys.issubset(
-                set(inspect.signature(loss_func).parameters.keys())):
+        if inspect.isfunction(field_type) and \
+                keys.issubset(set(inspect.signature(field_type).parameters.keys())):
             return field_type
         raise ValueError(f"{field_type} is not a {cls.TYPE}")
 
