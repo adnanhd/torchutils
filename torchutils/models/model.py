@@ -51,7 +51,7 @@ class TrainerModel(pydantic.BaseModel):
                          criterion=criterion, optimizer=optimizer,
                          scheduler=scheduler)
         self._logger = logging.getLogger(model.__class__.__qualname__ + " Model")
-        self._loss = AverageScore(model.__class__.__name__ + " Model Loss")
+        self._loss = AverageScore(model.__class__.__name__ + " Model Loss", reset_on='epoch_end')
 
 
     def __getstate__(self) -> typing.Set[str]:
@@ -132,13 +132,11 @@ class TrainerModel(pydantic.BaseModel):
             self.scheduler.step(self._loss.average)
         else:
             self.scheduler.step()
-        self._loss.reset()
 
     def reset_backward(self):
         if self._backward_hooks.__len__() != 0:
             warnings.warn("BackwardHook is not empty", RuntimeWarning)
             self._backward_hooks.clear()
-        self._loss.reset()
 
     def _push_for_backward(self, tensor: GradTensor.TYPE) -> None:
         if GradTensor.isinstance(tensor):
