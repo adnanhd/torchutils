@@ -40,7 +40,8 @@ class _BaseValidator(ABC):
     @classmethod
     def isinstance(cls, obj):
         try:
-            return all(lambda validator: not validator(obj) is None, cls.__get_validators__())
+            return all(not validator(obj) is None
+                       for validator in cls.__get_validators__())
         except ValueError:
             return False
 

@@ -13,8 +13,9 @@ class Tensor(_BaseValidator):
     @classmethod
     def class_validator(cls, field_type):
         if isinstance(field_type, torch.Tensor) \
-            or isinstance(field_type, numpy.ndarray):
+                or isinstance(field_type, numpy.ndarray):
             return field_type
+
 
 class GradTensor(_BaseValidator):
     TYPE = torch.Tensor
@@ -23,11 +24,7 @@ class GradTensor(_BaseValidator):
     f. call isinstance() with any torch.tensor and np.ndarray
     """
     @classmethod
-    def isinstance(cls, obj):
-        return super().isinstance(obj) and obj.requires_grad
-    
-    @classmethod
     def class_validator(cls, field_type):
         if isinstance(field_type, torch.Tensor) \
-            and field_type.requires_grad:
+                and field_type.requires_grad:
             return field_type
