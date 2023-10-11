@@ -24,16 +24,21 @@ class Criterion(_BaseValidator):
 
     @classmethod
     def class_validator(cls, field_type, info):
-        if isinstance(field_type, str):
-            field_class = cls.__typedict__[field_type]
-            kwargs = info.data['arguments']
-            kwargs = obtain_registered_kwargs(field_class, kwargs)
-            field_type = field_class(**kwargs)
-        if isinstance(field_type, torch.nn.Module):
-            return field_type
         try:
             return Functional.class_validator(field_type, info)
         except ValueError:
+            if isinstance(field_type, str):
+                field_class = cls.__typedict__[field_type]
+                if inspect.isfunction(field_class):
+                    return field_class
+                elif inspect.isclass(field_class):
+                    kwargs = info.data['arguments']
+                    kwargs = obtain_registered_kwargs(field_class, kwargs)
+                    field_type = field_class(**kwargs)
+                else:
+                    raise ValueError(f"{field_type} is not a {cls.TYPE}")
+            if isinstance(field_type, torch.nn.Module):
+                return field_type
             raise ValueError(f"{field_type} is not a {cls.TYPE}")
 
 
