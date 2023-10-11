@@ -42,6 +42,7 @@ for loss_func in vars(torch.functional.F).values():
     if inspect.isfunction(loss_func) and \
             keys.issubset(set(inspect.signature(loss_func).parameters.keys())):
         Functional.__set_component__(loss_func)
+        Criterion.__set_component__(loss_func)
 
 
 for criterion_class in vars(torch.nn.modules.loss).values():
