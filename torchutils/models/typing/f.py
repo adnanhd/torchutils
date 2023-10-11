@@ -12,8 +12,8 @@ class Functional(_BaseValidator):
 
     @classmethod
     def class_validator(cls, field_type, info):
-        if inspect.isfunction(field_type) \
-                and len(inspect.signature(field_type).parameters) == 2:
+        if inspect.isfunction(loss_func) and keys.issubset(
+                set(inspect.signature(loss_func).parameters.keys())):
             return field_type
         raise ValueError(f"{field_type} is not a {cls.TYPE}")
 
@@ -42,6 +42,7 @@ for loss_func in vars(torch.functional.F).values():
     if inspect.isfunction(loss_func) and \
             keys.issubset(set(inspect.signature(loss_func).parameters.keys())):
         Functional.__set_component__(loss_func)
+        Criterion.__set_component__(loss_func)
 
 
 for criterion_class in vars(torch.nn.modules.loss).values():
