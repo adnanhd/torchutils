@@ -90,7 +90,7 @@ class Trainer:
 
                 with torch.no_grad():
                     callback.on_validation_run_begin()
-                    for index, batch in enumerate(dataloader):
+                    for index, batch in enumerate(valid_dataloader):
                         # Step Preperation
                         callback.on_training_step_begin()
 
