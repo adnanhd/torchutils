@@ -53,8 +53,12 @@ class Trainer:
 
         try:
             callback.on_initialization()
-            dataloader = self.train_dataset.dataloader(batch_size, cuda=self.model.device.type == 'cuda', train=True)
-            valid_dataloader = self.valid_dataset.dataloader(batch_size=None, train=False) if not self.valid_dataset.dataset is None else None
+            cuda = self.model.device.type == 'cuda'
+            dataloader = self.train_dataset.dataloader(batch_size, cuda=cuda, train=True)
+            valid_dataloader = None
+            if self.valid_dataset.dataset is not None:
+                valid_dataloader = self.valid_dataset.dataloader(cuda=cuda, train=False)
+            del cuda
 
             callback.on_training_begin()
 
