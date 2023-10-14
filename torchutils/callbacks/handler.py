@@ -39,6 +39,14 @@ class CallbackHandler:
         for cback in self.callbacks:
             cback.remove_handlers(handlers)
 
+    def attach_score_dict(self, score_dict: typing.Dict[str, float]):
+        for cback in self.callbacks:
+            cback.attach_score_dict(score_dict)
+
+    def detach_score_dict(self):
+        for cback in self.callbacks:
+            cback.detach_score_dict()
+
     def __iter__(self):
         return self.callbacks
 

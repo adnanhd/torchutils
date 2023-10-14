@@ -8,7 +8,6 @@ import warnings
 import logging
 from .callback import TrainerCallback
 from ..models.hashs import digest
-from ..metrics import MetricHandler
 from ..models import TrainerModel
 
 
@@ -133,11 +132,11 @@ class ModelCheckpoint(TrainerCallback):
         self.hparams = copy.deepcopy(config)
 
     def on_training_epoch_end(self):
-        self.history.append({'status': 'epoch_end', **MetricHandler.score_averages()})
+        self.history.append({'status': 'epoch_end', **self.scores})
 
     def on_validation_run_end(self):
-        self.history.append({'status': 'valid_end', **MetricHandler.score_averages()})
-        score = math.pow(-1, self.minimize) * MetricHandler.get_score_average(self.monitor)
+        self.history.append({'status': 'valid_end', **self.scores})
+        score = math.pow(-1, self.minimize) * self.scores[self.monitor]
 
         if score * self.delta < self.score:
             self.score = score

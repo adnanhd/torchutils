@@ -42,6 +42,14 @@ class TrainerCallback(abc.ABC):
         for hdlr in handlers:
             self.logger.removeHandler(hdlr)
 
+    @typing.final
+    def attach_score_dict(self, score_dict):
+        self.scores = score_dict
+
+    @typing.final
+    def detach_score_dict(self):
+        self.scores = dict()
+
     def on_initialization(self):
         """
         Event called at the end of trainer initialisation.

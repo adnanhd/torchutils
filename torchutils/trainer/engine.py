@@ -60,7 +60,7 @@ class Trainer:
         **hparams
     ):
         callback = CallbackHandler(callbacks=callbacks)
-        mhandler = MetricHandler(metrics=metrics)
+        mhandler = MetricHandler(metrics=metrics.union({'duration'}))
         timer = AverageScore('Duration', reset_on='epoch_end')
         hparams, trainloader, validloader = self._initialize_loaders(
                 batch_size=batch_size, hparams=hparams,
@@ -70,6 +70,7 @@ class Trainer:
         self.model.add_handlers(handlers)
         callback.add_handlers(handlers)
         mhandler.add_handlers(handlers)
+        callback.attach_score_dict(mhandler.score_dict())
 
         try:
             callback.on_initialization()
@@ -92,16 +93,18 @@ class Trainer:
 
                     # Step finishing
                     # finish computing train metrics ##
-                    mhandler.log_values(TRAIN_STEP, epoch, index)
+                    mhandler.save_values_to_score_dict()
+                    mhandler.log(TRAIN_STEP, epoch, index)
                     callback.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
-                    mhandler.reset_on_step_end.trigger()
+                    mhandler.reset_scores_on_step_end.trigger()
                     del batch, output, begin_time
 
                 # Epoch finishing
                 self.model.scheduler_step(epoch_idx=epoch)
-                mhandler.log_averages(TRAIN_EPOCH, epoch, index)
+                mhandler.save_averages_to_score_dict()
+                mhandler.log(TRAIN_EPOCH, epoch, index)
                 callback.on_training_epoch_end()
-                mhandler.reset_on_epoch_end.trigger()
+                mhandler.reset_scores_on_epoch_end.trigger()
 
                 if hparams['num_epochs_per_validation'] <= 0 \
                         or (epoch + 1) % hparams['num_epochs_per_validation']:
@@ -121,15 +124,17 @@ class Trainer:
 
                         # Step finishing
                         # finish computing valid metrics ##
-                        mhandler.log_values(VALID_STEP, epoch, index)
+                        mhandler.save_values_to_score_dict()
+                        mhandler.log(VALID_STEP, epoch, index)
                         callback.on_validation_step_end(batch_index=index, batch=batch, batch_output=output)
-                        mhandler.reset_on_step_end.trigger()
+                        mhandler.reset_scores_on_step_end.trigger()
                         del batch, output, begin_time
 
                     # Epoch finishing
-                    mhandler.log_averages(VALID_RUN, epoch, index)
+                    mhandler.save_averages_to_score_dict()
+                    mhandler.log(VALID_RUN, epoch, index)
                     callback.on_validation_run_end()
-                    mhandler.reset_on_epoch_end.trigger()
+                    mhandler.reset_scores_on_epoch_end.trigger()
             callback.on_training_end()
         except StopTrainingException:
             callback.on_stop_training_error()
@@ -137,5 +142,6 @@ class Trainer:
             callback.on_termination()
 
         self.model.remove_handlers(handlers)
-        callback.remove_callbacks(handlers)
+        callback.remove_handlers(handlers)
         mhandler.remove_handlers(handlers)
+        callback.detach_score_dict()

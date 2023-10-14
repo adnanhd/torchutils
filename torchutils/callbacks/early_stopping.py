@@ -2,7 +2,6 @@
 import logging
 import math
 from .callback import TrainerCallback, StopTrainingException
-from ..metrics import MetricHandler
 
 
 class EarlyStopping(TrainerCallback):
@@ -48,12 +47,11 @@ class EarlyStopping(TrainerCallback):
         self.score: float = -math.pow(-1, self.minimize) * math.inf
 
     def on_training_begin(self, hparams):
-        print(hparams)
         if hparams['num_epochs_per_validation'] == 0:
             self.logger.warn("EarlyStopping never called while training.")
 
     def on_validation_run_end(self):
-        score = math.pow(-1, self.minimize) * MetricHandler.get_score_average(self.monitor)
+        score = math.pow(-1, self.minimize) * self.scores[self.monitor]
 
         self.logger.debug(f"Best score: {self.score} Current score: {score}")
 

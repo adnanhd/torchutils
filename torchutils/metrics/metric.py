@@ -97,8 +97,8 @@ class MetricHandler:
     __scores__: typing.Dict[str, AverageScore] = dict()
     __functs__: typing.Dict[str, typing.Callable] = dict()
 
-    def __init__(self, metrics: typing.Tuple[str] = tuple()) -> None:
-        self.metrics = metrics
+    def __init__(self, metrics: typing.Set[str] = tuple()) -> None:
+        self.metrics = metrics.union({'batch_index', 'epoch'})
         self.scores = dict()
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(15)
@@ -108,7 +108,7 @@ class MetricHandler:
             self.logger.addHandler(hdlr)
 
     def remove_handlers(self, handlers: typing.List[logging.Handler] = list()):
-        for hdlr in self.handlers:
+        for hdlr in handlers:
             self.logger.removeHandler(hdlr)
 
     @classmethod
@@ -125,18 +125,19 @@ class MetricHandler:
     def log(self, level, epoch_index, batch_index):
         self.scores['epoch'] = epoch_index
         self.scores['batch_index'] = batch_index
-        self.logger.log(level, self.scores)
+        scores = map(self.scores.__getitem__, self.metrics)
+        self.logger.log(level, dict(zip(self.metrics, scores)))
 
     def score_dict(self):
         return self.scores
 
     def save_values_to_score_dict(self):
-        for name in self.metrics:
-            self.scores[name] = self.__scores__[name].value
+        for name, score in self.__scores__.items():
+            self.scores[name] = score.value
 
     def save_averages_to_score_dict(self):
-        for name in self.metrics:
-            self.scores[name] = self.__scores__[name].average
+        for name, score in self.__scores__.items():
+            self.scores[name] = score.average
 
     @callbackmethod
     def reset_scores_on_step_end(self): pass
