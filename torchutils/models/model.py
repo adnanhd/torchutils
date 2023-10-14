@@ -52,7 +52,10 @@ class TrainerModel(pydantic.BaseModel):
         if modelname is None:
             modelname = model.__class__.__qualname__
         self._logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
-        self._loss = AverageScore(modelname + " Loss", reset_on='epoch_end')
+        self._loss = AverageScore(self.criterion.__name__, reset_on='epoch_end')
+
+    def get_score_names(self) -> typing.Set[str]:
+        return {self._loss.name}
 
     def __getstate__(self) -> typing.Set[str]:
         if isinstance(self.criterion, torch.nn.Module):
