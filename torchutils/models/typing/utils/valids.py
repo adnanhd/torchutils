@@ -9,13 +9,6 @@ class RegisterationWarning(Warning):
 warnings.filterwarnings('ignore', category=RegisterationWarning)
 
 
-def reverse_dict(d: dict) -> dict:
-    assert isinstance(d, dict)
-    if d.__len__() == 0:
-        return dict()
-    return dict(map(lambda k, v: (v, k), *zip(*d.items())))
-
-
 class _BaseValidator(ABC):
     TYPE = None
     __typedict__ = None

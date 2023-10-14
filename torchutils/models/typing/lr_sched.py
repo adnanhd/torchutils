@@ -1,12 +1,11 @@
 import typing
 import torch
-from .utils import _BaseValidator, reverse_dict, obtain_registered_kwargs
+from .utils import _BaseValidator, obtain_registered_kwargs
 
 try:
     LRScheduler = torch.optim.lr_scheduler.LRScheduler
 except AttributeError:
     LRScheduler = torch.optim.lr_scheduler._LRScheduler
-
 
 
 class Scheduler(_BaseValidator):
@@ -23,7 +22,7 @@ class Scheduler(_BaseValidator):
         if not isinstance(field_type, cls.TYPE):
             raise ValueError(f"{field_type} is not a {cls.TYPE}")
         return field_type
-    
+
 
 for scheduler in LRScheduler.__subclasses__():
     Scheduler.__set_component__(scheduler)
