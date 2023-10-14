@@ -1,16 +1,24 @@
 # Copyright © 2021 Chris Hughes
 import abc
 import logging
+import typing
 
 
-class StopTraining(Exception):
+def profiler(fn):
+    def wrapped_fn(self, *args, **kwargs):
+        self.logger.debug(f'{fn.__name__} is called')
+        return fn(self, *args, **kwargs)
+    return wrapped_fn
+
+
+class StopTrainingException(Exception):
     """
     An exception which can be raised in order to stop a training run early.
     """
     pass
 
 
-class CallbackMethodNotImplementedError(Exception):
+class CallbackMethodNotImplemented(Exception):
     pass
 
 
@@ -19,125 +27,136 @@ class TrainerCallback(abc.ABC):
     The abstract base class to be subclassed when creating new callbacks.
     """
 
-    @property
-    def logger(self) -> logging.Logger:
-        return logging.getLogger(self.__class__.__name__)
-    
-    @property
-    def status(self) -> None:
-        return None
-    
+    def __init__(self, verbose=True):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.addFilter(lambda _: verbose)
+        self.scores = dict()
+
+    @typing.final
+    def add_handlers(self, handlers):
+        for hdlr in handlers:
+            self.logger.addHandler(hdlr)
+
+    @typing.final
+    def remove_handlers(self, handlers):
+        for hdlr in handlers:
+            self.logger.removeHandler(hdlr)
+
     def on_initialization(self):
         """
         Event called at the end of trainer initialisation.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_training_begin(self, kwargs):
         """
         Event called at the start of training run.
-        :param num_epochs total number of epochs at the most 
-        :param batch_size the number of samples in a training batch 
+        :param num_epochs total number of epochs at the most
+        :param batch_size the number of samples in a training batch
         :param step_size the number of batches
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_training_epoch_begin(self):
         """
         Event called at the beginning of a training epoch.
         :param epoch
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_training_step_begin(self):
         """
         Event called at the beginning of a training step.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_training_step_end(self, batch_index, batch, batch_output):
         """
         Event called at the end of a training step.
         :param batch: the current batch of training data
-        :param batch_output: the outputs returned by :meth:`pytorch_accelerated.trainer.Trainer.calculate_train_batch_loss`
+        :param batch_output: the outputs returned by :meth:
+            `models.TrainerModel.forward_pass`
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_training_epoch_end(self):
         """
         Event called at the end of a training epoch.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_training_end(self):
         """
         Event called at the end of training run.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_validation_run_begin(self):
         """
         Event called at the beginning of an evaluation epoch.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_validation_step_begin(self):
         """
         Event called at the beginning of a evaluation step.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_validation_step_end(self, batch_index, batch, batch_output):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data
-        :param batch_output: the outputs returned by :meth:`pytorch_accelerated.trainer.Trainer.calculate_eval_batch_loss`
+        :param batch_output: the outputs returned by :meth:
+            `models.TrainerModel.forward_pass`
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_validation_run_end(self):
         """
         Event called at the start of an evaluation run.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_training_valid_end(self):
         """
-        Event called during a training run after both training and evaluation epochs have been completed.
+        Event called during a training run after
+        both training and evaluation epochs have been completed.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_evaluation_run_begin(self, kwargs):
         """
         Event called at the start of an evaluation run.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_evaluation_step_begin(self):
         """
         Event called at the beginning of a evaluation step.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_evaluation_step_end(self, batch_index, batch, batch_output):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data
-        :param batch_output: the outputs returned by :meth:`pytorch_accelerated.trainer.Trainer.calculate_eval_batch_loss`
+        :param batch_output: the outputs returned by :meth:
+            `models.TrainerModel.forward_pass`
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_evaluation_run_end(self):
         """
         Event called at the end of an evaluation run.
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_stop_training_error(self):
         """
         Event called when a stop training error is raised
         """
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented
 
     def on_termination(self):
-        raise CallbackMethodNotImplementedError
+        raise CallbackMethodNotImplemented

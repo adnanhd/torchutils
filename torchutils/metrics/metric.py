@@ -1,7 +1,5 @@
-import abc
 import typing
 import logging
-import warnings
 import numpy as np
 
 
@@ -21,14 +19,22 @@ class AverageScore:
     """Computes and stores the average and current value"""
     __slots__ = ['_name', '_sum', '_count', '_value', '_fmtstr']
 
-    def __init__(self, name: str, fmt: str = ":.4e", reset_on=None, by=1):
+    def __init__(self, name: str, fmt: str = ":.4e", reset_on=None):
         assert isinstance(name, str), """name must be a string"""
         self._name = to_capital(name)
         self.set_format(fmt)
         self._value = np.nan
         self._sum = 0
         self._count = 0
-        MetricHandler.register(self, reset_trigger=reset_on, n=by)
+        assert reset_on in ('epoch_end', None)
+        MetricHandler.register(self, reset_trigger=reset_on, n=1)
+
+    def set_format(self, fmt):
+        self._fmtstr = f"{self._name}" + "={average" + fmt + "}"
+
+    @property
+    def format(self):
+        return self._fmtstr
 
     @property
     def name(self) -> str:
@@ -45,9 +51,6 @@ class AverageScore:
     @property
     def value(self) -> float:
         return self._value
-
-    def set_format(self, fmt):
-        self._fmtstr = f"{self._name}" + "={average" + fmt + "}"
 
     def reset(self) -> None:
         self._value = np.nan
@@ -92,12 +95,21 @@ class MetricHandler:
     # neden class? registry icin
     # neden instance? sadece bi subseti hesaplamak icin
     __scores__: typing.Dict[str, AverageScore] = dict()
-    __counts__: typing.Dict[str, int] = dict()
+    __functs__: typing.Dict[str, typing.Callable] = dict()
 
-    def __init__(self, metrics=None) -> None:
+    def __init__(self, metrics: typing.Tuple[str] = tuple()) -> None:
         self.metrics = metrics
+        self.scores = dict()
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(15)
+
+    def add_handlers(self, handlers: typing.List[logging.Handler] = list()):
+        for hdlr in handlers:
+            self.logger.addHandler(hdlr)
+
+    def remove_handlers(self, handlers: typing.List[logging.Handler] = list()):
+        for hdlr in self.handlers:
+            self.logger.removeHandler(hdlr)
 
     @classmethod
     def register(cls, score, reset_trigger=None, n=1):
@@ -106,36 +118,28 @@ class MetricHandler:
         cls.__scores__[score.name] = score
 
         if reset_trigger == 'step_end':
-            cls.reset_on_step_end(score, n=n)
-        if reset_trigger == 'epoch_end':
-            cls.reset_on_epoch_end(score, n=n)
+            cls.reset_scores_on_step_end(score, n=n)
+        elif reset_trigger == 'epoch_end':
+            cls.reset_scores_on_epoch_end(score, n=n)
 
-    def log_values(self, level, epoch_index, batch_index):
-        score_values = self.score_values()
-        score_values['epoch'] = epoch_index
-        score_values['batch_index'] = batch_index
-        self.logger.log(level, score_values)
+    def log(self, level, epoch_index, batch_index):
+        self.scores['epoch'] = epoch_index
+        self.scores['batch_index'] = batch_index
+        self.logger.log(level, self.scores)
 
-    def log_averages(self, level, epoch_index, batch_index):
-        score_values = self.score_averages()
-        score_values['epoch'] = epoch_index
-        score_values['batch_index'] = batch_index
-        self.logger.log(level, score_values)
+    def score_dict(self):
+        return self.scores
 
-    @classmethod
-    def get_score(self, score_name) -> float:
-        return self.__scores__[score_name]
+    def save_values_to_score_dict(self):
+        for name in self.metrics:
+            self.scores[name] = self.__scores__[name].value
 
-    @classmethod
-    def score_values(self) -> typing.Dict[str, float]:
-        return {name: score._value for name, score in self.__scores__.items()}
-
-    @classmethod
-    def score_averages(self) -> typing.Dict[str, float]:
-        return {name: score.average for name, score in self.__scores__.items()}
+    def save_averages_to_score_dict(self):
+        for name in self.metrics:
+            self.scores[name] = self.__scores__[name].average
 
     @callbackmethod
-    def reset_on_step_end(self): pass
+    def reset_scores_on_step_end(self): pass
 
     @callbackmethod
-    def reset_on_epoch_end(self): pass
+    def reset_scores_on_epoch_end(self): pass

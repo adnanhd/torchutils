@@ -1,8 +1,6 @@
-import inspect
 import logging
 import pydantic
 import typing
-import warnings
 import torch
 from collections import OrderedDict
 
@@ -44,21 +42,31 @@ class TrainerModel(pydantic.BaseModel):
         model: NeuralNet.TYPE,
         criterion: Criterion.TYPE,
         optimizer: Optimizer.TYPE,
+        modelname: str = None,
         scheduler: typing.Optional[Scheduler.TYPE] = None,
         ** kwargs,
     ):
         super().__init__(model=model, arguments=kwargs,
                          criterion=criterion, optimizer=optimizer,
                          scheduler=scheduler)
-        self._logger = logging.getLogger(model.__class__.__qualname__ + " Model")
-        self._loss = AverageScore(model.__class__.__name__ + " Model Loss", reset_on='epoch_end')
-
+        if modelname is None:
+            modelname = model.__class__.__qualname__
+        self._logger = logging.getLogger(modelname + " Model")
+        self._loss = AverageScore(modelname + " Loss", reset_on='epoch_end')
 
     def __getstate__(self) -> typing.Set[str]:
         if isinstance(self.criterion, torch.nn.Module):
             return {'model', 'optimizer', 'scheduler', 'criterion'}
         else:
             return {'model', 'optimizer', 'scheduler'}
+
+    def add_handlers(self, handlers=list()):
+        for hdlr in handlers:
+            self._logger.addHandler(hdlr)
+
+    def remove_handlers(self, handlers=list()):
+        for hdlr in handlers:
+            self._logger.removeHandler(hdlr)
 
     def state_dict(self):
         state = OrderedDict()
@@ -69,8 +77,8 @@ class TrainerModel(pydantic.BaseModel):
             elif hasattr(module, 'state_dict'):
                 state[key] = module.state_dict()
             else:
-                warnings.warn(
-                    f"{key} has no state_dict() attribute.", RuntimeWarning
+                self._logger.warn(
+                    f"{key} has no state_dict() attribute."
                 )
         return state
 
@@ -91,16 +99,16 @@ class TrainerModel(pydantic.BaseModel):
         for key in self.__getstate__():
             module = getattr(self, key)
             if module is None or key not in state_dict:
-                warnings.warn(
+                self._logger.warn(
                     f"{key} either absent in the state_dict or None."
                 )
             elif hasattr(module, 'load_state_dict'):
                 module.load_state_dict(state_dict[key])
             else:
-                warnings.warn(
+                self._logger.warn(
                     f"{key} exits in the state_dict but that "
                     f"of {self.__qualname__} has no load_state_dict()"
-                    "attribute.", RuntimeWarning
+                    "attribute."
                 )
 
     def train(self) -> None:
@@ -121,9 +129,8 @@ class TrainerModel(pydantic.BaseModel):
                 batch_size=batch_size,
                 device=self.device.type)
         except ImportError:
-            warnings.warn("torchsummary not installed", RuntimeWarning)
+            self._logger.warn("torchsummary not installed")
             print("torchsummary not installed")
-
 
     def scheduler_step(self, epoch_idx=None):
         if self.scheduler is None:
@@ -135,14 +142,14 @@ class TrainerModel(pydantic.BaseModel):
 
     def reset_backward(self):
         if self._backward_hooks.__len__() != 0:
-            warnings.warn("BackwardHook is not empty", RuntimeWarning)
+            self._logger.warn("BackwardHook is not empty")
             self._backward_hooks.clear()
 
     def _push_for_backward(self, tensor: GradTensor.TYPE) -> None:
         if GradTensor.isinstance(tensor):
             self._backward_hooks.append(tensor)
         else:
-            warnings.warn("Tensor is not a GradTensor", RuntimeWarning)
+            self._logger.debug("Tensor is not a GradTensor")
 
     def forward_pass(self, batch, batch_idx=None):
         x, y = batch
@@ -155,10 +162,9 @@ class TrainerModel(pydantic.BaseModel):
     def backward_pass(self):
         self.optimizer.zero_grad()
         if self._backward_hooks.__len__() == 0:
-            warnings.warn(
+            self._logger.warn(
                 "TrainerModel.backward_pass receives no loss to backward"
-                "check requires_grad attribute of input and output pairs",
-                RuntimeWarning
+                "check requires_grad attribute of input and output pairs"
             )
         while self._backward_hooks.__len__() != 0:
             self._backward_hooks.pop().backward()
