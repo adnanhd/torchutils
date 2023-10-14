@@ -27,9 +27,9 @@ class TrainerCallback(abc.ABC):
     The abstract base class to be subclassed when creating new callbacks.
     """
 
-    def __init__(self, verbose=True):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.addFilter(lambda _: verbose)
+    def __init__(self, level=logging.INFO, verbose=True):
+        self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        self.logger.setLevel(level if verbose else logging.FATAL)
         self.scores = dict()
 
     @typing.final

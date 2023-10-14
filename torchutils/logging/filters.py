@@ -21,7 +21,7 @@ class scoreTrainStepFilter(logging.Filter):
         self.counter = 0
 
     def filter(self, record):
-        if record.levelname != 'TRAIN_STEP':
-            return False
-        self.counter = (self.counter + 1) % self.n
-        return self.counter == 0
+        if record.levelname == 'TRAIN_STEP':
+            self.counter = (self.counter + 1) % self.n
+            return self.counter == 0
+        return True

@@ -35,7 +35,7 @@ class EarlyStopping(TrainerCallback):
                             the monitored quantity
                             Default: False
         """
-        super().__init__(verbose=verbose)
+        super().__init__(level=logging.DEBUG if verbose else logging.INFO)
         assert goal in ('minimize', 'maximize')
 
         self.monitor: str = monitor
@@ -63,6 +63,5 @@ class EarlyStopping(TrainerCallback):
             self.counter += 1
             self.logger.debug(f"Plateau: {self.counter} out of {self.patience}")
         else:
-            print("EARLY STOPP")
             self.logger.info("Early Stopping...")
             raise StopTrainingException

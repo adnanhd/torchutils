@@ -51,7 +51,7 @@ class TrainerModel(pydantic.BaseModel):
                          scheduler=scheduler)
         if modelname is None:
             modelname = model.__class__.__qualname__
-        self._logger = logging.getLogger(modelname + " Model")
+        self._logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
         self._loss = AverageScore(modelname + " Loss", reset_on='epoch_end')
 
     def __getstate__(self) -> typing.Set[str]:

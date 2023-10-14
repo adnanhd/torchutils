@@ -100,7 +100,7 @@ class MetricHandler:
     def __init__(self, metrics: typing.Set[str] = tuple()) -> None:
         self.metrics = metrics.union({'batch_index', 'epoch'})
         self.scores = dict()
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
         self.logger.setLevel(15)
 
     def add_handlers(self, handlers: typing.List[logging.Handler] = list()):

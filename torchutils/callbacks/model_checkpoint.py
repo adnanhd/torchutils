@@ -52,19 +52,18 @@ class ModelCheckpoint(TrainerCallback):
     """
 
     def __init__(self,
-                 monitor: str = 'loss',
-                 minimize: bool = True,
-                 patience: int = 0,
+                 model: TrainerModel,
+                 monitor: str,
+                 goal: str = 'minimize',
+                 # patience: int = 0,
                  delta: float = 0.0,
                  verbose: bool = True,
-                 model: TrainerModel = None,
                  filepath='model_checkpoint.ckpt',
                  init_from_checkpoint: bool = False,
                  halt_into_checkpoint: bool = False,
-                 save_only_best_model: bool = True,
-                 eval_with_best_model: bool = False,
                  ):
         assert filepath.endswith('.ckpt')
+        assert goal in ('minimize', 'maximize')
         super().__init__(verbose=verbose)
         # filesystemdaki weights
         # callabackteki checkpoint
@@ -74,9 +73,9 @@ class ModelCheckpoint(TrainerCallback):
         self.model: TrainerModel = model
         self.state_dict = model.state_dict()
         self.delta: float = 1 + delta
-        self.minimize: bool = minimize
+        self.minimize: bool = goal == 'minimize'
         self.checkpoint_path: str = filepath
-        self.score: float = math.pow(-1, minimize) * math.inf
+        self.score: float = math.pow(-1, goal == 'minimize') * math.inf
 
         # values to be stored
         self.history = list()
@@ -84,8 +83,6 @@ class ModelCheckpoint(TrainerCallback):
 
         self.init_from_checkpoint: bool = init_from_checkpoint
         self.halt_into_checkpoint: bool = halt_into_checkpoint
-        self.save_only_best_model: bool = save_only_best_model
-        self.eval_with_best_model: bool = eval_with_best_model
 
     @property
     def current_run(self):
@@ -114,8 +111,8 @@ class ModelCheckpoint(TrainerCallback):
             else:
                 raise FileNotFoundError(f'ckptpath {self.checkpoint_path}')
 
-    def on_training_end(self):
-        if self.halt_into_checkpoint():
+    def on_termination(self):
+        if self.train and self.halt_into_checkpoint:
             if os.path.isfile(self.checkpoint_path):
                 run = torch.load(self.checkpoint_path)['runs'][0]
                 score = run['scores'][self.montior][0]
@@ -125,11 +122,16 @@ class ModelCheckpoint(TrainerCallback):
 
             if is_better:
                 self._statedict_to_ckptfile()
+                self.logger.info(f"model saved into {self.checkpoint_path}")
             else:
                 self.logger.info("No better model saved into checkpoint")
 
     def on_training_begin(self, config: typing.Dict):
         self.hparams = copy.deepcopy(config)
+        self.train = True
+
+    def on_evaluation_run_begin(self, config: typing.Dict):
+        self.train = False
 
     def on_training_epoch_end(self):
         self.history.append({'status': 'epoch_end', **self.scores})
