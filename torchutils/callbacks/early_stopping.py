@@ -15,7 +15,7 @@ class EarlyStopping(TrainerCallback):
                  goal: str = 'minimize',
                  patience: int = 7,
                  delta: float = 0.0,
-                 verbose: bool = True,
+                 verbose: bool = False,
                  ):
         """
         Args:

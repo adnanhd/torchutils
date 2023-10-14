@@ -57,14 +57,14 @@ class ModelCheckpoint(TrainerCallback):
                  goal: str = 'minimize',
                  # patience: int = 0,
                  delta: float = 0.0,
-                 verbose: bool = True,
+                 verbose: bool = False,
                  filepath='model_checkpoint.ckpt',
                  init_from_checkpoint: bool = False,
                  halt_into_checkpoint: bool = False,
                  ):
         assert filepath.endswith('.ckpt')
         assert goal in ('minimize', 'maximize')
-        super().__init__(verbose=verbose)
+        super().__init__(level=logging.DEBUG if verbose else logging.INFO)
         # filesystemdaki weights
         # callabackteki checkpoint
         # modeldeki state_dict
