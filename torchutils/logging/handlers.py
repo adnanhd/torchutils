@@ -32,12 +32,17 @@ class WandbHandler(logging.Handler):
         self.addFilter(scoreFilter)
 
     def emit(self, record):
-        if scoreFilterRun(record):
-            metrics = {k + '/run': v for k, v in record.msg.items()}
+        if record.levelname == 'VALID_STEP':
+            metrics = {k + '/valid_step': v for k, v in record.msg.items()}
+        elif record.levelname == 'VALID_RUN':
+            metrics = {k + '/valid_run': v for k, v in record.msg.items()}
+        elif record.levelname == 'TRAIN_STEP':
+            metrics = {k + '/train_step': v for k, v in record.msg.items()}
+        elif record.levelname == 'TRAIN_EPOCH':
+            metrics = {k + '/train_epoch': v for k, v in record.msg.items()}
         else:
-            metrics = {k + '/step': v for k, v in record.msg.items()}
+            metrics = record.msg
         self.wandb.log(metrics)
 
     def close(self):
         self.wandb.finish()
-    pass
