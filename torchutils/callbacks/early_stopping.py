@@ -1,8 +1,7 @@
 # Copyright © 2022 Adnan Harun Dogan
-import numpy as np
-import typing
-from .base import TrainerCallback, StopTrainingError
-from torchutils.trainer.utils import IterationInterface
+import logging
+import math
+from .callback import TrainerCallback, StopTrainingException
 
 
 class EarlyStopping(TrainerCallback):
@@ -12,64 +11,57 @@ class EarlyStopping(TrainerCallback):
     """
 
     def __init__(self,
-                 monitor: str = 'val_loss',
+                 monitor: str,
+                 goal: str = 'minimize',
                  patience: int = 7,
-                 verbose: bool = False,
                  delta: float = 0.0,
-                 trace_func: typing.Callable[[str], None] = print,
+                 verbose: bool = False,
                  ):
         """
         Args:
-            patience (int): How long to wait after last time validation loss
-                            improved.
+            monitor (str): The metric or quantity to be monitored.
+                            Default: val_loss
+            maximize (bool): How improving the monitored qunatity defined.
+                            If true, the maximum is better, otherwise,
+                            vice versa.
+                            Default: True
+            patience (int): How long to wait after last time the monitored
+                            quantity has improved.
                             Default: 7
-            verbose (bool): If True, prints a message for each validation loss
-                            improvement.
-                            Default: False
             delta (float): Minimum change in the monitored quantity to qualify
                            as an improvement.
                             Default: 0
-            trace_func (function): trace print function.
-                            Default: print
+            verbose (bool): If True, prints a message for each improvement in
+                            the monitored quantity
+                            Default: False
         """
-        super().__init__()
-        self.monitor = monitor
-        self.patience = patience
-        self.verbose = verbose
-        self.counter = 0
-        self.best_score = None
-        self.early_stop = False
-        self.val_loss = np.Inf
-        self.delta = delta
-        self.trace_func: typing.Callable[
-            [str], None
-        ] = self.logger.info if trace_func is None else trace_func
-        self._check_flag_ = None
+        super().__init__(level=logging.DEBUG if verbose else logging.INFO)
+        assert goal in ('minimize', 'maximize')
+
+        self.monitor: str = monitor
+        self.patience: int = patience
+        self.delta: float = 1 + delta
+        self.minimize: bool = goal == 'minimize'
+
+        self.counter: int = 0
+        self.score: float = -math.pow(-1, self.minimize) * math.inf
 
     def on_training_begin(self, hparams):
-        self._check_flag_ = True
+        if hparams['num_epochs_per_validation'] == 0:
+            self.logger.warn("EarlyStopping never called while training.")
 
-    def on_training_end(self, stat):
-        if self._check_flag_:
-            self.logger.warn(f'{self.__class__.__name__}.on_validation_run_end'
-                             'method never called while training.')
+    def on_validation_run_end(self):
+        score = math.pow(-1, self.minimize) * self.scores[self.monitor]
 
-    def on_validation_run_end(self, epoch: IterationInterface):
-        score = - epoch.get_current_scores(self.monitor)[self.monitor]
-        self._check_flag_ = False
+        self.logger.debug(f"Best score: {self.score} Current score: {score}")
 
-        if self.best_score is None:
-            self.best_score = score
-        elif score < self.best_score * (1 - self.delta):
-            self.counter += 1
-            if self.verbose:
-                self.trace_func(
-                    f"Stopping counter: {self.counter} out of {self.patience}")
-                self.trace_func(
-                    f"Best value: {self.best_score} Epoch-end value: {score}")
-            if self.counter >= self.patience:
-                self.early_stop = True
-                raise StopTrainingError('EarlyStop stopped the model')
-        else:
-            self.best_score = score
+        if self.score < score * self.delta:
+            self.score = score
             self.counter = 0
+            self.logger.info(f"Best Score set to {score}")
+        elif self.counter < self.patience:
+            self.counter += 1
+            self.logger.debug(f"Plateau: {self.counter} out of {self.patience}")
+        else:
+            self.logger.info("Early Stopping...")
+            raise StopTrainingException

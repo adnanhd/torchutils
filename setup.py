@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='torchutils',
-    version='2.0.0',
+    version='2.1.0',
     description=open('README.md').read(),
     author='adnanharundogan',
     author_email='adnanharundogan@gmail.com',

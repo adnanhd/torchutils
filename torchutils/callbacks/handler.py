@@ -1,5 +1,7 @@
-from .callback import TrainerCallback, StopTraining, CallbackMethodNotImplementedError
+from .callback import TrainerCallback, StopTrainingException
+from .callback import CallbackMethodNotImplemented
 import typing
+import logging
 
 
 def evettriggermethod(method):
@@ -8,15 +10,16 @@ def evettriggermethod(method):
         for callback in self.callbacks:
             try:
                 getattr(callback, method.__name__)(*args, **kwargs)
-            except CallbackMethodNotImplementedError:
+            except CallbackMethodNotImplemented:
                 continue
-            except StopTraining:
+            except StopTrainingException:
                 stop_training = True
-        
+
         if stop_training:
-            raise StopTraining
+            raise StopTrainingException
 
     return evettriggerdecorator
+
 
 class CallbackHandler:
     """
@@ -25,10 +28,24 @@ class CallbackHandler:
     """
     __slots__ = ['callbacks']
 
-    def __init__(self, callbacks=None):
-        self.callbacks: typing.List[TrainerCallback] = []
-        if callbacks is not None:
-            self.callbacks.extend(callbacks)
+    def __init__(self, callbacks=list()):
+        self.callbacks: typing.List[TrainerCallback] = callbacks
+
+    def add_handlers(self, handlers: typing.List[logging.Handler] = list()):
+        for cback in self.callbacks:
+            cback.add_handlers(handlers)
+
+    def remove_handlers(self, handlers: typing.List[logging.Handler] = list()):
+        for cback in self.callbacks:
+            cback.remove_handlers(handlers)
+
+    def attach_score_dict(self, score_dict: typing.Dict[str, float]):
+        for cback in self.callbacks:
+            cback.attach_score_dict(score_dict)
+
+    def detach_score_dict(self):
+        for cback in self.callbacks:
+            cback.detach_score_dict()
 
     def __iter__(self):
         return self.callbacks
