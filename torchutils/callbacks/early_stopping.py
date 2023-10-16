@@ -40,25 +40,28 @@ class EarlyStopping(TrainerCallback):
 
         self.monitor: str = monitor
         self.patience: int = patience
-        self.delta: float = 1 + delta
-        self.minimize: bool = goal == 'minimize'
+        self.maximize: bool = goal == 'maximize'
+        self.delta: float = (1 + delta) if self.maximize else (1 - delta)
 
         self.counter: int = 0
-        self.score: float = -math.pow(-1, self.minimize) * math.inf
+        self.score: float = -math.inf
 
     def on_training_begin(self, hparams):
         if hparams['num_epochs_per_validation'] == 0:
             self.logger.warn("EarlyStopping never called while training.")
 
     def on_validation_run_end(self):
-        score = math.pow(-1, self.minimize) * self.scores[self.monitor]
+        # score <- -monitored_score if self.maximize else monitored_score
+        # score <- monitored_score if maximize else -monitored_score
+        score = self.scores[self.monitor]
+        score = score if self.maximize else -score
 
-        self.logger.debug(f"Best score: {self.score} Current score: {score}")
-
-        if self.score < score * self.delta:
+        self.logger.debug(f"Best score: {self.score if self.maximize else -self.score} "
+                          f"Current score: {score if self.maximize else -score}")
+        if self.score * self.delta < score:
             self.score = score
             self.counter = 0
-            self.logger.info(f"Best Score set to {score}")
+            self.logger.info(f"Best Score set to {score if self.maximize else -score}")
         elif self.counter < self.patience:
             self.counter += 1
             self.logger.debug(f"Plateau: {self.counter} out of {self.patience}")

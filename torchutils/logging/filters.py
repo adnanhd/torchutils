@@ -20,13 +20,13 @@ class scoreFilterRun(logging.Filter):
     def filter(self, record):
         if record.levelname == 'TRAIN_EPOCH':
             if self.train_threshold == 0:
-                return True
+                return False
             else:
                 self.train_cnt = (self.train_cnt + 1) % self.train_threshold
                 return self.train_cnt == 0
         if record.levelname == 'VALID_RUN':
             if self.valid_threshold == 0:
-                return True
+                return False
             else:
                 self.valid_cnt = (self.valid_cnt + 1) % self.valid_threshold
                 return self.valid_cnt == 0
@@ -47,13 +47,13 @@ class scoreFilterStep(logging.Filter):
     def filter(self, record):
         if record.levelname == 'TRAIN_STEP':
             if self.train_threshold == 0:
-                return True
+                return False
             else:
                 self.train_cnt = (self.train_cnt + 1) % self.train_threshold
                 return self.train_cnt == 0
         if record.levelname == 'VALID_STEP':
             if self.valid_threshold == 0:
-                return True
+                return False
             else:
                 self.valid_cnt = (self.valid_cnt + 1) % self.valid_threshold
                 return self.valid_cnt == 0

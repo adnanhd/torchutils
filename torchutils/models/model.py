@@ -1,4 +1,5 @@
 import logging
+import inspect
 import pydantic
 import typing
 import torch
@@ -52,7 +53,10 @@ class TrainerModel(pydantic.BaseModel):
         if modelname is None:
             modelname = model.__class__.__qualname__
         self._logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
-        self._loss = AverageScore(self.criterion.__name__, reset_on='epoch_end')
+        if inspect.isfunction(self.criterion):
+            self._loss = AverageScore(self.criterion.__name__, reset_on='epoch_end')
+        else:
+            self._loss = AverageScore(self.criterion.__class__.__name__, reset_on='epoch_end')
 
     def get_score_names(self) -> typing.Set[str]:
         return {self._loss.name}
