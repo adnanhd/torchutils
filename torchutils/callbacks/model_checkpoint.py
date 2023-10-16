@@ -72,8 +72,8 @@ class ModelCheckpoint(TrainerCallback):
         self.monitor: str = monitor
         self.model: TrainerModel = model
         self.state_dict = model.state_dict()
-        self.delta: float = 1 + delta
-        self.minimize: bool = goal == 'minimize'
+        self.maximize: bool = goal == 'maximize'
+        self.delta: float = (1 + delta) if self.maximize else (1 - delta)
         self.checkpoint_path: str = filepath
         self.score: float = math.pow(-1, goal == 'minimize') * math.inf
 
@@ -90,7 +90,7 @@ class ModelCheckpoint(TrainerCallback):
                     scores=self.history,
                     monitor=self.monitor,
                     state_dict_checksum=digest(self.state_dict),
-                    goal='minimize' if self.minimize else 'maximize')
+                    goal='maximize' if self.maximize else 'minimize')
 
     def _statedict_to_ckptfile(self):
         checkpoint = dict(state_dict=self.state_dict,
@@ -138,8 +138,8 @@ class ModelCheckpoint(TrainerCallback):
 
     def on_validation_run_end(self):
         self.history.append({'status': 'valid_end', **self.scores})
-        score = math.pow(-1, self.minimize) * self.scores[self.monitor]
+        score = self.scores[self.monitor] if self.maximize else -self.scores[self.monitor]
 
-        if score * self.delta < self.score:
+        if self.score * self.delta < score:
             self.score = score
             self._statedict_to_ckptfile()
