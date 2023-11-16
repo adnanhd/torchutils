@@ -81,6 +81,7 @@ class Trainer:
                 # Epoch preperation
                 callback.on_training_epoch_begin()
 
+                self.model.train()
                 for index, batch in enumerate(trainloader):
                     # Step preperation
                     callback.on_training_step_begin()
@@ -110,6 +111,7 @@ class Trainer:
                         or (epoch + 1) % hparams['num_epochs_per_validation']:
                     continue
 
+                self.model.eval()
                 with torch.no_grad():
                     callback.on_validation_run_begin()
                     for index, batch in enumerate(validloader):
@@ -118,7 +120,7 @@ class Trainer:
 
                         # Step execution
                         begin_time = time.time()
-                        output = self.model.forward_pass(batch_idx=index, batch=batch)
+                        output = self.model.forward_pass_no_grad(batch_idx=index, batch=batch)
                         self.model.reset_backward()
                         timer.update(time.time() - begin_time)
 
