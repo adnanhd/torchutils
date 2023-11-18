@@ -1,22 +1,23 @@
 import torch.optim as optim
-from .utils import _BaseValidator, obtain_registered_kwargs
+import typing
+import inspect
+from .utils import obtain_registered_kwargs, _RegisteredBasModelv2
 
 
-class Optimizer(_BaseValidator):
-    TYPE = optim.Optimizer
-    __typedict__ = dict()
+class Optimizer(_RegisteredBasModelv2):
+    @classmethod
+    def __subclasses_list__(cls) -> typing.List[type]:
+        return optim.Optimizer.__subclasses__()
 
     @classmethod
-    def class_validator(cls, field_type, info):
-        if isinstance(field_type, str):
-            field_class = cls.__typedict__[field_type]
-            params = info.data['model'].parameters()
-            kwargs = obtain_registered_kwargs(field_class, info.data['arguments'])
-            field_type = field_class(params, **kwargs)
-        if not isinstance(field_type, cls.TYPE):
-            raise ValueError(f"{field_type} is not a {cls.TYPE}")
+    def model_name_validator(cls, field_type, info):
+        if inspect.isclass(field_type):
+            if field_type not in cls.__subclasses_list__():
+                raise ValueError(f"Unknown model {field_type}")
+            model = info.data['model']
+            kwargs = obtain_registered_kwargs(field_type, info.data['arguments'])
+            return field_type(model.parameters(), **kwargs)
         return field_type
 
 
-for optimizer_class in optim.Optimizer.__subclasses__():
-    Optimizer.__set_component__(optimizer_class)
+Optimizer.register(optim.Optimizer)

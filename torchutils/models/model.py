@@ -3,7 +3,6 @@ import inspect
 import pydantic
 import typing
 import torch
-import json
 from collections import OrderedDict
 
 from torchutils.metrics import AverageScore
@@ -11,6 +10,7 @@ from .hashs import digest
 from .typing import (
     NeuralNet,
     Criterion,
+    Functional,
     Optimizer,
     Scheduler,
     Tensor,
@@ -20,7 +20,7 @@ from .typing import (
 
 class TrainerModel(pydantic.BaseModel):
     arguments: typing.Dict = pydantic.Field(default_factory=dict)
-    criterion: Criterion
+    criterion: typing.Union[Criterion, Functional]
     model: NeuralNet
     optimizer: Optimizer
     scheduler: typing.Optional[Scheduler]
@@ -41,11 +41,11 @@ class TrainerModel(pydantic.BaseModel):
 
     def __init__(
         self,
-        model: NeuralNet.TYPE,
-        criterion: Criterion.TYPE,
-        optimizer: Optimizer.TYPE,
+        model: NeuralNet,
+        criterion: Criterion,
+        optimizer: Optimizer,
         modelname: str = None,
-        scheduler: typing.Optional[Scheduler.TYPE] = None,
+        scheduler: typing.Optional[Scheduler] = None,
         ** kwargs,
     ):
         super().__init__(model=model, arguments=kwargs,
@@ -179,10 +179,7 @@ class TrainerModel(pydantic.BaseModel):
         if not self.model.__getstate__()['training']:
             self._logger.warn("Training without self.train() call")
         y_pred, loss = self.forward(batch, batch_idx=batch_idx)
-        if GradTensor.isinstance(loss):
-            self._backward_hooks.append(loss)
-        else:
-            self._logger.debug("Tensor is not a GradTensor")
+        self._push_for_backward(loss)
         self._scores['loss'].update(loss.item())
         return y_pred
 
@@ -195,10 +192,12 @@ class TrainerModel(pydantic.BaseModel):
         return y_pred
 
     def _push_for_backward(self, tensor: Tensor):
-        if GradTensor.isinstance(tensor):
+        try:
+            tensor = GradTensor.tensor_validator(tensor)
+            tensor = GradTensor.grad_validator(tensor)
             self._backward_hooks.append(tensor)
-        else:
-            self._logger.debug("Tensor is not a GradTensor")
+        except ValueError as e:
+            self._logger.debug(e)
 
     def backward_pass(self):
         self.optimizer.zero_grad()

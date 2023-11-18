@@ -1,57 +1,63 @@
 import typing
 import torch
 import inspect
-from torch.nn.modules.loss import _Loss as Loss
-from .utils import _BaseValidator, obtain_registered_kwargs
-from .tensor import Tensor
+from .utils import _RegisteredBasModelv2, obtain_registered_kwargs
 
 
-class Functional(_BaseValidator):
-    TYPE = typing.Callable[[Tensor.TYPE, Tensor.TYPE], Tensor.TYPE]
-    __typedict__ = dict()
+FUNCTIONALS = list()
+
+
+def register_functionals(fn):
+    FUNCTIONALS.append(fn)
+
+
+class Functional(_RegisteredBasModelv2):
+    @classmethod
+    def __subclasses_list__(cls) -> typing.List[type]:
+        return FUNCTIONALS.copy()
 
     @classmethod
-    def class_validator(cls, field_type, info):
-        if inspect.isfunction(field_type) and \
-                keys.issubset(set(inspect.signature(field_type).parameters.keys())):
+    def __get_validators__(cls):
+        yield cls.class_name_validator
+        yield cls.function_validator
+        yield cls.loss_signature_validator
+
+    @classmethod
+    def function_validator(cls, field_type, info):
+        if inspect.isfunction(field_type):
             return field_type
-        raise ValueError(f"{field_type} is not a {cls.TYPE}")
-
-
-class Criterion(_BaseValidator):
-    TYPE = typing.Union[torch.nn.Module, Functional]
-    __typedict__ = dict()
+        raise ValueError(f"{field_type} is not a {cls.__name__}")
 
     @classmethod
-    def class_validator(cls, field_type, info):
-        try:
-            return Functional.class_validator(field_type, info)
-        except ValueError:
-            if isinstance(field_type, str):
-                field_class = cls.__typedict__[field_type]
-                if inspect.isfunction(field_class):
-                    return field_class
-                elif inspect.isclass(field_class):
-                    kwargs = info.data['arguments']
-                    kwargs = obtain_registered_kwargs(field_class, kwargs)
-                    field_type = field_class(**kwargs)
-                else:
-                    raise ValueError(f"{field_type} is not a {cls.TYPE}")
-            if isinstance(field_type, torch.nn.Module):
-                return field_type
-            raise ValueError(f"{field_type} is not a {cls.TYPE}")
+    def loss_signature_validator(cls, field_type, info):
+        sign = inspect.signature(field_type).parameters.keys()
+        if {'input', 'target'}.issubset(set(sign)):
+            return field_type
+        raise ValueError(f"{field_type} is not a {cls.__name__}")
 
 
-keys = {'input', 'target'}
 for loss_func in vars(torch.functional.F).values():
-    if inspect.isfunction(loss_func) and \
-            keys.issubset(set(inspect.signature(loss_func).parameters.keys())):
-        Functional.__set_component__(loss_func)
-        Criterion.__set_component__(loss_func)
+    try:
+        loss_func = Functional.function_validator(loss_func, None)
+        loss_func = Functional.loss_signature_validator(loss_func, None)
+        FUNCTIONALS.append(loss_func)
+    except ValueError:
+        pass
 
 
-for criterion_class in vars(torch.nn.modules.loss).values():
-    if hasattr(criterion_class, 'mro') \
-            and Loss in criterion_class.mro() \
-            and criterion_class is not Loss:
-        Criterion.__set_component__(criterion_class)
+class Criterion(_RegisteredBasModelv2):
+    @classmethod
+    def __subclasses_list__(cls) -> typing.List[type]:
+        return torch.nn.modules.loss._Loss.__subclasses__()
+
+    @classmethod
+    def model_name_validator(cls, field_type, info):
+        if inspect.isclass(field_type):
+            if field_type not in cls.__subclasses_list__():
+                raise ValueError(f"Unknown model {field_type}")
+            kwargs = obtain_registered_kwargs(field_type, info.data['arguments'])
+            return field_type(**kwargs)
+        return field_type
+
+
+Criterion.register(torch.nn.modules.loss._Loss)
