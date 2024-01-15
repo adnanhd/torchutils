@@ -5,11 +5,12 @@ import typing
 import torch
 from collections import OrderedDict
 
-from torchutils.metrics import AverageScore
+from torchutils.metrics import TrainerAverageScore
 from .hashs import digest
 from .typing import (
     NeuralNet,
     Criterion,
+    Functional,
     Optimizer,
     Scheduler,
     Tensor,
@@ -19,11 +20,12 @@ from .typing import (
 
 class TrainerModel(pydantic.BaseModel):
     arguments: typing.Dict = pydantic.Field(default_factory=dict)
-    criterion: Criterion
+    criterion: typing.Union[Criterion, Functional]
     model: NeuralNet
     optimizer: Optimizer
     scheduler: typing.Optional[Scheduler]
-    _loss: AverageScore = pydantic.PrivateAttr()
+    _scores: typing.Dict[str, TrainerAverageScore] = pydantic.PrivateAttr(default_factory=dict)
+    _buffer: typing.Dict[str, typing.Any] = pydantic.PrivateAttr(default_factory=dict)
     _logger: logging.Logger = pydantic.PrivateAttr()
     _backward_hooks: typing.List[GradTensor] = pydantic.PrivateAttr(default_factory=list)
 
@@ -40,11 +42,11 @@ class TrainerModel(pydantic.BaseModel):
 
     def __init__(
         self,
-        model: NeuralNet.TYPE,
-        criterion: Criterion.TYPE,
-        optimizer: Optimizer.TYPE,
+        model: NeuralNet,
+        criterion: Criterion,
+        optimizer: Optimizer,
         modelname: str = None,
-        scheduler: typing.Optional[Scheduler.TYPE] = None,
+        scheduler: typing.Optional[Scheduler] = None,
         ** kwargs,
     ):
         super().__init__(model=model, arguments=kwargs,
@@ -52,32 +54,47 @@ class TrainerModel(pydantic.BaseModel):
                          scheduler=scheduler)
         if modelname is None:
             modelname = model.__class__.__qualname__
-        self._logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        loggername = self.__class__.__module__ + '.' + self.__class__.__name__
         if inspect.isfunction(self.criterion):
-            self._loss = AverageScore(self.criterion.__name__, reset_on='epoch_end')
+            lossname = self.criterion.__name__
         else:
-            self._loss = AverageScore(self.criterion.__class__.__name__, reset_on='epoch_end')
+            lossname = self.criterion.__class__.__name__
+        self._scores['loss'] = TrainerAverageScore(lossname, reset_on='epoch_end')
+        self._logger = logging.getLogger(loggername)
+
+    # score functions
+    def register_score(self, name: str, score: TrainerAverageScore):
+        assert isinstance(score, TrainerAverageScore)
+        assert name not in self.__pydantic_private__['_scores'].keys()
+        return self.__pydantic_private__['_scores'].__setitem__(name, score)
+
+    def get_score(self, name: str):
+        assert name in self.__pydantic_private__['_scores'].keys()
+        return self.__pydantic_private__['_scores'].__getitem__(name)
 
     def get_score_names(self) -> typing.Set[str]:
-        return {self._loss.name}
+        return set(s.name for s in self._scores.values())
 
-    def __getstate__(self) -> typing.Set[str]:
+    # handler functions
+    def add_handlers(self, handlers=list()):
+        for hdlr in handlers:
+            self.__pydantic_private__['_logger'].addHandler(hdlr)
+
+    # @TODO: remove_handlers -> pop_handlers
+    def remove_handlers(self, handlers=list()):
+        for hdlr in handlers:
+            self.__pydantic_private__['_logger'].removeHandler(hdlr)
+
+    # STATE DICT FUNCTIONS
+    def __state_names__(self) -> typing.Set[str]:
         if isinstance(self.criterion, torch.nn.Module):
             return {'model', 'optimizer', 'scheduler', 'criterion'}
         else:
             return {'model', 'optimizer', 'scheduler'}
 
-    def add_handlers(self, handlers=list()):
-        for hdlr in handlers:
-            self._logger.addHandler(hdlr)
-
-    def remove_handlers(self, handlers=list()):
-        for hdlr in handlers:
-            self._logger.removeHandler(hdlr)
-
     def state_dict(self):
         state = OrderedDict()
-        for key in self.__getstate__():
+        for key in self.__state_names__():
             module = self.__getattribute__(key)
             if module is None:
                 continue
@@ -89,21 +106,10 @@ class TrainerModel(pydantic.BaseModel):
                 )
         return state
 
-    def __hash__(self) -> int:
-        return int(digest(self.state_dict()), 16)
-
-    @property
-    def device(self) -> torch.device:
-        return next(self.model.parameters()).device
-
-    @property
-    def checksum(self) -> str:
-        return digest(self.state_dict())
-
     def load_state_dict(
             self,
             state_dict: typing.Dict[str, "torch.Tensor"]) -> None:
-        for key in self.__getstate__():
+        for key in self.__state_names__():
             module = getattr(self, key)
             if module is None or key not in state_dict:
                 self._logger.warn(
@@ -118,15 +124,20 @@ class TrainerModel(pydantic.BaseModel):
                     "attribute."
                 )
 
-    def train(self) -> None:
-        self.model.train()
-        if isinstance(self.criterion, torch.nn.Module):
-            self.criterion.train()
+    def __hash__(self) -> int:
+        return int(digest(self.state_dict()), 16)
 
-    def eval(self) -> None:
-        self.model.eval()
-        if isinstance(self.criterion, torch.nn.Module):
-            self.criterion.eval()
+    @property
+    def device(self) -> torch.device:
+        return next(self.model.parameters()).device
+
+    @property
+    def dtype(self) -> torch.dtype:
+        return next(self.model.parameters()).dtype
+
+    @property
+    def checksum(self) -> str:
+        return digest(self.state_dict())
 
     def summary(self, input_size, batch_size=-1) -> None:
         try:
@@ -139,32 +150,54 @@ class TrainerModel(pydantic.BaseModel):
             self._logger.warn("torchsummary not installed")
             print("torchsummary not installed")
 
+    # TRAINER FUNCTIONS
+    def train(self) -> None:
+        self.model.train()
+        if isinstance(self.criterion, torch.nn.Module):
+            self.criterion.train()
+
+    def eval(self) -> None:
+        self.model.eval()
+        if isinstance(self.criterion, torch.nn.Module):
+            self.criterion.eval()
+
     def scheduler_step(self, epoch_idx=None):
         if self.scheduler is None:
             pass
         elif isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-            self.scheduler.step(self._loss.average)
+            self.scheduler.step(self._scores['loss'].average)
         else:
             self.scheduler.step()
 
-    def reset_backward(self):
-        if self._backward_hooks.__len__() != 0:
-            self._logger.warn("BackwardHook is not empty")
-            self._backward_hooks.clear()
-
-    def _push_for_backward(self, tensor: GradTensor.TYPE) -> None:
-        if GradTensor.isinstance(tensor):
-            self._backward_hooks.append(tensor)
-        else:
-            self._logger.debug("Tensor is not a GradTensor")
-
-    def forward_pass(self, batch, batch_idx=None):
+    def forward(self, batch, batch_idx=None):
         x, y = batch
         y_pred = self.model(x)
         loss = self.criterion(y_pred, y)
+        return y_pred, loss
+
+    def forward_pass(self, batch, batch_idx=None):
+        if not self.model.__getstate__()['training']:
+            self._logger.warn("Training without self.train() call")
+        y_pred, loss = self.forward(batch, batch_idx=batch_idx)
         self._push_for_backward(loss)
-        self._loss.update(loss.item())
+        self._scores['loss'].update(loss.item())
         return y_pred
+
+    @torch.no_grad()
+    def forward_pass_no_grad(self, batch, batch_idx=None):
+        if self.model.__getstate__()['training']:
+            self._logger.warn("Evaluating without self.eval() call")
+        y_pred, loss = self.forward(batch, batch_idx=batch_idx)
+        self._scores['loss'].update(loss.item())
+        return y_pred
+
+    def _push_for_backward(self, tensor: Tensor):
+        try:
+            tensor = GradTensor.tensor_validator(tensor)
+            tensor = GradTensor.grad_validator(tensor)
+            self._backward_hooks.append(tensor)
+        except ValueError as e:
+            self._logger.debug(e)
 
     def backward_pass(self):
         self.optimizer.zero_grad()
@@ -176,3 +209,8 @@ class TrainerModel(pydantic.BaseModel):
         while self._backward_hooks.__len__() != 0:
             self._backward_hooks.pop().backward()
         self.optimizer.step()
+
+    def reset_backward(self):
+        if self._backward_hooks.__len__() != 0:
+            self._logger.warn("BackwardHook is not empty")
+            self._backward_hooks.clear()

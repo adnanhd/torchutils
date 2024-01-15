@@ -1,13 +1,25 @@
 import torch.nn as nn
-from .utils import _BaseValidator
+import torchvision.models as m
+from .utils import _BaseModel, obtain_registered_kwargs
+
+__all__ = ['NeuralNet']
 
 
-class NeuralNet(_BaseValidator):
-    TYPE = nn.Module
-    __typedict__ = dict()
+class NeuralNet(_BaseModel):
 
     @classmethod
-    def class_validator(cls, field_type, info):
-        if not isinstance(field_type, cls.TYPE):
-            raise ValueError(f"{field_type} is not a {cls.TYPE}")
+    def __get_validators__(cls):
+        yield cls.torchvision_model_builder
+        yield cls.field_validator
+
+    @classmethod
+    def torchvision_model_builder(cls, field_type, info):
+        if isinstance(field_type, str):
+            builder = m.get_model_builder(field_type)
+            config = obtain_registered_kwargs(builder, info.data['arguments'])
+            info.data['arguments'].setdefault('device', None)
+            return builder(**config).to(device=info.data['arguments']['device'])
         return field_type
+
+
+NeuralNet.register(nn.Module)

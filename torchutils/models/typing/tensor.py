@@ -1,30 +1,41 @@
 import numpy
 import torch
-import typing
-from .utils import _BaseValidator
+from .utils import _BaseModel
 
 
-class Tensor(_BaseValidator):
-    TYPE = typing.Union[torch.Tensor, numpy.ndarray]
+class Tensor(_BaseModel):
     """
     A generic array/tensor type that returns true for every
     f. call isinstance() with any torch.tensor and np.ndarray
     """
     @classmethod
-    def class_validator(cls, field_type):
-        if isinstance(field_type, torch.Tensor) \
-                or isinstance(field_type, numpy.ndarray):
+    def tensor_validator(cls, field_type, info=None):
+        if isinstance(field_type, torch.Tensor):
             return field_type
+        raise ValueError(f"{field_type} is not a {torch.Tensor}")
+
+    @classmethod
+    def ndarray_validator(cls, field_type, info=None):
+        if isinstance(field_type, numpy.ndarray):
+            return field_type
+        raise ValueError(f"{field_type} is not a {numpy.ndarray}")
 
 
-class GradTensor(_BaseValidator):
-    TYPE = torch.Tensor
+Tensor.register(torch.Tensor)
+
+
+class GradTensor(Tensor):
     """
     A generic array/tensor type that returns true for every
     f. call isinstance() with any torch.tensor and np.ndarray
     """
     @classmethod
-    def class_validator(cls, field_type):
-        if isinstance(field_type, torch.Tensor) \
-                and field_type.requires_grad:
+    def __get_validators__(cls):
+        yield cls.field_validator
+        yield cls.grad_validator
+
+    @classmethod
+    def grad_validator(cls, field_type: torch.Tensor, info=None):
+        if field_type.requires_grad:
             return field_type
+        raise ValueError(f"{field_type} doesn't require gradient.")

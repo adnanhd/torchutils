@@ -1,43 +1,50 @@
-from abc import ABC
-import warnings
+import abc
+import typing
+import torch
 
 
-class RegisterationWarning(Warning):
-    pass
+Module = typing.Callable[..., typing.TypeVar("Module", bound=torch.nn.Module)]
 
 
-warnings.filterwarnings('ignore', category=RegisterationWarning)
+class _BaseModel(abc.ABC):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.field_validator
+
+    @classmethod
+    def field_validator(cls, field_type, info):
+        if isinstance(field_type, cls):
+            return field_type
+        raise ValueError(f"{field_type} is not a {cls}")
 
 
-class _BaseValidator(ABC):
-    TYPE = None
-    __typedict__ = None
+class _RegisteredBasModelv2(_BaseModel):
+    @classmethod
+    def __subclasses_dict__(cls) -> typing.Dict[str, type]:
+        return dict(map(lambda subcls: (subcls.__name__, subcls),
+                        cls.__subclasses_list__()))
 
     @classmethod
     def __get_validators__(cls):
-        yield cls.class_validator
+        yield cls.class_name_validator
+        yield cls.model_name_validator
+        yield cls.field_validator
 
     @classmethod
-    def __get_component__(cls, name):
-        if name not in cls.__typedict__:
-            warnings.warn(f"{cls.__qualname__}: {name} not registered", RegisterationWarning)
-        return cls.__typedict__[name]
+    @abc.abstractmethod
+    def __subclass_list__(cls) -> typing.List[type]:
+        pass
 
     @classmethod
-    def __set_component__(cls, type):
-        name = type.__name__
-        if name in cls.__typedict__:
-            warnings.warn(f"{cls.__qualname__}: {name} yet registered", RegisterationWarning)
-        cls.__typedict__[name] = type
+    def class_name_validator(cls, field_type, info):
+        if isinstance(field_type, str):
+            try:
+                return cls.__subclasses_dict__()[field_type]
+            except KeyError:
+                raise ValueError(f"Unknown model {field_type}")
+        return field_type
 
     @classmethod
-    def isinstance(cls, obj):
-        try:
-            return all(not validator(obj) is None
-                       for validator in cls.__get_validators__())
-        except ValueError:
-            return False
-
-    @classmethod
-    def class_validator(cls, field_type, info):
-        raise NotImplementedError()
+    @abc.abstractmethod
+    def model_name_validator(cls, field_type, info):
+        pass
