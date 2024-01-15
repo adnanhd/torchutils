@@ -147,15 +147,10 @@ class ScoreLogger:
     # 3. gorevi metricleri belli araliklarla calistirmak
     __slots__ = ('scores', 'logger')
 
-    # neden class? registry icin
-    # neden instance? sadece bi subseti hesaplamak icin
-    __scores__: typing.Dict[str, TrainerAverageScore] = dict()
-    # __functs__: typing.Dict[str, typing.Callable] = dict()
-
     def __init__(self, level: int = 15) -> None:
         self.scores: typing.List[ScoreContainer] = list()
         self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
-        self.logger.setLevel(level)
+        self.logger.setLevel(15)
 
     def add_scores(self, score_lst: ScoreContainer):
         self.scores.append(score_lst)
@@ -174,6 +169,8 @@ class ScoreLogger:
     def log(self, level, epoch_index:int = None, batch_index: int = None):
         for score_list in self.scores:
             scores = score_list.get_scores()
-            scores['epoch'] = epoch_index
-            scores['batch_index'] = batch_index
-            self.logger.log(score_list.level, scores)
+            if epoch_index is not None:
+                scores['epoch'] = epoch_index
+            if batch_index is not None:
+                scores['batch_index'] = batch_index
+            self.logger.log(level, scores)
