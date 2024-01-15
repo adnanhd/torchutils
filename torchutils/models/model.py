@@ -5,7 +5,7 @@ import typing
 import torch
 from collections import OrderedDict
 
-from torchutils.metrics import AverageScore
+from torchutils.metrics import TrainerAverageScore
 from .hashs import digest
 from .typing import (
     NeuralNet,
@@ -24,7 +24,8 @@ class TrainerModel(pydantic.BaseModel):
     model: NeuralNet
     optimizer: Optimizer
     scheduler: typing.Optional[Scheduler]
-    _scores: typing.Dict[str, AverageScore] = pydantic.PrivateAttr(default_factory=dict)
+    _scores: typing.Dict[str, TrainerAverageScore] = pydantic.PrivateAttr(default_factory=dict)
+    _buffer: typing.Dict[str, typing.Any] = pydantic.PrivateAttr(default_factory=dict)
     _logger: logging.Logger = pydantic.PrivateAttr()
     _backward_hooks: typing.List[GradTensor] = pydantic.PrivateAttr(default_factory=list)
 
@@ -58,12 +59,12 @@ class TrainerModel(pydantic.BaseModel):
             lossname = self.criterion.__name__
         else:
             lossname = self.criterion.__class__.__name__
-        self._scores['loss'] = AverageScore(lossname, reset_on='epoch_end')
+        self._scores['loss'] = TrainerAverageScore(lossname, reset_on='epoch_end')
         self._logger = logging.getLogger(loggername)
 
     # score functions
-    def register_score(self, name: str, score: AverageScore):
-        assert isinstance(score, AverageScore)
+    def register_score(self, name: str, score: TrainerAverageScore):
+        assert isinstance(score, TrainerAverageScore)
         assert name not in self.__pydantic_private__['_scores'].keys()
         return self.__pydantic_private__['_scores'].__setitem__(name, score)
 
@@ -172,7 +173,6 @@ class TrainerModel(pydantic.BaseModel):
         x, y = batch
         y_pred = self.model(x)
         loss = self.criterion(y_pred, y)
-        # self._scores['loss'].update(loss.item())
         return y_pred, loss
 
     def forward_pass(self, batch, batch_idx=None):

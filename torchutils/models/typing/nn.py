@@ -17,7 +17,8 @@ class NeuralNet(_BaseModel):
         if isinstance(field_type, str):
             builder = m.get_model_builder(field_type)
             config = obtain_registered_kwargs(builder, info.data['arguments'])
-            return builder(**config)
+            info.data['arguments'].setdefault('device', None)
+            return builder(**config).to(device=info.data['arguments']['device'])
         return field_type
 
 

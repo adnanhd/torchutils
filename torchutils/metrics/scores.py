@@ -15,7 +15,7 @@ def to_capital(string: str):
     return " ".join(word.capitalize() for word in to_lower(string).split("_"))
 
 
-class AverageScore:
+class TrainerAverageScore:
     """Computes and stores the average and current value"""
     __slots__ = ['_name', '_sum', '_count', '_value', '_fmtstr']
 
@@ -27,7 +27,7 @@ class AverageScore:
         self._sum = 0
         self._count = 0
         assert reset_on in ('epoch_end', None)
-        MetricHandler.register(self, reset_trigger=reset_on, n=1)
+        ScoreContainer.addMetric(self, reset_trigger=reset_on, n=1)
 
     def set_format(self, fmt):
         self._fmtstr = f"{self._name}" + "={average" + fmt + "}"
@@ -78,10 +78,10 @@ class callbackmethod:
 
     def __init__(self, ep):
         self._name = ep.__qualname__
-        self.callbacks: typing.List[typing.Tuple[AverageScore, int]] = list()
+        self.callbacks: typing.List[typing.Tuple[TrainerAverageScore, int]] = list()
 
     def __call__(self, endpoint, n=1):
-        assert isinstance(endpoint, AverageScore), endpoint
+        assert isinstance(endpoint, TrainerAverageScore), endpoint
         self.callbacks.append((endpoint, n))
         return endpoint
 
@@ -91,29 +91,21 @@ class callbackmethod:
                 score.reset()
 
 
-class MetricHandler:
+class ScoreContainer:
+    # 1. gorevi scorelarin dictini tutmak
+    # 2.a gorevi AverageScore'lari belli araliklarla okumak
+    # 2.b gorevi bunlari belli araliklarla publish etmek
+    # 3. gorevi metricleri belli araliklarla calistirmak
+    __slots__ = ('metrics', 'scores', 'level')
+
     # neden class? registry icin
     # neden instance? sadece bi subseti hesaplamak icin
-    __scores__: typing.Dict[str, AverageScore] = dict()
-    __functs__: typing.Dict[str, typing.Callable] = dict()
-
-    def __init__(self, metrics: typing.Set[str] = tuple()) -> None:
-        self.metrics = metrics.union({'batch_index', 'epoch'})
-        self.scores = dict()
-        self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
-        self.logger.setLevel(15)
-
-    def add_handlers(self, handlers: typing.List[logging.Handler] = list()):
-        for hdlr in handlers:
-            self.logger.addHandler(hdlr)
-
-    def remove_handlers(self, handlers: typing.List[logging.Handler] = list()):
-        for hdlr in handlers:
-            self.logger.removeHandler(hdlr)
+    __scores__: typing.Dict[str, TrainerAverageScore] = dict()
+    # __functs__: typing.Dict[str, typing.Callable] = dict()
 
     @classmethod
-    def register(cls, score, reset_trigger=None, n=1):
-        assert isinstance(score, AverageScore)
+    def addMetric(cls, score, reset_trigger=None, n=1):
+        assert isinstance(score, TrainerAverageScore)
         assert reset_trigger in ('step_end', 'epoch_end', None)
         cls.__scores__[score.name] = score
 
@@ -122,13 +114,21 @@ class MetricHandler:
         elif reset_trigger == 'epoch_end':
             cls.reset_scores_on_epoch_end(score, n=n)
 
-    def log(self, level, epoch_index, batch_index):
-        self.scores['epoch'] = epoch_index
-        self.scores['batch_index'] = batch_index
-        scores = map(self.scores.__getitem__, self.metrics)
-        self.logger.log(level, dict(zip(self.metrics, scores)))
+    @callbackmethod
+    def reset_scores_on_step_end(self): pass
 
-    def score_dict(self):
+    @callbackmethod
+    def reset_scores_on_epoch_end(self): pass
+
+    def __init__(self, score_names: typing.Set[str] = set(), level: int = 15) -> None:
+        self.metrics = score_names
+        self.level = level
+        self.scores = dict()
+
+    def get_scores(self) -> typing.Dict[str, float]:
+        return dict(zip(self.metrics, map(self.scores.__getitem__, self.metrics)))
+
+    def score_dict(self) -> typing.Dict[str, float]:
         return self.scores
 
     def save_values_to_score_dict(self):
@@ -139,8 +139,41 @@ class MetricHandler:
         for name, score in self.__scores__.items():
             self.scores[name] = score.average
 
-    @callbackmethod
-    def reset_scores_on_step_end(self): pass
 
-    @callbackmethod
-    def reset_scores_on_epoch_end(self): pass
+class ScoreLogger:
+    # 1. gorevi scorelarin dictini tutmak
+    # 2.a gorevi AverageScore'lari belli araliklarla okumak
+    # 2.b gorevi bunlari belli araliklarla publish etmek
+    # 3. gorevi metricleri belli araliklarla calistirmak
+    __slots__ = ('scores', 'logger')
+
+    # neden class? registry icin
+    # neden instance? sadece bi subseti hesaplamak icin
+    __scores__: typing.Dict[str, TrainerAverageScore] = dict()
+    # __functs__: typing.Dict[str, typing.Callable] = dict()
+
+    def __init__(self, level: int = 15) -> None:
+        self.scores: typing.List[ScoreContainer] = list()
+        self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        self.logger.setLevel(level)
+
+    def add_scores(self, score_lst: ScoreContainer):
+        self.scores.append(score_lst)
+
+    def remove_scores(self, score_lst: ScoreContainer):
+        self.scores.remove(score_lst)
+
+    def add_handlers(self, handlers: typing.List[logging.Handler] = list()):
+        for hdlr in handlers:
+            self.logger.addHandler(hdlr)
+
+    def remove_handlers(self, handlers: typing.List[logging.Handler] = list()):
+        for hdlr in handlers:
+            self.logger.removeHandler(hdlr)
+
+    def log(self, level, epoch_index:int = None, batch_index: int = None):
+        for score_list in self.scores:
+            scores = score_list.get_scores()
+            scores['epoch'] = epoch_index
+            scores['batch_index'] = batch_index
+            self.logger.log(score_list.level, scores)

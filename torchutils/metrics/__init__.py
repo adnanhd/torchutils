@@ -1,2 +1,2 @@
 # from .utils import EndPoint, endpointmethod, eventtrigger
-from .metric import AverageScore, MetricHandler
+from .scores import ScoreContainer, TrainerAverageScore, ScoreLogger
