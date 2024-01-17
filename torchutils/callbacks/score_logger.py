@@ -5,8 +5,9 @@ from .utils import LogLevelEnum
 
 
 class AverageScoreLogger(TrainerCallback):
-    def __init__(self, *score_names):
+    def __init__(self, *score_names, level=10):
         super().__init__(readable_scores=set(score_names))
+        self._logger.setLevel(level)
 
     def on_training_epoch_begin(self, epoch_index: int):
         self._buffer['epoch_index'] = epoch_index
@@ -15,10 +16,21 @@ class AverageScoreLogger(TrainerCallback):
         self._buffer['batch_index'] = batch_index
 
     def on_training_step_end(self, batch_index, batch, batch_output):
-        self.log(level=LogLevelEnum.TRAINING_STEP_END.value, msg=self.get_score_value().union(self._buffer))
+        values = self.get_score_value()
+        values.update(self._buffer)
+        self.log(level=LogLevelEnum.TRAINING_STEP_END.value, msg=values)
     
     def on_validation_step_end(self):
-        self.log(level=LogLevelEnum.VALIDATION_STEP_END.value, msg=self.get_score_value().union(self._buffer))
+        values = self.get_score_value()
+        values.update(self._buffer)
+        self.log(level=LogLevelEnum.VALIDATION_STEP_END.value, msg=values)
 
     def on_training_epoch_end(self):
-        self.log(level=LogLevelEnum.TRAINING_EPOCH_END.value, msg=self.get_score_averages().union(self._buffer))
+        averages = self.get_score_averages()
+        averages['epoch_index'] = self._buffer['epoch_index']
+        self.log(level=LogLevelEnum.TRAINING_EPOCH_END.value, msg=averages)
+
+    def on_validation_run_end(self):
+        averages = self.get_score_averages()
+        averages['epoch_index'] = self._buffer['epoch_index']
+        self.log(level=LogLevelEnum.VALIDATION_END.value, msg=averages)

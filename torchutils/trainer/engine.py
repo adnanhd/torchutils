@@ -6,15 +6,11 @@ import logging
 import typing
 import warnings
 
-from ..metrics import IteratorProfiler, Profiler
+from ..metrics import CircularIteratorProfiler, Profiler
 from ..models import TrainerModel
 from ..datasets import TrainerDataset
 from ..metrics import AverageScore, AverageScoreHandler
 from ..callbacks import CallbackHandler, StopTrainingException, TrainerCallback
-from ..logging import (
-    TRAIN_EPOCH, VALID_RUN, EVAL_RUN,
-    TRAIN_STEP, VALID_STEP, EVAL_STEP
-)
 
 
 class Trainer:
@@ -36,6 +32,7 @@ class Trainer:
         valid_dataset: typing.Optional[torch.utils.data.Dataset] = None,
         train_dataloader_kwargs: dict = dict(),
         valid_dataloader_kwargs: dict = dict(),
+        log_level: int = logging.INFO
     ):
         self.model: TrainerModel = model
         self.train_dataset: TrainerDataset = TrainerDataset(train_dataset, **train_dataloader_kwargs)
@@ -45,6 +42,7 @@ class Trainer:
         self.callbacks: typing.List[TrainerCallback] = list()
         self.handlers: typing.Iterable[logging.Handler] = list()
         self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        self.logger.setLevel(log_level)
 
     def compile(
             self,
@@ -77,9 +75,9 @@ class Trainer:
         dataloader = self.train_dataset.dataloader(batch_size=batch_size, device=device, train=True, **kwargs)
 
         if profile:
-            dataloader = IteratorProfiler(iterable=dataloader, name='load_time')
+            dataloader = CircularIteratorProfiler(iterable=dataloader, name='load_time')
             if valid_dataloader != []:
-                valid_dataloader = IteratorProfiler(iterable=valid_dataloader, name='valid_load_time')
+                valid_dataloader = CircularIteratorProfiler(iterable=valid_dataloader, name='valid_load_time')
 
         hparams = dict(**hparams,
                        batch_size=batch_size,
@@ -120,7 +118,7 @@ class Trainer:
         # logging initialization
         self.logger.info('Training Starts...')
         self.logger.info(str(self.model))
-        self.logger.info(str(hparams))
+        self.logger.info(f'params: {hparams}')
 
         try:
             callb_lst.on_initialization()
@@ -135,7 +133,7 @@ class Trainer:
                 for index, batch in enumerate(trainloader):
 
                     # Step preperation
-                    callb_lst.on_training_step_begin(batch_index=batch)
+                    callb_lst.on_training_step_begin(batch_index=index)
 
                     # Step execution
                     exec_timer.set()
@@ -159,12 +157,12 @@ class Trainer:
 
                 self.model.eval()
                 with torch.no_grad():
-                    callb_lst.on_validation_run_begin()
+                    callb_lst.on_validation_run_begin(epoch_index=epoch)
 
                     for index, batch in enumerate(validloader):
 
                         # Step Preperation
-                        callb_lst.on_validation_step_begin()
+                        callb_lst.on_validation_step_begin(batch_index=index)
 
                         # Step execution
                         exec_timer.set()
@@ -234,7 +232,7 @@ class Trainer:
             dataloader_kwargs['device'] = self.model.device
             dataloader = test_dataset.dataloader(**dataloader_kwargs)
             if profile:
-                dataloader = IteratorProfiler(iterable=dataloader, name='load_time')
+                dataloader = CircularIteratorProfiler(iterable=dataloader, name='load_time')
 
             try:
                 callb_lst.on_initialization()

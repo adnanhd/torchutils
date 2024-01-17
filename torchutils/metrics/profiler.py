@@ -1,3 +1,4 @@
+from logging import DEBUG
 import pydantic
 import logging
 import typing
@@ -61,13 +62,14 @@ class FunctionProfiler(Profiler):
 
 
 class IteratorProfiler(Profiler):
-    iterable: typing.Iterable
-    _iterator: typing.Iterator = pydantic.PrivateAttr(None)
+    iterable: typing.Iterable[typing.Any]
+    _iterator: typing.Iterator[typing.Any] = pydantic.PrivateAttr()
     _average: float = pydantic.PrivateAttr(0)
     _count: int = pydantic.PrivateAttr(0)
 
+    #@pydantic.field_validator('iterable')
     def __iter__(self):
-        self._iterator = self.iterable.__iter__()
+        self._iterator = iter(self.iterable)
         return self
     
     def __next__(self):
@@ -84,9 +86,20 @@ class IteratorProfiler(Profiler):
             raise StopIteration
         return element
     
+class CircularIteratorProfiler(pydantic.BaseModel):
+    _name = pydantic.PrivateAttr()
+    _iterable = pydantic.PrivateAttr()
+    def __init__(self, name: str, iterable: typing.Iterable[typing.Any]):
+        super().__init__()
+        self._iterable = iterable
+        self._name = name
+
+    def __iter__(self):
+        return iter(IteratorProfiler(iterable=self._iterable, name=self._name))
+    
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     @FunctionProfiler(name='simple function')
     def foo():
@@ -95,5 +108,7 @@ if __name__ == '__main__':
     with ContextProfiler(name='simple context'):
         foo()
 
-    for x in IteratorProfiler(name='iterator', iterable=range(5)):
-        pass
+    x = IteratorProfiler(name='iterator', iterable=list(range(5)))
+    for j in range(2):
+        for i in x:
+            pass
