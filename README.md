@@ -15,11 +15,11 @@ class Model(nn.Module):
     ...
     return X
 
-class _TrainerModel(TrainerModel):
-  def forward_pass(self, batch, batch_index=None):
+class MyTrainerModel(TrainerModel):
+  def forward(self, batch, batch_index=None):
     ...
 
-model = _TrainerModel(
+model = MyTrainerModel(
   model=Model(), 
   criterion='MSELoss', 
   optimizer='SDG',
