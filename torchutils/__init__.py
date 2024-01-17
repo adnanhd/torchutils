@@ -46,4 +46,4 @@ import torchutils.logging
 import torchutils.metrics
 # import torchutils.utils
 
-__version__ = '2.2.0'
+__version__ = '2.3.0'
