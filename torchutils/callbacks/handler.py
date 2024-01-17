@@ -61,10 +61,10 @@ class CallbackHandler:
     def on_training_begin(self, params): pass
 
     @evettriggermethod
-    def on_training_epoch_begin(self): pass
+    def on_training_epoch_begin(self, epoch_index: int): pass
 
     @evettriggermethod
-    def on_training_step_begin(self): pass
+    def on_training_step_begin(self, batch_index: int): pass
 
     @evettriggermethod
     def on_training_step_end(self, batch_index, batch, batch_output): pass
@@ -76,10 +76,10 @@ class CallbackHandler:
     def on_training_end(self): pass
 
     @evettriggermethod
-    def on_validation_run_begin(self): pass
+    def on_validation_run_begin(self, epoch_index: int): pass
 
     @evettriggermethod
-    def on_validation_step_begin(self): pass
+    def on_validation_step_begin(self, batch_index: int): pass
 
     @evettriggermethod
     def on_validation_step_end(self, batch_index, batch, batch_output): pass

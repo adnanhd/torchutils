@@ -1,41 +1,24 @@
-from .base import TrainerCallback
-import logging
-from ..logging import LoggerInterface
-from ..trainer.utils import (
-    TrainingArguments,
-    IterationInterface
-)
+from .callback import TrainerCallback
+import pydantic
+import typing
+from .utils import LogLevelEnum
 
 
-class ScoreLoggerCallback(TrainerCallback):
-    """
-    A callback which visualises the state of each training
-    and evaluation epoch using a progress bar
-    """
+class AverageScoreLogger(TrainerCallback):
+    def __init__(self, *score_names):
+        super().__init__(readable_scores=set(score_names))
 
-    def __init__(self, *score_names: str):
-        super().__init__()
-        self._handler: LoggerInterface = None
-        self._score_names = score_names
-        self._logger = logging.getLogger(__name__)
+    def on_training_epoch_begin(self, epoch_index: int):
+        self._buffer['epoch_index'] = epoch_index
 
-    def on_initialization(self, handlers: LoggerInterface):
-        self._handler = handlers
+    def on_training_step_begin(self, batch_index: int):
+        self._buffer['batch_index'] = batch_index
 
-    def on_training_begin(self, hparams: TrainingArguments):
-        self._handler.log_hparams(hparams.dict)
-        self._handler.log_module(hparams.model)
+    def on_training_step_end(self, batch_index, batch, batch_output):
+        self.log(level=LogLevelEnum.TRAINING_STEP_END.value, msg=self.get_score_value().union(self._buffer))
+    
+    def on_validation_step_end(self):
+        self.log(level=LogLevelEnum.VALIDATION_STEP_END.value, msg=self.get_score_value().union(self._buffer))
 
-    def on_training_epoch_end(self, epoch: IterationInterface):
-        self._handler.log_scores({
-            f'train/{score}': value for score,
-            value in epoch.get_current_scores(*self._score_names).items()
-        })
-
-    def on_validation_run_end(self, epoch: IterationInterface):
-        # self._log.event = LoggingEvent.VALIDATION_RUN
-        # @TODO: run at validation run end
-        self._handler.log_scores({
-            f'valid/{score}': value for score,
-            value in epoch.get_current_scores(*self._score_names).items()
-        })
+    def on_training_epoch_end(self):
+        self.log(level=LogLevelEnum.TRAINING_EPOCH_END.value, msg=self.get_score_averages().union(self._buffer))
