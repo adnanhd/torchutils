@@ -32,4 +32,4 @@ handler_str.addFilter(scoreFilterStep(6))
 handler_str.setFormatter(formatter)
 etime = trainer.train(num_epochs=5, batch_size=1000,
                       handlers=[handler_str], metrics={'linear_model_loss'},
-                      callbacks=[EarlyStopping(monitor='linear_model_loss', verbose=True, goal='minimize', patience=0)])
+                      callbacks=[EarlyStopping(monitor=model.criterion_name, verbose=True, goal='minimize', patience=0)])

@@ -32,4 +32,4 @@ handler_str.addFilter(scoreFilterStep(6))
 handler_str.setFormatter(formatter)
 etime = trainer.train(num_epochs=5, batch_size=1000,
                       handlers=[handler_str], metrics={'linear_model_loss'},
-                      callbacks=[ModelCheckpoint(monitor='linear_model_loss', goal='minimize', filepath='model.ckpt', model=model, halt_into_checkpoint=True)])
+                      callbacks=[ModelCheckpoint(monitor=model.criterion_name, goal='minimize', filepath='model.ckpt', model=model, halt_into_checkpoint=True)])
