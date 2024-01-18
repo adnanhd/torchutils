@@ -20,7 +20,7 @@ class MyTrainerModel(TrainerModel):
     ...
 
 model = MyTrainerModel(
-  model=Model(), 
+  model=Model(), ## equivalenlty model='model-name' if 'model-name' is registerd in torchvision.models
   criterion='MSELoss', 
   optimizer='SDG',
   scheduler='ReduceLROnPleateau',
