@@ -45,13 +45,14 @@ class TrainerModel(TrainerBaseModel):
         optimizer: Optimizer,
         modelname: str = None,
         scheduler: typing.Optional[Scheduler] = None,
+        writable_scores: typing.Set[str] = set(),
+        readable_scores: typing.Set[str] = set(),
         ** kwargs,
     ):
         if modelname is None:
             modelname = model.__class__.__qualname__
-        super().__init__(model=model, arguments=kwargs,
-                         criterion=criterion, optimizer=optimizer,
-                         scheduler=scheduler)
+        super().__init__(model=model, arguments=kwargs, criterion=criterion, optimizer=optimizer,
+                         scheduler=scheduler, readable_scores=readable_scores, writable_scores=writable_scores)
         if inspect.isfunction(self.criterion):
             lossname = self.criterion.__name__
         else:
@@ -154,7 +155,7 @@ class TrainerModel(TrainerBaseModel):
         loss = self.criterion(y_pred, y)
         return y_pred, loss
 
-    def forward_pass(self, batch, batch_idx=None):
+    def forward_pass_on_training_step(self, batch, batch_idx=None):
         if not self.model.__getstate__()['training']:
             self.log_warn("Training without self.train() call")
         y_pred, loss = self.forward(batch, batch_idx=batch_idx)
@@ -163,7 +164,15 @@ class TrainerModel(TrainerBaseModel):
         return y_pred
 
     @torch.no_grad()
-    def forward_pass_no_grad(self, batch, batch_idx=None):
+    def forward_pass_on_validation_step(self, batch, batch_idx=None):
+        if self.model.__getstate__()['training']:
+            self.log_warn("Evaluating without self.eval() call")
+        y_pred, loss = self.forward(batch, batch_idx=batch_idx)
+        self._loss.update(loss.item())
+        return y_pred
+    
+    @torch.no_grad()
+    def forward_pass_on_evauluation_step(self, batch, batch_idx=None):
         if self.model.__getstate__()['training']:
             self.log_warn("Evaluating without self.eval() call")
         y_pred, loss = self.forward(batch, batch_idx=batch_idx)

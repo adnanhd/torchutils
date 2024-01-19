@@ -41,7 +41,7 @@ class Trainer:
         self.metrics: typing.Set[str] = set()
         self.callbacks: typing.List[TrainerCallback] = list()
         self.handlers: typing.Iterable[logging.Handler] = list()
-        self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(log_level)
 
     def compile(
@@ -118,7 +118,7 @@ class Trainer:
         # logging initialization
         self.logger.info('Training Starts...')
         self.logger.info(str(self.model))
-        self.logger.info(f'params: {hparams}')
+        self.logger.info(f'train_params: {hparams}')
 
         try:
             callb_lst.on_initialization()
@@ -137,7 +137,7 @@ class Trainer:
 
                     # Step execution
                     exec_timer.set()
-                    output = self.model.forward_pass(batch_idx=index, batch=batch)
+                    output = self.model.forward_pass_on_training_step(batch_idx=index, batch=batch)
                     self.model.backward_pass()
                     exec_timer.lap()
 
@@ -166,7 +166,7 @@ class Trainer:
 
                         # Step execution
                         exec_timer.set()
-                        output = self.model.forward_pass_no_grad(batch_idx=index, batch=batch)
+                        output = self.model.forward_pass_on_validation_step(batch_idx=index, batch=batch)
                         self.model.reset_backward()
                         exec_timer.lap()
 
@@ -220,8 +220,7 @@ class Trainer:
 
         # logging initialization
         self.logger.info('Prediction Starts...')
-        self.logger.info(str(self.model))
-        self.logger.info(str(hparams))
+        self.logger.info("predict_params: " + str(hparams))
 
         for test_nu, test_dataset in enumerate(test_datasets):
             if not isinstance(test_dataset, TrainerDataset):
@@ -243,11 +242,11 @@ class Trainer:
                 for index, batch in enumerate(dataloader):
 
                     # Step Preperation
-                    callb_lst.on_evaluation_step_begin()
+                    callb_lst.on_evaluation_step_begin(batch_index=index)
 
                     # Step execution
                     exec_timer.set()
-                    output = self.model.forward_pass_no_grad(batch_idx=index, batch=batch)
+                    output = self.model.forward_pass_on_evauluation_step(batch_idx=index, batch=batch)
                     self.model.reset_backward()
                     exec_timer.lap()
 
