@@ -15,7 +15,6 @@ class AverageScoreBuffer(pydantic.BaseModel):
             names = set(AVERAGE_SCORES_DICT.keys())
         self._names = self.names_validator(names)
 
-
     def add_score_names(self, *names):
         for name in names:
             if name not in AVERAGE_SCORES_DICT:

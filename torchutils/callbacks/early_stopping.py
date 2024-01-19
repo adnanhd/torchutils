@@ -16,6 +16,8 @@ class EarlyStopping(TrainerCallback):
 
     _counter: int = pydantic.PrivateAttr(0)
     _score: float = pydantic.PrivateAttr(-float('inf'))
+    _epoch: int = pydantic.PrivateAttr(0)
+    _nepv: int = pydantic.PrivateAttr()
 
     @pydantic.field_validator('delta')
     def validate_delta(cls, value, values: pydantic.ValidationInfo):
@@ -26,10 +28,7 @@ class EarlyStopping(TrainerCallback):
         return self.goal.value == 'maximize'
     
 
-    def __init__(self,
-                 monitor: str,
-                 **kwds
-                 ):
+    def __init__(self, monitor: str, verbose=False, **kwds):
         """
         Args:
             monitor (str): The metric or quantity to be monitored.
@@ -48,11 +47,19 @@ class EarlyStopping(TrainerCallback):
                             the monitored quantity
                             Default: False
         """
-        super().__init__(readable_scores={monitor}, monitor=monitor, **kwds)
+        if isinstance(verbose, int):
+            level = verbose
+        else:
+            level = 10 if verbose else 20
+        super().__init__(readable_scores={monitor}, monitor=monitor, level=level, **kwds)
 
     def on_training_begin(self, hparams):
+        self._nepv = hparams['num_epochs_per_validation']
         if hparams['num_epochs_per_validation'] == 0:
             self.log_warn("EarlyStopping will not be called while training.")
+
+    def on_validation_run_begin(self, epoch_index: int):
+        self._epoch = epoch_index
 
     def on_validation_run_end(self):
         # score <- -monitored_score if self.maximize else monitored_score
@@ -64,10 +71,12 @@ class EarlyStopping(TrainerCallback):
         if self._score * self.delta < _score:
             self._score = _score
             self._counter = 0
-            self.log_info(f"Best Score set to {score}")
+            self.log_info(f"Best {self.monitor} score set to {score}")
         elif self._counter < self.patience:
-            self._counter += 1
-            self.log_debug(f"Plateau: {self._counter} out of {self.patience}")
+            self._counter += self._nepv
+            self.log_info(f"Plateau: {self._counter} out of {self.patience}")
         else:
-            self.log_info("Early Stopping...")
+            delta = (1 - self.delta) if self.maximize else (1 - self.delta)
+            self.log_warn(f"Early Stopping @ epoch {self._epoch} as {self.monitor}={score:.3e} "
+                          f"not optimized {delta * 100:.2f}% w/in the last {self.patience} calls...")
             raise StopTrainingException

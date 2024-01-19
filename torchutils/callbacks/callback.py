@@ -30,14 +30,14 @@ class TrainerCallback(TrainerBaseModel):
         """
         raise CallbackMethodNotImplemented
 
-    def on_training_epoch_begin(self):
+    def on_training_epoch_begin(self, epoch_index: int):
         """
         Event called at the beginning of a training epoch.
         :param epoch
         """
         raise CallbackMethodNotImplemented
 
-    def on_training_step_begin(self):
+    def on_training_step_begin(self, batch_index: int):
         """
         Event called at the beginning of a training step.
         """
@@ -64,19 +64,19 @@ class TrainerCallback(TrainerBaseModel):
         """
         raise CallbackMethodNotImplemented
 
-    def on_validation_run_begin(self):
+    def on_validation_run_begin(self, epoch_index: int):
         """
         Event called at the beginning of an evaluation epoch.
         """
         raise CallbackMethodNotImplemented
 
-    def on_validation_step_begin(self):
+    def on_validation_step_begin(self, batch_index: int):
         """
         Event called at the beginning of a evaluation step.
         """
         raise CallbackMethodNotImplemented
 
-    def on_validation_step_end(self, batch_index, batch, batch_output):
+    def on_validation_step_end(self, batch_index: int, batch, batch_output):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data
@@ -104,13 +104,13 @@ class TrainerCallback(TrainerBaseModel):
         """
         raise CallbackMethodNotImplemented
 
-    def on_evaluation_step_begin(self):
+    def on_evaluation_step_begin(self: int):
         """
         Event called at the beginning of a evaluation step.
         """
         raise CallbackMethodNotImplemented
 
-    def on_evaluation_step_end(self, batch_index, batch, batch_output):
+    def on_evaluation_step_end(self, batch_index: int, batch, batch_output):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data

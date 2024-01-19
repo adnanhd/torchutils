@@ -11,6 +11,7 @@ class TrainerBaseModel(pydantic.BaseModel):
     _sender: AverageScoreSender = pydantic.PrivateAttr()
     _recver: AverageScoreReceiver = pydantic.PrivateAttr()
     _buffer: typing.Dict[str, typing.Any] = pydantic.PrivateAttr(default_factory=dict)
+
     """
     The abstract base class to be subclassed when creating new callbacks.
     """
@@ -21,9 +22,10 @@ class TrainerBaseModel(pydantic.BaseModel):
                  **kwds):
         super().__init__(**kwds)
         assert isinstance(writable_scores, set) and isinstance(readable_scores, set)
-        self._logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        self._logger = logging.getLogger(self.__class__.__name__)
         self._sender = AverageScoreSender(names=writable_scores.copy())
         self._recver = AverageScoreReceiver(names=readable_scores.copy())
+        self._logger.setLevel(level=level)
 
     def log(self, msg, level=logging.INFO, **kwds) -> None:
         self._logger.log(level=level, msg=msg, **kwds)
@@ -61,16 +63,11 @@ class TrainerBaseModel(pydantic.BaseModel):
         sender.add_score_names(name)
 
     @typing.final
-    def add_score_names(self, name: str) -> None:
-        recver: AverageScoreSender = self.__pydantic_private__['_recver']
-        recver.add_score_names(name)
-
-    @typing.final
     def log_score(self, name: str, value: float) -> None:
         self._sender.send(name, value)
 
     @typing.final
-    def get_score_value(self) -> typing.Dict[str, float]:
+    def get_score_values(self) -> typing.Dict[str, float]:
         return self._recver.values
 
     @typing.final

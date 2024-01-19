@@ -9,11 +9,11 @@ class AverageScore(pydantic.BaseModel):
     _sum: float = pydantic.PrivateAttr(0)
     _count: float = pydantic.PrivateAttr(0)
     _value: float = pydantic.PrivateAttr(math.nan)
-    _logger: logging.Logger = pydantic.PrivateAttr()
+    #_logger: logging.Logger = pydantic.PrivateAttr()
 
     def __init__(self, **kwds):
         super().__init__(**kwds)
-        self._logger = logging.getLogger(self.__class__.__name__)
+        #self._logger = logging.getLogger(self.__class__.__name__)
         AVERAGE_SCORES_DICT[self.name] = self
 
     @pydantic.field_validator('name')
