@@ -1,8 +1,6 @@
-# Copyright © 2021 Chris Hughes
-import abc
+import typing
 import logging
 import pydantic
-import typing
 from .buffer import AverageScoreSender, AverageScoreReceiver
 
 
