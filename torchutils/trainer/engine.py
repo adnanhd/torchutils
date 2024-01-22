@@ -6,9 +6,9 @@ import logging
 import typing
 import warnings
 
-from ..metrics import CircularIteratorProfiler, Profiler
+from ..utils import CircularIteratorProfiler, Profiler
 from ..models import TrainerModel
-from ..datasets import TrainerDataset
+from ..datasets import DataLoaderWrapper
 from ..metrics import AverageScore, AverageScoreHandler
 from ..callbacks import CallbackHandler, StopTrainingException, TrainerCallback
 
@@ -35,8 +35,8 @@ class Trainer:
         log_level: int = logging.INFO
     ):
         self.model: TrainerModel = model
-        self.train_dataset: TrainerDataset = TrainerDataset(train_dataset, **train_dataloader_kwargs)
-        self.valid_dataset: TrainerDataset = TrainerDataset(valid_dataset, **valid_dataloader_kwargs)
+        self.train_dataset: DataLoaderWrapper = DataLoaderWrapper(train_dataset, **train_dataloader_kwargs)
+        self.valid_dataset: DataLoaderWrapper = DataLoaderWrapper(valid_dataset, **valid_dataloader_kwargs)
         
         self.metrics: typing.Set[str] = set()
         self.callbacks: typing.List[TrainerCallback] = list()
@@ -223,8 +223,8 @@ class Trainer:
         self.logger.info("predict_params: " + str(hparams))
 
         for test_nu, test_dataset in enumerate(test_datasets):
-            if not isinstance(test_dataset, TrainerDataset):
-                test_dataset = TrainerDataset(test_dataset)
+            if not isinstance(test_dataset, DataLoaderWrapper):
+                test_dataset = DataLoaderWrapper(test_dataset)
 
             dataloader_kwargs.setdefault('batch_size', len(test_dataset.dataset))
             dataloader_kwargs['train'] = False
