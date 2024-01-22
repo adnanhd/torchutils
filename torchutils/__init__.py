@@ -44,6 +44,6 @@ import torchutils.callbacks
 import torchutils.trainer
 import torchutils.logging
 import torchutils.metrics
-# import torchutils.utils
+import torchutils.utils
 
 __version__ = '2.3.0'

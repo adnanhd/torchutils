@@ -65,16 +65,16 @@ class EarlyStopping(TrainerCallback):
         # score <- -monitored_score if self.maximize else monitored_score
         # score <- monitored_score if maximize else -monitored_score
         score = self.get_score_averages()[self.monitor]
-        self.log_debug(f'Best score: {self._score} Current Score: {score}')
+        #self.log_debug(f'Best score: {self._score} Current Score: {score}')
         _score = score if self.maximize else -score
 
         if self._score * self.delta < _score:
             self._score = _score
             self._counter = 0
-            self.log_info(f"Best {self.monitor} score set to {score}")
+            self.log_debug(f"Best {self.monitor} score set to {score}")
         elif self._counter < self.patience:
             self._counter += self._nepv
-            self.log_info(f"Plateau: {self._counter} out of {self.patience}")
+            self.log_debug(f"Plateau: {self._counter} out of {self.patience}")
         else:
             delta = (1 - self.delta) if self.maximize else (1 - self.delta)
             self.log_warn(f"Early Stopping @ epoch {self._epoch} as {self.monitor}={score:.3e} "

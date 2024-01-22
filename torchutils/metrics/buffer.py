@@ -5,7 +5,6 @@ import typing
 import math
 
 
-
 class AverageScoreBuffer(pydantic.BaseModel):
     _names: typing.Set[str] = pydantic.PrivateAttr(default_factory=set)
     _scores: typing.Dict[str, AverageScore] = pydantic.PrivateAttr(default_factory=dict)
