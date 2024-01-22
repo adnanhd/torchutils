@@ -15,12 +15,12 @@ class Model(nn.Module):
     ...
     return X
 
-class _TrainerModel(TrainerModel):
-  def forward_pass(self, batch, batch_index=None):
+class MyTrainerModel(TrainerModel):
+  def forward(self, batch, batch_index=None):
     ...
 
-model = _TrainerModel(
-  model=Model(), 
+model = MyTrainerModel(
+  model=Model(), ## equivalenlty model='model-name' if 'model-name' is registerd in torchvision.models
   criterion='MSELoss', 
   optimizer='SDG',
   scheduler='ReduceLROnPleateau',

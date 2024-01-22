@@ -4,14 +4,28 @@ import copy
 import torch
 import typing
 import math
-import warnings
-import logging
 from .callback import TrainerCallback
 from ..models.hashs import digest
 from ..models import TrainerModel
+import collections
+import pydantic
+from .utils import GoalEnum
 
 
 class ModelCheckpoint(TrainerCallback):
+    monitor: str
+    goal: GoalEnum
+    delta: float = pydantic.Field(0.0, validate_default=True)
+    ckptpath: str = 'model.ckpt'
+    init_from_checkpoint: bool = False
+    halt_into_checkpoint: bool = False
+
+    _model: TrainerModel = pydantic.PrivateAttr()
+    _state_dict: collections.OrderedDict = pydantic.PrivateAttr()
+    _score: float = pydantic.PrivateAttr()
+    _delta: float = pydantic.PrivateAttr()
+    _is_train: bool = pydantic.PrivateAttr()
+    _history: list = pydantic.PrivateAttr()
     """
     Handles save and load operations between TrainerModel and Memory.
 
@@ -50,96 +64,84 @@ class ModelCheckpoint(TrainerCallback):
             loads the best checkpoint in the ModelCheckpoint to the TRAINER_MODEL
             on_evaluation_begin.
     """
+    @pydantic.field_validator('delta')
+    def validate_delta(cls, value, values: pydantic.ValidationInfo):
+        return (1 + value) if values.data['goal'].value == 'maximize' else (1 - value)
 
-    def __init__(self,
-                 model: TrainerModel,
-                 monitor: str,
-                 goal: str = 'minimize',
-                 # patience: int = 0,
-                 delta: float = 0.0,
-                 verbose: bool = False,
-                 filepath='model_checkpoint.ckpt',
-                 init_from_checkpoint: bool = False,
-                 halt_into_checkpoint: bool = False,
-                 ):
-        assert filepath.endswith('.ckpt')
-        assert goal in ('minimize', 'maximize')
-        super().__init__(level=logging.DEBUG if verbose else logging.INFO)
+    def __init__(self, monitor: str, model: TrainerModel, **kwds):
+        super().__init__(monitor=monitor, readable_scores={monitor}, **kwds)
         # filesystemdaki weights
         # callabackteki checkpoint
         # modeldeki state_dict
 
-        self.monitor: str = monitor
-        self.model: TrainerModel = model
-        self.state_dict = model.state_dict()
-        self.maximize: bool = goal == 'maximize'
-        self.delta: float = (1 + delta) if self.maximize else (1 - delta)
-        self.checkpoint_path: str = filepath
-        self.score: float = math.pow(-1, goal == 'minimize') * math.inf
+        self._model: TrainerModel = model
+        self._state_dict = model.state_dict()
+        self._score: float = math.pow(-1, int(not self.maximize)) * math.inf
 
         # values to be stored
-        self.history = list()
-        self.hparams = dict()
+        self._history = list()
+        # self.hparams = dict()
 
-        self.init_from_checkpoint: bool = init_from_checkpoint
-        self.halt_into_checkpoint: bool = halt_into_checkpoint
+    @property
+    def maximize(self):
+        return self.goal.value == 'maximize'
 
     @property
     def current_run(self):
-        return dict(config=self.hparams,
-                    scores=self.history,
+        return dict(#config=self.hparams,
+                    scores=self._history,
                     monitor=self.monitor,
-                    state_dict_checksum=digest(self.state_dict),
+                    state_dict_checksum=digest(self._state_dict),
                     goal='maximize' if self.maximize else 'minimize')
 
     def _statedict_to_ckptfile(self):
-        checkpoint = dict(state_dict=self.state_dict,
-                          checksum=digest(self.state_dict),
+        checkpoint = dict(state_dict=self._state_dict,
+                          checksum=digest(self._state_dict),
                           runs=[self.current_run])
-        if os.path.isfile(self.checkpoint_path):
-            checkpoint['runs'].extend(torch.load(self.checkpoint_path)['runs'])
-        torch.save(checkpoint, self.checkpoint_path)
+        if os.path.isfile(self.ckptpath):
+            checkpoint['runs'].extend(torch.load(self.ckptpath)['runs'])
+        torch.save(checkpoint, self.ckptpath)
 
     def _ckptfile_to_statedict(self):
-        self.model.load_state_dict(
-                torch.load(self.checkpoint_path)['state_dict'])
+        self._model.load_state_dict(
+                torch.load(self.ckptpath)['state_dict'])
 
     def on_initialization(self):
         if self.init_from_checkpoint:
-            if os.path.isfile(self.checkpoint_path):
+            if os.path.isfile(self.ckptpath):
                 self._ckptfile_to_statedict()
             else:
-                raise FileNotFoundError(f'ckptpath {self.checkpoint_path}')
+                raise FileNotFoundError(f'ckptpath {self.ckptpath}')
 
     def on_termination(self):
-        if self.train and self.halt_into_checkpoint:
-            if os.path.isfile(self.checkpoint_path):
-                run = torch.load(self.checkpoint_path)['runs'][0]
-                score = run['scores'][self.montior][0]
-                is_better = score * self.delta < self.score
+        if self._is_train and self.halt_into_checkpoint:
+            if os.path.isfile(self.ckptpath):
+                run = torch.load(self.ckptpath)['runs'][0]
+                score = run['scores'][-1][self.monitor]
+                is_better = score * self.delta < self._score
             else:
                 is_better = True
 
             if is_better:
                 self._statedict_to_ckptfile()
-                self.logger.info(f"model saved into {self.checkpoint_path}")
+                self.log_info(f"model saved into {self.ckptpath}")
             else:
-                self.logger.info("No better model saved into checkpoint")
+                self.log_info("No better model saved into checkpoint")
 
     def on_training_begin(self, config: typing.Dict):
-        self.hparams = copy.deepcopy(config)
-        self.train = True
+        #self.hparams = copy.deepcopy(config)
+        self._is_train = True
 
     def on_evaluation_run_begin(self, config: typing.Dict):
-        self.train = False
+        self._is_train = False
 
     def on_training_epoch_end(self):
-        self.history.append({'status': 'epoch_end', **self.scores})
+        self._history.append({'status': 'epoch_end', **self.get_score_averages()})
 
     def on_validation_run_end(self):
-        self.history.append({'status': 'valid_end', **self.scores})
-        score = self.scores[self.monitor] if self.maximize else -self.scores[self.monitor]
+        self._history.append({'status': 'valid_end', **self.get_score_averages()})
+        score = self.get_score_averages()[self.monitor] if self.maximize else -self.get_score_averages()[self.monitor]
 
-        if self.score * self.delta < score:
-            self.score = score
+        if self._score * self.delta < score:
+            self._score = score
             self._statedict_to_ckptfile()

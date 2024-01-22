@@ -6,15 +6,11 @@ import logging
 import typing
 import warnings
 
-from .profilers import ProfilerIterator
+from ..metrics import CircularIteratorProfiler, Profiler
 from ..models import TrainerModel
 from ..datasets import TrainerDataset
-from ..metrics import TrainerAverageScore, ScoreContainer, ScoreLogger
+from ..metrics import AverageScore, AverageScoreHandler
 from ..callbacks import CallbackHandler, StopTrainingException, TrainerCallback
-from ..logging import (
-    TRAIN_EPOCH, VALID_RUN, EVAL_RUN,
-    TRAIN_STEP, VALID_STEP, EVAL_STEP
-)
 
 
 class Trainer:
@@ -36,6 +32,7 @@ class Trainer:
         valid_dataset: typing.Optional[torch.utils.data.Dataset] = None,
         train_dataloader_kwargs: dict = dict(),
         valid_dataloader_kwargs: dict = dict(),
+        log_level: int = logging.INFO
     ):
         self.model: TrainerModel = model
         self.train_dataset: TrainerDataset = TrainerDataset(train_dataset, **train_dataloader_kwargs)
@@ -44,7 +41,8 @@ class Trainer:
         self.metrics: typing.Set[str] = set()
         self.callbacks: typing.List[TrainerCallback] = list()
         self.handlers: typing.Iterable[logging.Handler] = list()
-        self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(log_level)
 
     def compile(
             self,
@@ -77,10 +75,9 @@ class Trainer:
         dataloader = self.train_dataset.dataloader(batch_size=batch_size, device=device, train=True, **kwargs)
 
         if profile:
-            score = TrainerAverageScore('load_time', reset_on='epoch_end')
-            dataloader = ProfilerIterator(dataloader, score=score)
+            dataloader = CircularIteratorProfiler(iterable=dataloader, name='load_time')
             if valid_dataloader != []:
-                valid_dataloader = ProfilerIterator(valid_dataloader, score=score)
+                valid_dataloader = CircularIteratorProfiler(iterable=valid_dataloader, name='valid_load_time')
 
         hparams = dict(**hparams,
                        batch_size=batch_size,
@@ -105,12 +102,10 @@ class Trainer:
 
         # initialize components
         callb_lst = CallbackHandler(callbacks=callbacks)
-        score_lst = ScoreContainer(score_names=metrics)
-        score_lgr = ScoreLogger()
-        score_lgr.add_scores(score_lst)
+        score_lst = AverageScoreHandler()
 
         # dataloader prepare
-        step_timer = TrainerAverageScore('Exec Time', reset_on='epoch_end')
+        exec_timer = Profiler(name='exec_time')
         hparams, trainloader, validloader = self._initialize_loaders(
                 batch_size=batch_size, hparams=hparams,
                 profile=True, nepv=num_epochs_per_validation)
@@ -119,13 +114,11 @@ class Trainer:
         self.add_handlers(handlers)
         self.model.add_handlers(handlers)
         callb_lst.add_handlers(handlers)
-        score_lgr.add_handlers(handlers)
-        callb_lst.attach_score_dict(score_lst.score_dict())
 
         # logging initialization
         self.logger.info('Training Starts...')
         self.logger.info(str(self.model))
-        self.logger.info(str(hparams))
+        self.logger.info(f'train_params: {hparams}')
 
         try:
             callb_lst.on_initialization()
@@ -134,34 +127,29 @@ class Trainer:
 
             for epoch in range(num_epochs):
                 # Epoch preperation
-                callb_lst.on_training_epoch_begin()
+                callb_lst.on_training_epoch_begin(epoch_index=epoch)
 
                 self.model.train()
                 for index, batch in enumerate(trainloader):
 
                     # Step preperation
-                    callb_lst.on_training_step_begin()
+                    callb_lst.on_training_step_begin(batch_index=index)
 
                     # Step execution
-                    begin_time = time.time()
-                    output = self.model.forward_pass(batch_idx=index, batch=batch)
+                    exec_timer.set()
+                    output = self.model.forward_pass_on_training_step(batch_idx=index, batch=batch)
                     self.model.backward_pass()
-                    step_timer.update(time.time() - begin_time)
+                    exec_timer.lap()
 
                     # Step finishing
                     # finish computing train metrics ##
-                    score_lst.save_values_to_score_dict()
-                    score_lgr.log(TRAIN_STEP, epoch_index=epoch, batch_index=index)
                     callb_lst.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
-                    score_lst.reset_scores_on_step_end.trigger()
-                    del batch, output, begin_time
+                    del index, batch, output
 
                 # Epoch finishing
                 self.model.scheduler_step(epoch_idx=epoch)
-                score_lst.save_averages_to_score_dict()
-                score_lgr.log(TRAIN_EPOCH, epoch_index=epoch)
                 callb_lst.on_training_epoch_end()
-                score_lst.reset_scores_on_epoch_end.trigger()
+                score_lst.reset_scores()
 
                 if hparams['num_epochs_per_validation'] <= 0 \
                         or (epoch + 1) % hparams['num_epochs_per_validation']:
@@ -169,32 +157,27 @@ class Trainer:
 
                 self.model.eval()
                 with torch.no_grad():
-                    callb_lst.on_validation_run_begin()
+                    callb_lst.on_validation_run_begin(epoch_index=epoch)
 
                     for index, batch in enumerate(validloader):
 
                         # Step Preperation
-                        callb_lst.on_validation_step_begin()
+                        callb_lst.on_validation_step_begin(batch_index=index)
 
                         # Step execution
-                        begin_time = time.time()
-                        output = self.model.forward_pass_no_grad(batch_idx=index, batch=batch)
+                        exec_timer.set()
+                        output = self.model.forward_pass_on_validation_step(batch_idx=index, batch=batch)
                         self.model.reset_backward()
-                        step_timer.update(time.time() - begin_time)
+                        exec_timer.lap()
 
                         # Step finishing
                         # finish computing valid metrics ##
-                        score_lst.save_values_to_score_dict()
-                        score_lgr.log(VALID_STEP, epoch_index=epoch, batch_index=index)
                         callb_lst.on_validation_step_end(batch_index=index, batch=batch, batch_output=output)
-                        score_lst.reset_scores_on_step_end.trigger()
-                        del batch, output, begin_time
+                        del index, batch, output
 
                     # Epoch finishing
-                    score_lst.save_averages_to_score_dict()
-                    score_lgr.log(VALID_RUN, epoch_index=epoch)
                     callb_lst.on_validation_run_end()
-                    score_lst.reset_scores_on_epoch_end.trigger()
+                    score_lst.reset_scores()
             callb_lst.on_training_end()
         except StopTrainingException:
             callb_lst.on_stop_training_error()
@@ -204,8 +187,6 @@ class Trainer:
         self.remove_handlers(handlers)
         self.model.remove_handlers(handlers)
         callb_lst.remove_handlers(handlers)
-        score_lgr.remove_handlers(handlers)
-        callb_lst.detach_score_dict()
 
 
     @torch.no_grad()
@@ -229,22 +210,17 @@ class Trainer:
 
         # initialize components
         callb_lst = CallbackHandler(callbacks=callbacks)
-        score_lst = ScoreContainer(score_names=metrics)
-        score_lgr = ScoreLogger()
-        score_lgr.add_scores(score_lst)
-        exec_timer = TrainerAverageScore('Exec Time', reset_on='epoch_end')
+        score_lst = AverageScoreHandler()
+        exec_timer = Profiler(name='exec_time')
         
         # handlers
         self.add_handlers(handlers)
         self.model.add_handlers(handlers)
         callb_lst.add_handlers(handlers)
-        score_lgr.add_handlers(handlers)
-        callb_lst.attach_score_dict(score_lst.score_dict())
 
         # logging initialization
         self.logger.info('Prediction Starts...')
-        self.logger.info(str(self.model))
-        self.logger.info(str(hparams))
+        self.logger.info("predict_params: " + str(hparams))
 
         for test_nu, test_dataset in enumerate(test_datasets):
             if not isinstance(test_dataset, TrainerDataset):
@@ -255,9 +231,7 @@ class Trainer:
             dataloader_kwargs['device'] = self.model.device
             dataloader = test_dataset.dataloader(**dataloader_kwargs)
             if profile:
-                dataloader = ProfilerIterator(dataloader,
-                                              score=TrainerAverageScore('Load Time',
-                                                                 reset_on='epoch_end'))
+                dataloader = CircularIteratorProfiler(iterable=dataloader, name='load_time')
 
             try:
                 callb_lst.on_initialization()
@@ -268,27 +242,22 @@ class Trainer:
                 for index, batch in enumerate(dataloader):
 
                     # Step Preperation
-                    callb_lst.on_evaluation_step_begin()
+                    callb_lst.on_evaluation_step_begin(batch_index=index)
 
                     # Step execution
-                    begin_time = time.time()
-                    output = self.model.forward_pass_no_grad(batch_idx=index, batch=batch)
+                    exec_timer.set()
+                    output = self.model.forward_pass_on_evauluation_step(batch_idx=index, batch=batch)
                     self.model.reset_backward()
-                    exec_timer.update(time.time() - begin_time)
+                    exec_timer.lap()
 
                     # Step finishing
                     # finish computing valid metrics ##
-                    score_lst.save_values_to_score_dict()
-                    score_lgr.log(EVAL_STEP, test_nu, index)
                     callb_lst.on_evaluation_step_end(batch_index=index, batch=batch, batch_output=output)
-                    score_lst.reset_scores_on_step_end.trigger()
-                    del batch, output, begin_time
+                    del index, batch, output
 
                 # Epoch finishing
-                score_lst.save_averages_to_score_dict()
-                score_lgr.log(EVAL_RUN, test_nu, index)
                 callb_lst.on_evaluation_run_end()
-                score_lst.reset_scores_on_epoch_end.trigger()
+                score_lst.reset_scores()
                     
             except StopTrainingException:
                 callb_lst.on_stop_training_error()
@@ -298,8 +267,6 @@ class Trainer:
         self.remove_handlers(handlers)
         self.model.remove_handlers(handlers)
         callb_lst.remove_handlers(handlers)
-        score_lgr.remove_handlers(handlers)
-        callb_lst.detach_score_dict()
 
     def add_handlers(self, hdlrs: typing.List[logging.Handler]):
         for hdlr in hdlrs:
