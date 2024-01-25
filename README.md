@@ -1,20 +1,6 @@
 ## torchutils
 PyTorch-Utils is a library to boost the use of PyTorch library using only very few lines of codes.
 
-## TO-DO
-- [ ] `Metric Handler.compute()` functions 
-- [ ] and metric registration mechanism
-  - [ ] adding some regression, classification, segmentation metrics
-  - [ ] support also jit or ray computation
-- [ ] passing `batch` and `batch_output` to `MetricHandler.compute()` only, not to `CallbackHandler`
-
-- [ ] profilers logging etc.
-
-- [ ] get rid of DataLoaderWrapper instead use datasets.DatasetWrapper
-- [ ] register some well known datasets like mnist, cifar-10, cifar-100, voc
-
-- [ ] fix AverageScore registration, overwrite if it's exists and fix `.add_score()` and `.add_score_name()` functions
-
 ### A Quick Example
 ```python
 from torchutils.trainer import Trainer
@@ -47,3 +33,17 @@ valid_dataset = ...
 trainer = Trainer(model=model, train_dataset=train_dataset, valid_dataset=valid_dataset)
 trainer.train(num_epochs=120, batch_size=24)
 ```
+
+## TO-DO
+- [ ] `Metric Handler.compute()` functions 
+- [ ] and metric registration mechanism
+  - [ ] adding some regression, classification, segmentation metrics
+  - [ ] support also jit or ray computation
+- [ ] passing `batch` and `batch_output` to `MetricHandler.compute()` only, not to `CallbackHandler`
+
+- [ ] profilers logging etc.
+
+- [ ] get rid of DataLoaderWrapper instead use datasets.DatasetWrapper
+- [ ] register some well known datasets like mnist, cifar-10, cifar-100, voc
+
+- [ ] fix AverageScore registration, overwrite if it's exists and fix `.add_score()` and `.add_score_name()` functions
