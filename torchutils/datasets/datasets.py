@@ -15,16 +15,27 @@ After that you can use `map`, `apply` and other functionalities like you normall
 either `torchdatasets.Dataset` or `torchdatasets.Iterable`.
 """
 
+import os
 import abc
 import functools
 import pathlib
 import typing
+from torch import default_generator, device as torch_device
+from torch.utils.data import random_split
 
-from torch.utils.data import ChainDataset as TorchChain
-from torch.utils.data import ConcatDataset as TorchConcatDataset
-from torch.utils.data import Dataset as TorchDataset
-from torch.utils.data import IterableDataset as TorchIterable
-from torch.utils.data import TensorDataset as TorchTensorDataset
+from torch.utils.data import (
+    ChainDataset as TorchChain,
+    ConcatDataset as TorchConcatDataset,
+    Dataset as TorchDataset,
+    IterableDataset as TorchIterable,
+    TensorDataset as TorchTensorDataset,
+    DataLoader as TorchDataLoader
+)
+
+#from torch.utils.data import ConcatDataset as TorchConcatDataset
+#from torch.utils.data import Dataset as TorchDataset
+#from torch.utils.data import IterableDataset as TorchIterable
+#from torch.utils.data import TensorDataset as TorchTensorDataset
 
 from ._base import Base, MetaDataset, MetaIterable
 from .cachers import Memory
@@ -48,6 +59,20 @@ class _DatasetBase(Base):
         self._maps = []
         self._concat_object = concat_object
         self._chain_object = chain_object
+
+    def random_split(self, *lengths, generator=default_generator):
+        return random_split(self, lengths, generator=generator)
+    
+    def dataloader(self, train: bool = False, device: torch_device = 'cpu', **kwargs):
+        assert isinstance(device, torch_device) or isinstance(device, str)
+        device = torch_device(device) if isinstance(device, str) else device
+
+        kwargs.setdefault('batch_size', len(self))
+        kwargs.setdefault('shuffle', train)
+        kwargs.setdefault('pin_memory', device.type != 'cuda')
+        kwargs.setdefault('num_workers', (device.type != 'cuda') * os.cpu_count())
+
+        return TorchDataLoader(self, **kwargs)
 
     def map(self, function: typing.Callable):
         r"""**Map function to each element of dataset.**

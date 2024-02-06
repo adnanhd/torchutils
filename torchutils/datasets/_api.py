@@ -1,6 +1,8 @@
-DATASETS_DICT = dict()
 from .datasets import WrapDataset
 from torch.utils.data import Dataset
+
+
+DATASETS_DICT = dict()
 
 
 def wrap_builder_output(builder):

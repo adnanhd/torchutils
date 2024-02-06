@@ -8,7 +8,7 @@ import warnings
 
 from ..utils import CircularIteratorProfiler, Profiler
 from ..models import TrainerModel
-from ..datasets import DataLoaderWrapper
+from ..datasets import Dataset
 from ..metrics import AverageScore, AverageScoreHandler
 from ..callbacks import CallbackHandler, StopTrainingException, TrainerCallback
 
@@ -19,6 +19,8 @@ class Trainer:
         'device',
         'train_dataset',
         'valid_dataset',
+        'train_dataloader_kwargs',
+        'valid_dataloader_kwargs',
         'metrics',
         'callbacks',
         'handlers',
@@ -35,8 +37,10 @@ class Trainer:
         log_level: int = logging.INFO
     ):
         self.model: TrainerModel = model
-        self.train_dataset: DataLoaderWrapper = DataLoaderWrapper(train_dataset, **train_dataloader_kwargs)
-        self.valid_dataset: DataLoaderWrapper = DataLoaderWrapper(valid_dataset, **valid_dataloader_kwargs)
+        self.train_dataset: Dataset = train_dataset
+        self.valid_dataset: Dataset = valid_dataset
+        self.train_dataloader_kwargs = train_dataloader_kwargs
+        self.valid_dataloader_kwargs = valid_dataloader_kwargs
         
         self.metrics: typing.Set[str] = set()
         self.callbacks: typing.List[TrainerCallback] = list()
@@ -69,10 +73,15 @@ class Trainer:
         if self.valid_dataset.dataset is None:
             nepv = 0
             valid_dataloader = []
-        else:
+        elif not isinstance(self.valid_dataset, torch.data.utils.DataLoader):
             valid_dataloader = self.valid_dataset.dataloader(device=device, train=False, **kwargs)
+        else:
+            valid_dataloader = self.valid_dataset
             
-        dataloader = self.train_dataset.dataloader(batch_size=batch_size, device=device, train=True, **kwargs)
+        if not isinstance(self.train_dataset, torch.data.utils.DataLoader):
+            dataloader = self.train_dataset.dataloader(batch_size=batch_size, device=device, train=True, **kwargs)
+        else:
+            dataloader = self.train_dataset
 
         if profile:
             dataloader = CircularIteratorProfiler(iterable=dataloader, name='load_time')
