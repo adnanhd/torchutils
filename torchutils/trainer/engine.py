@@ -152,7 +152,7 @@ class Trainer:
 
                     # Step finishing
                     # finish computing train metrics ##
-                    callb_lst.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
+                    callb_lst.on_training_step_end(batch_index=index)
                     del index, batch, output
 
                 # Epoch finishing
@@ -181,7 +181,7 @@ class Trainer:
 
                         # Step finishing
                         # finish computing valid metrics ##
-                        callb_lst.on_validation_step_end(batch_index=index, batch=batch, batch_output=output)
+                        callb_lst.on_validation_step_end(batch_index=index)
                         del index, batch, output
 
                     # Epoch finishing
@@ -201,7 +201,7 @@ class Trainer:
     @torch.no_grad()
     def predict(
         self,
-        *test_datasets: torch.utils.data.Dataset,
+        test_dataset: torch.utils.data.Dataset,
         metrics: typing.Set[str] = set(),
         callbacks: typing.List[TrainerCallback] = list(),
         handlers: typing.Iterable[logging.Handler] = list(),
@@ -231,9 +231,9 @@ class Trainer:
         self.logger.info('Prediction Starts...')
         self.logger.info("predict_params: " + str(hparams))
 
-        for test_nu, test_dataset in enumerate(test_datasets):
-            if not isinstance(test_dataset, DataLoaderWrapper):
-                test_dataset = DataLoaderWrapper(test_dataset)
+        with torch.no_grad():
+            if not isinstance(test_dataset, Dataset):
+                test_dataset = Dataset(test_dataset)
 
             dataloader_kwargs.setdefault('batch_size', len(test_dataset.dataset))
             dataloader_kwargs['train'] = False
@@ -261,7 +261,7 @@ class Trainer:
 
                     # Step finishing
                     # finish computing valid metrics ##
-                    callb_lst.on_evaluation_step_end(batch_index=index, batch=batch, batch_output=output)
+                    callb_lst.on_evaluation_step_end(batch_index=index)
                     del index, batch, output
 
                 # Epoch finishing
