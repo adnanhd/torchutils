@@ -1,13 +1,21 @@
-from .datasets import WrapDataset
-from torch.utils.data import Dataset
+from .datasets import WrapDataset, WrapIterable, TorchDataset, TorchIterable, _Wrap, Dataset
 
 
 DATASETS_DICT = dict()
 
 
-def wrap_builder_output(builder):
-    maybe_wrap = lambda dset: WrapDataset(dset) if isinstance(dset, Dataset) else dset
+def maybe_wrap(dataset) -> Dataset:
+    if isinstance(dataset, TorchDataset):
+        return WrapDataset(dataset=dataset)
+    elif isinstance(dataset, TorchIterable):
+        return WrapIterable(dataset=dataset)
+    return dataset
 
+def is_wrapped(dataset):
+    return isinstance(dataset, _Wrap)
+
+
+def wrap_builder_output(builder):
     def wrapped_builder(**kwds):
         return tuple(map(maybe_wrap, builder(**kwds)))
     return wrapped_builder
@@ -26,5 +34,4 @@ def register_builder(name):
 
 def build_dataset(name, **builder_kwds):
     assert name in DATASETS_DICT.keys(), f'{name} is not registered'
-    maybe_wrap = lambda dset: WrapDataset(dset) if isinstance(dset, Dataset) else dset
     return tuple(map(maybe_wrap, DATASETS_DICT[name](**builder_kwds)))

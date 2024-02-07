@@ -3,6 +3,5 @@
 
 from . import cachers, datasets, maps, modifiers, samplers
 from ._api import build_dataset, register_builder
-from .datasets import Dataset, Iterable
-from .wrappers import DataLoaderWrapper
-__version__ = '0.2.0'
+from .datasets import Dataset, Iterable, WrapDataset, WrapIterable
+from ._version import __version__

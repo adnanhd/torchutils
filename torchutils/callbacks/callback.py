@@ -1,5 +1,5 @@
 # Copyright © 2021 Chris Hughes
-from ..metrics import TrainerBaseModel
+from .._dev_utils import TrainerBaseModel
 
 
 class StopTrainingException(Exception):

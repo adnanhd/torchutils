@@ -5,7 +5,7 @@ import typing
 import torch
 from collections import OrderedDict
 
-from ..metrics import AverageScore, TrainerBaseModel
+from .._dev_utils import AverageScore, TrainerBaseModel
 from .hashs import digest
 from .typing import (
     NeuralNet,
