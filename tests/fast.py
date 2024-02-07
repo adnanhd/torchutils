@@ -4,10 +4,10 @@ import torch.nn as nn
 from torchutils.logging import CSVHandler, scoreFilterRun
 from torchutils.trainer import Trainer
 from torchutils.models import TrainerModel
-from torchutils.datasets import NumpyDataset
+from torchutils.datasets.datasets import TensorDataset
 from torchutils.callbacks import AverageScoreLogger
 import sys
-from torchutils.datasets.transforms import ToDevice
+#from torchutils.datasets.transforms import ToDevice
 
 # Download ImageNet labels
 dataset_length = 300000
@@ -20,10 +20,10 @@ model = TrainerModel(
     momentum=0.80,
 )
 
-dataset = NumpyDataset(inputs=torch.randn(dataset_length, 512),
-                       labels=torch.ones(dataset_length, 1),
-                       input_transforms=[ToDevice('cuda')],
-                       label_transforms=[ToDevice('cuda')])
+dataset = TensorDataset(torch.randn(dataset_length, 512),
+                        torch.ones(dataset_length, 1))
+
+1/0
 
 trainer = Trainer(model=model, train_dataset=dataset, log_level=10)
 handler_csv = CSVHandler("deneme.csv", "linear_model_loss")
