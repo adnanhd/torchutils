@@ -1,4 +1,3 @@
-from .._dev_utils import TrainerBaseModel
 from .metric import _BaseMetric
 from itertools import chain
 import typing

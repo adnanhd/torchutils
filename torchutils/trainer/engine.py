@@ -42,7 +42,6 @@ class Trainer:
         log_level: int = logging.INFO
     ):
         self.model: TrainerModel = model
-        
         self.metrics: typing.Set[str] = set()
         self.callbacks: typing.List[TrainerCallback] = list()
         self.handlers: typing.Iterable[logging.Handler] = list()
