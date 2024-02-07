@@ -40,6 +40,7 @@
 
 # import torchutils.data
 import torchutils.models
+import torchutils.metrics
 import torchutils.callbacks
 import torchutils.trainer
 import torchutils.logging
