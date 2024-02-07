@@ -39,11 +39,11 @@ trainer.train(num_epochs=120, batch_size=24)
 - [ ] and metric registration mechanism
   - [ ] adding some regression, classification, segmentation metrics
   - [ ] support also jit or ray computation
-- [ ] passing `batch` and `batch_output` to `MetricHandler.compute()` only, not to `CallbackHandler`
+- [x] passing `batch` and `batch_output` to `MetricHandler.compute()` only, not to `CallbackHandler`
 
 - [ ] profilers logging etc.
 
-- [ ] get rid of DataLoaderWrapper instead use datasets.DatasetWrapper
+- [x] get rid of DataLoaderWrapper instead use datasets.DatasetWrapper
 - [ ] register some well known datasets like mnist, cifar-10, cifar-100, voc
 
 - [ ] fix AverageScore registration, overwrite if it's exists and fix `.add_score()` and `.add_score_name()` functions
