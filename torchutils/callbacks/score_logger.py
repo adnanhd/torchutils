@@ -4,7 +4,7 @@ import typing
 from .utils import LogLevelEnum
 
 
-class AverageScoreLogger(TrainerCallback):
+class LogMetersCallback(TrainerCallback):
     def __init__(self, *score_names, level=10):
         super().__init__(readable_scores=set(score_names))
         self._logger.setLevel(level)

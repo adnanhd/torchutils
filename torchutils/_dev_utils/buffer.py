@@ -1,13 +1,13 @@
-from .score import AVERAGE_SCORES_DICT, AverageScore
+from .meter import AVERAGE_SCORES_DICT, AverageMeter
 import pydantic
 import logging
 import typing
 import math
 
 
-class AverageScoreBuffer(pydantic.BaseModel):
+class MeterModelBuffer(pydantic.BaseModel):
     _names: typing.Set[str] = pydantic.PrivateAttr(default_factory=set)
-    _scores: typing.Dict[str, AverageScore] = pydantic.PrivateAttr(default_factory=dict)
+    _scores: typing.Dict[str, AverageMeter] = pydantic.PrivateAttr(default_factory=dict)
     def __init__(self, names=None):
         super().__init__()
         if names is None:
@@ -34,25 +34,25 @@ class AverageScoreBuffer(pydantic.BaseModel):
     def names(self) -> typing.Set[str]:
         return self._names.copy()
     
-    def _get_average_score(self, name: str) -> AverageScore:
+    def _get_average_score(self, name: str) -> AverageMeter:
         assert name in self._names, f'{name} is not valid'
         if name not in self._scores:
             self._scores[name] = AVERAGE_SCORES_DICT[name]
         return self._scores[name]
 
 
-class AverageScoreSender(AverageScoreBuffer):
+class MeterModelSender(MeterModelBuffer):
     def send(self, name: str, value: float):
         self._get_average_score(name).update(value)
     
     def names_validator(cls, value) -> typing.Set[str]:
         for name in value:
             if name not in AVERAGE_SCORES_DICT:
-                AVERAGE_SCORES_DICT[name] = AverageScore(name=name)
+                AVERAGE_SCORES_DICT[name] = AverageMeter(name=name)
         return value
 
 
-class AverageScoreReceiver(AverageScoreBuffer):
+class MeterModelReceiver(MeterModelBuffer):
     @pydantic.computed_field
     def values(self) -> typing.Dict[str, float]:
         scores =  map(self._get_average_score, self._names)
@@ -72,7 +72,7 @@ class AverageScoreReceiver(AverageScoreBuffer):
         return dict(zip(self._names, scores))
 
 
-class AverageScoreHandler(AverageScoreBuffer):
+class MeterHandler(MeterModelBuffer):
     def reset_scores(self, *score_names: str):
         if len(score_names) == 0:
             score_names = self.names
@@ -81,8 +81,8 @@ class AverageScoreHandler(AverageScoreBuffer):
     
 
 if __name__ == '__main__':
-    sender = AverageScoreSender(names={'Foo'})
-    receiver = AverageScoreReceiver()
-    handler = AverageScoreHandler()
+    sender = MeterModelSender(names={'Foo'})
+    receiver = MeterModelReceiver()
+    handler = MeterHandler()
     sender.send('Foo', 2)
     handler.reset_scores()

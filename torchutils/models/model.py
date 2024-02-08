@@ -3,9 +3,10 @@ import inspect
 import pydantic
 import typing
 import torch
+from functools import reduce
 from collections import OrderedDict
 
-from .._dev_utils import AverageScore, TrainerBaseModel
+from .._dev_utils import AverageMeter, TrainerMeterModel
 from .hashs import digest
 from .typing import (
     NeuralNet,
@@ -18,14 +19,14 @@ from .typing import (
 )
 
 
-class TrainerModel(TrainerBaseModel):
+class TrainerModel(TrainerMeterModel):
     arguments: typing.Dict = pydantic.Field(default_factory=dict)
     criterion: typing.Union[Criterion, Functional]
     model: NeuralNet
     optimizer: Optimizer
     scheduler: typing.Optional[Scheduler]
     _backward_hooks: typing.List[GradTensor] = pydantic.PrivateAttr(default_factory=list)
-    _loss: AverageScore = pydantic.PrivateAttr()
+    _loss: AverageMeter = pydantic.PrivateAttr()
 
     @classmethod
     def __get_validators__(cls):
@@ -57,13 +58,17 @@ class TrainerModel(TrainerBaseModel):
             lossname = self.criterion.__name__
         else:
             lossname = self.criterion.__class__.__name__
-        self._loss = AverageScore(name=lossname)
+        self._loss = AverageMeter(name=lossname)
         self._buffer['lossname'] = lossname
         self._buffer['modelname'] = modelname
 
     @pydantic.computed_field
     def criterion_name(self) -> str:
         return self._buffer['lossname']
+
+    @pydantic.computed_field
+    def num_parameters(self) -> int:
+        return reduce(lambda acc, param: acc.__add__(param.numel()), self.model.parameters(), 0)
 
     # STATE DICT FUNCTIONS
     def __state_names__(self) -> typing.Set[str]:
@@ -115,7 +120,7 @@ class TrainerModel(TrainerBaseModel):
     def dtype(self) -> torch.dtype:
         return next(self.model.parameters()).dtype
 
-    @property
+    @pydantic.computed_field
     def checksum(self) -> str:
         return digest(self.state_dict())
 
@@ -156,7 +161,7 @@ class TrainerModel(TrainerBaseModel):
         return y_pred, loss
 
     def forward_pass_on_training_step(self, batch, batch_idx=None):
-        if not self.model.__getstate__()['training']:
+        if not self.model.training:
             self.log_warn("Training without self.train() call")
         y_pred, loss = self.forward(batch, batch_idx=batch_idx)
         self._push_for_backward(loss)
@@ -165,7 +170,7 @@ class TrainerModel(TrainerBaseModel):
 
     @torch.no_grad()
     def forward_pass_on_validation_step(self, batch, batch_idx=None):
-        if self.model.__getstate__()['training']:
+        if self.model.training:
             self.log_warn("Evaluating without self.eval() call")
         y_pred, loss = self.forward(batch, batch_idx=batch_idx)
         self._loss.update(loss.item())
@@ -173,7 +178,7 @@ class TrainerModel(TrainerBaseModel):
     
     @torch.no_grad()
     def forward_pass_on_evauluation_step(self, batch, batch_idx=None):
-        if self.model.__getstate__()['training']:
+        if self.model.training:
             self.log_warn("Evaluating without self.eval() call")
         y_pred, loss = self.forward(batch, batch_idx=batch_idx)
         self._loss.update(loss.item())

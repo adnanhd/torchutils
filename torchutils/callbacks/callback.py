@@ -1,5 +1,5 @@
 # Copyright © 2021 Chris Hughes
-from .._dev_utils import TrainerBaseModel
+from .._dev_utils import TrainerMeterModel
 
 
 class StopTrainingException(Exception):
@@ -14,7 +14,7 @@ class CallbackMethodNotImplemented(Exception):
 
 
 
-class TrainerCallback(TrainerBaseModel):
+class TrainerCallback(TrainerMeterModel):
     def on_initialization(self):
         """
         Event called at the end of trainer initialisation.

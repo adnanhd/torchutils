@@ -8,7 +8,7 @@ import warnings
 
 from ..utils import CircularIteratorProfiler, Profiler
 from ..models import TrainerModel
-from .._dev_utils import AverageScore, AverageScoreHandler
+from .._dev_utils import AverageMeter, MeterHandler
 from ..callbacks import CallbackHandler, StopTrainingException, TrainerCallback
 
 from ..datasets._api import maybe_wrap
@@ -115,7 +115,7 @@ class Trainer:
 
         # initialize components
         callb_lst = CallbackHandler(callbacks=callbacks)
-        score_lst = AverageScoreHandler()
+        score_lst = MeterHandler()
 
         # handlers
         self.add_handlers(handlers)
@@ -220,7 +220,7 @@ class Trainer:
 
         # initialize components
         callb_lst = CallbackHandler(callbacks=callbacks)
-        score_lst = AverageScoreHandler()
+        score_lst = MeterHandler()
         exec_timer = Profiler(name='exec_time')
         
         # handlers

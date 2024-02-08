@@ -39,7 +39,7 @@ def create_metric_validator(**params):
 
 
 numpy_metric_validator = create_metric_validator(y_pred=np.ndarray, y_true=np.ndarray)
-tensor_metric_validator = create_metric_validator(input=torch.Tensor, target=torch.Tensor)
+tensor_metric_validator = create_metric_validator(output=torch.Tensor, target=torch.Tensor)
 
 
 class NumpyMetric(_BaseMetric):

@@ -1,13 +1,13 @@
 import typing
 import logging
 import pydantic
-from .buffer import AverageScoreSender, AverageScoreReceiver
+from .buffer import MeterModelSender, MeterModelReceiver
 
 
-class TrainerBaseModel(pydantic.BaseModel):
+class MeterModel(pydantic.BaseModel):
     _logger: logging.Logger = pydantic.PrivateAttr()
-    _sender: AverageScoreSender = pydantic.PrivateAttr()
-    _recver: AverageScoreReceiver = pydantic.PrivateAttr()
+    _sender: MeterModelSender = pydantic.PrivateAttr()
+    _recver: MeterModelReceiver = pydantic.PrivateAttr()
     _buffer: typing.Dict[str, typing.Any] = pydantic.PrivateAttr(default_factory=dict)
 
     """
@@ -21,8 +21,8 @@ class TrainerBaseModel(pydantic.BaseModel):
         super().__init__(**kwds)
         assert isinstance(writable_scores, set) and isinstance(readable_scores, set)
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._sender = AverageScoreSender(names=writable_scores.copy())
-        self._recver = AverageScoreReceiver(names=readable_scores.copy())
+        self._sender = MeterModelSender(names=writable_scores.copy())
+        self._recver = MeterModelReceiver(names=readable_scores.copy())
         self._logger.setLevel(level=level)
 
     def log(self, msg, level=logging.INFO, **kwds) -> None:
@@ -57,7 +57,7 @@ class TrainerBaseModel(pydantic.BaseModel):
 
     @typing.final
     def add_score(self, name: str) -> None:
-        sender: AverageScoreSender = self.__pydantic_private__['_sender']
+        sender: MeterModelSender = self.__pydantic_private__['_sender']
         sender.add_score_names(name)
 
     @typing.final

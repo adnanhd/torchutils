@@ -4,7 +4,7 @@ import typing
 import math
 
 
-class AverageScore(pydantic.BaseModel):
+class AverageMeter(pydantic.BaseModel):
     name: str
     _sum: float = pydantic.PrivateAttr(0)
     _count: float = pydantic.PrivateAttr(0)
@@ -49,4 +49,4 @@ class AverageScore(pydantic.BaseModel):
         self._count += 1
     
 
-AVERAGE_SCORES_DICT: typing.Dict[str, AverageScore] = dict()
+AVERAGE_SCORES_DICT: typing.Dict[str, AverageMeter] = dict()

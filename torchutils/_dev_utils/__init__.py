@@ -1,4 +1,4 @@
 # from .utils import EndPoint, endpointmethod, eventtrigger
-from .score import AverageScore
-from .base import TrainerBaseModel
-from .buffer import AverageScoreSender, AverageScoreReceiver, AverageScoreHandler
+from .meter import AverageMeter
+from .base import MeterModel as TrainerMeterModel
+from .buffer import MeterModelSender, MeterModelReceiver, MeterHandler
