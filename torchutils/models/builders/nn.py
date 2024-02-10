@@ -2,8 +2,8 @@ import torch.nn as nn
 import torchvision.models as m
 import inspect
 import abc
-from .base import BuilderType
-from .._dev_utils import obtain_registered_kwargs
+from ...utils import BuilderType
+from ._dev_utils import obtain_registered_kwargs
 
 __all__ = ['NeuralNet']
 

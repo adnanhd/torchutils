@@ -118,9 +118,10 @@ class Trainer:
         score_lst = MeterHandler()
 
         # handlers
-        self.add_handlers(handlers)
-        self.model.add_handlers(handlers)
-        callb_lst.add_handlers(handlers)
+        for hdlr in handlers:
+            self.logger.addHandler(hdlr)
+            self.model.add_handler(hdlr)
+            callb_lst.add_handler(hdlr)
 
         # logging initialization
         self.logger.info('Training Starts...')
@@ -150,13 +151,13 @@ class Trainer:
 
                     # Step finishing
                     # finish computing train metrics ##
-                    callb_lst.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
+                    callb_lst.on_training_step_end(batch_index=index)
                     del index, batch, output
 
                 # Epoch finishing
                 self.model.scheduler_step(epoch_idx=epoch)
                 callb_lst.on_training_epoch_end()
-                score_lst.reset_scores()
+                score_lst.reset_meters()
 
                 if hparams['num_epochs_per_validation'] <= 0 \
                         or (epoch + 1) % hparams['num_epochs_per_validation']:
@@ -179,22 +180,23 @@ class Trainer:
 
                         # Step finishing
                         # finish computing valid metrics ##
-                        callb_lst.on_validation_step_end(batch_index=index, batch=batch, batch_output=output)
+                        callb_lst.on_validation_step_end(batch_index=index)
                         del index, batch, output
 
                     # Epoch finishing
                     callb_lst.on_validation_run_end()
-                    score_lst.reset_scores()
+                    score_lst.reset_meters()
             callb_lst.on_training_end()
         except StopTrainingException:
             callb_lst.on_stop_training_error()
         finally:
             callb_lst.on_termination()
 
-        self.remove_handlers(handlers)
-        self.model.remove_handlers(handlers)
-        callb_lst.remove_handlers(handlers)
-
+        
+        for hdlr in handlers:
+            self.logger.removeHandler(hdlr)
+            self.model.remove_handler(hdlr)
+            callb_lst.remove_handler(hdlr)
 
     @torch.no_grad()
     def predict(
@@ -224,9 +226,10 @@ class Trainer:
         exec_timer = Profiler(name='exec_time')
         
         # handlers
-        self.add_handlers(handlers)
-        self.model.add_handlers(handlers)
-        callb_lst.add_handlers(handlers)
+        for hdlr in handlers:
+            self.logger.addHandler(hdlr)
+            self.model.add_handler(hdlr)
+            callb_lst.add_handler(hdlr)
 
         # logging initialization
         self.logger.info('Prediction Starts...')
@@ -254,26 +257,27 @@ class Trainer:
 
                     # Step finishing
                     # finish computing valid metrics ##
-                    callb_lst.on_evaluation_step_end(batch_index=index, batch=batch, batch_output=output)
+                    callb_lst.on_evaluation_step_end(batch_index=index)
                     del index, batch, output
 
                 # Epoch finishing
                 callb_lst.on_evaluation_run_end()
-                score_lst.reset_scores()
+                score_lst.reset_meters()
                     
             except StopTrainingException:
                 callb_lst.on_stop_training_error()
             finally:
                 callb_lst.on_termination()
 
-        self.remove_handlers(handlers)
-        self.model.remove_handlers(handlers)
-        callb_lst.remove_handlers(handlers)
+        for hdlr in handlers:
+            self.logger.removeHandler(hdlr)
+            self.model.remove_handler(hdlr)
+            callb_lst.remove_handler(hdlr)
 
-    def add_handlers(self, hdlrs: typing.List[logging.Handler]):
+    def add_handler(self, *hdlrs: logging.Handler):
         for hdlr in hdlrs:
             self.logger.addHandler(hdlr)
 
-    def remove_handlers(self, hdlrs: typing.List[logging.Handler]):
+    def remove_handler(self, *hdlrs: logging.Handler):
         for hdlr in hdlrs:
             self.logger.removeHandler(hdlr)

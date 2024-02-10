@@ -1,14 +1,16 @@
 import torch
 import inspect
-from .base import BuilderType, FunctionalType
-from .._dev_utils import obtain_registered_kwargs
+from ...utils import BuilderType, FunctionalType
+from ._dev_utils import obtain_registered_kwargs
 
 
 class Functional(FunctionalType):
     @classmethod
-    def signature_assertions(cls, signature: inspect.Signature):
+    def field_signature_validator(cls, field_type, info):
+        signature = inspect.signature(field_type)
         assert signature.parameters['input'].annotation == torch.Tensor
         assert signature.parameters['target'].annotation == torch.Tensor
+        return field_type
 
 
 class Criterion(BuilderType):    

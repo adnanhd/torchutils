@@ -1,3 +1,3 @@
 from .profiler import IteratorProfiler, ContextProfiler, FunctionProfiler, Profiler, CircularIteratorProfiler
-from .base import ClassNameRegistrar, FunctionalRegistrar, _BaseModelType
+from .interfaces import ClassNameRegistrar, FunctionalRegistrar, _BaseModelType, BuilderType, FunctionalType, InstanceRegistrar, RegisteredBaseModel
 from .hashing import digest, digest_numpy, digest_torch, Hashable

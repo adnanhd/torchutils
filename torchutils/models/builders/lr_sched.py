@@ -1,8 +1,8 @@
 import typing
 import torch
 import inspect
-from .base import BuilderType
-from .._dev_utils import obtain_registered_kwargs
+from ...utils import BuilderType
+from ._dev_utils import obtain_registered_kwargs
 
 try:
     LRScheduler = torch.optim.lr_scheduler.LRScheduler

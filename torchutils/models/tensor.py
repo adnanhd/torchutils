@@ -21,9 +21,6 @@ class Tensor(_BaseModelType):
         raise ValueError(f"{field_type} is not a {numpy.ndarray}")
 
 
-Tensor.register(torch.Tensor)
-
-
 class GradTensor(Tensor):
     """
     A generic array/tensor type that returns true for every
@@ -35,3 +32,7 @@ class GradTensor(Tensor):
         if field_type.requires_grad:
             return field_type
         raise ValueError(f"{field_type} doesn't require gradient.")
+    
+
+Tensor.register(torch.Tensor)
+GradTensor.register(torch.Tensor)

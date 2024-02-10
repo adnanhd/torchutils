@@ -63,3 +63,24 @@ class FunctionalRegistrar(abc.ABCMeta):
     def has_functional(cls, class_name: str):
         """Retrieves the registered instance by its class name."""
         return class_name in cls._registrar.keys()
+
+
+class InstanceRegistrar(abc.ABCMeta):
+    def __new__(mcs, name, bases, attrs):
+        cls = super().__new__(mcs, name, bases, attrs)
+        cls._instances = dict()  # Initialize the dictionary for instances
+        return cls
+    
+    def add_instance(cls, name: str, obj):
+        cls._instances[name] = obj
+
+    def get_instance(cls, class_name: str):
+        """Retrieves the registered instance by its class name."""
+        try:
+            return cls._instances[class_name]
+        except KeyError:
+            raise RegisterationError(f"class {class_name}: not registered") from None      
+
+    def has_instance(cls, class_name: str):
+        """Retrieves the registered instance by its class name."""
+        return class_name in cls._instances.keys()

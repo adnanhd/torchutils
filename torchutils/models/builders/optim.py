@@ -1,8 +1,8 @@
 import torch.optim as optim
 import typing
 import inspect
-from .base import BuilderType
-from .._dev_utils import obtain_registered_kwargs
+from ...utils import BuilderType
+from ._dev_utils import obtain_registered_kwargs
 
 
 class Optimizer(BuilderType):
