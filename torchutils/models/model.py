@@ -6,16 +6,15 @@ import torch
 from functools import reduce
 from collections import OrderedDict
 
+from ..utils import digest
 from .._dev_utils import AverageMeter, TrainerMeterModel
-from .hashs import digest
-from .typing import (
+from .tensor import GradTensor, Tensor
+from .builders import (
     NeuralNet,
     Criterion,
     Functional,
     Optimizer,
     Scheduler,
-    Tensor,
-    GradTensor,
 )
 
 
@@ -186,9 +185,9 @@ class TrainerModel(TrainerMeterModel):
 
     def _push_for_backward(self, tensor: Tensor):
         try:
-            tensor = GradTensor.tensor_validator(tensor)
-            tensor = GradTensor.grad_validator(tensor)
-            self._backward_hooks.append(tensor)
+            self._backward_hooks.append(
+                GradTensor.field_validator(tensor)
+            )
         except ValueError as e:
             self.log_debug(e)
 
