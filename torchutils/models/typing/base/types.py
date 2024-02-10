@@ -1,12 +1,9 @@
 import abc
 import typing
-import torch
+from extra import ClassNameRegistrar
 
 
-Module = typing.Callable[..., typing.TypeVar("Module", bound=torch.nn.Module)]
-
-
-class _BaseModel(abc.ABC):
+class _BaseModelType(abc.ABC):
     @classmethod
     def __get_validators__(cls):
         yield cls.field_validator
@@ -18,7 +15,20 @@ class _BaseModel(abc.ABC):
         raise ValueError(f"{field_type} is not a {cls}")
 
 
-class _RegisteredBasModelv2(_BaseModel):
+class _BaseModelTypeWithRegistrar(_BaseModelType, metaclass=ClassNameRegistrar):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.class_name_validator
+        yield from super().__get_validators__
+
+    @classmethod
+    def class_name_validator(cls, field_type, info):
+        if isinstance(field_type, str):
+            return cls.get_instance(field_type)
+        return field_type
+
+
+class _RegisteredBasModelv2(_BaseModelType):
     @classmethod
     def __subclasses_dict__(cls) -> typing.Dict[str, type]:
         return dict(map(lambda subcls: (subcls.__name__, subcls),

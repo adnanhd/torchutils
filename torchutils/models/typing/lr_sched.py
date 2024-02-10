@@ -1,7 +1,7 @@
 import typing
 import torch
 import inspect
-from .utils import _RegisteredBasModelv2, obtain_registered_kwargs
+from .base import ClassNameRegistrar, _BaseModelType, obtain_registered_kwargs
 
 try:
     LRScheduler = torch.optim.lr_scheduler.LRScheduler
@@ -9,14 +9,7 @@ except AttributeError:
     LRScheduler = torch.optim.lr_scheduler._LRScheduler
 
 
-class Scheduler(_RegisteredBasModelv2):
-
-    @classmethod
-    def __subclasses_list__(cls) -> typing.List[type]:
-        subclasses = LRScheduler.__subclasses__()
-        subclasses.append(torch.optim.lr_scheduler.ReduceLROnPlateau)
-        return subclasses
-
+class Scheduler(_BaseModelType, metaclass=ClassNameRegistrar):
     @classmethod
     def model_name_validator(cls, field_type, info):
         if inspect.isclass(field_type):
@@ -28,5 +21,5 @@ class Scheduler(_RegisteredBasModelv2):
         return field_type
 
 
-Scheduler.register(LRScheduler)
+Scheduler.register_subclasses(LRScheduler)
 Scheduler.register(torch.optim.lr_scheduler.ReduceLROnPlateau)

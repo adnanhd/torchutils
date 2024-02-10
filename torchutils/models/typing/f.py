@@ -1,7 +1,7 @@
 import typing
 import torch
 import inspect
-from .utils import _RegisteredBasModelv2, obtain_registered_kwargs
+from .base import _BaseModel, ClassNameRegistrar, obtain_registered_kwargs
 
 
 FUNCTIONALS = list()
@@ -11,7 +11,7 @@ def register_functionals(fn):
     FUNCTIONALS.append(fn)
 
 
-class Functional(_RegisteredBasModelv2):
+class Functional(_BaseModel, metaclass=ClassNameRegistrar):
     @classmethod
     def __subclasses_list__(cls) -> typing.List[type]:
         return FUNCTIONALS.copy()
