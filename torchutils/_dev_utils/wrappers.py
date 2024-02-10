@@ -21,27 +21,14 @@ def wrap_dict_on_return(fn):
     return functools.wraps(fn)(lambda *args, **kwds: {fn.__name__: fn(*args, **kwds)})
 
 
-def log_score_on_return(fn):
-    meter = AverageMeter(name=fn.__name__)
+def log_score_return_dict(fn):
     @functools.wraps(fn)
     def wrapped_fn(*args, **kwds):
-        score = fn(*args, **kwds)
-        meter.update(score)
-        return {fn.__name__: score}
+        score_dict = fn(*args, **kwds)
+        for name, score in score_dict.items():
+            AverageMeter.get_instance(name).update(score)
+        return score_dict
     return wrapped_fn
-
-
-def log_scores_on_return(*names):
-    meters = tuple(map(AverageMeter, names))
-    def decorator(fn):
-        @functools.wraps(fn)
-        def wrapped_fn(*args, **kwds):
-            scores = fn(*args, **kwds)
-            for score, meter in zip(scores, meters):
-                meter.update(score)
-            return scores
-        return wrapped_fn
-    return decorator
 
 
 detach_input_tensors = make_epiloque_functor(torch.Tensor.detach)
