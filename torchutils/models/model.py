@@ -45,14 +45,14 @@ class TrainerModel(TrainerMeterModel):
         optimizer: Optimizer,
         modelname: str = None,
         scheduler: typing.Optional[Scheduler] = None,
-        writable_scores: typing.Set[str] = set(),
-        readable_scores: typing.Set[str] = set(),
+        scores: typing.Set[str] = set(),
         ** kwargs,
     ):
         if modelname is None:
             modelname = model.__class__.__qualname__
-        super().__init__(model=model, arguments=kwargs, criterion=criterion, optimizer=optimizer,
-                         scheduler=scheduler, readable_scores=readable_scores, writable_scores=writable_scores)
+        super().__init__(model=model, arguments=kwargs, 
+                         criterion=criterion, optimizer=optimizer,
+                         scheduler=scheduler, scores=scores)
         if inspect.isfunction(self.criterion):
             lossname = self.criterion.__name__
         else:
