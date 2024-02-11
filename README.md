@@ -35,8 +35,8 @@ trainer.train(num_epochs=120, batch_size=24)
 ```
 
 ## TO-DO
-- [ ] `Metric Handler.compute()` functions 
-- [ ] and metric registration mechanism
+- [x] `Metric Handler.compute()` functions 
+- [x] and metric registration mechanism
   - [ ] adding some regression, classification, segmentation metrics
   - [ ] support also jit or ray computation
 - [x] passing `batch` and `batch_output` to `MetricHandler.compute()` only, not to `CallbackHandler`

@@ -18,7 +18,8 @@ def make_epiloque_functor(f, cls=torch.Tensor):
 
 
 def wrap_dict_on_return(fn):
-    return functools.wraps(fn)(lambda *args, **kwds: {fn.__name__: fn(*args, **kwds)})
+    ffn = functools.wraps(fn)(lambda *args, **kwds: {fn.__name__: fn(*args, **kwds)})
+    return ffn
 
 
 def log_score_return_dict(fn):
@@ -26,6 +27,9 @@ def log_score_return_dict(fn):
     def wrapped_fn(*args, **kwds):
         score_dict = fn(*args, **kwds)
         for name, score in score_dict.items():
+            # TODO: optimize
+            if not AverageMeter.has_instance(name):
+                AverageMeter(name=name)
             AverageMeter.get_instance(name).update(score)
         return score_dict
     return wrapped_fn

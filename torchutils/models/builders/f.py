@@ -13,7 +13,7 @@ class Functional(FunctionalType):
         return field_type
 
 
-class Criterion(BuilderType):    
+class Criterion(BuilderType):
     @classmethod
     def builder_from_class(cls, field_type, info):
         if inspect.isclass(field_type) and cls.__subclasscheck__(field_type):

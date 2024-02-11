@@ -3,88 +3,116 @@ import numpy as np
 import inspect
 import typing
 import torch
-import functools
+from functools import wraps, reduce
 import pydantic
 from .meter import MeterHandler
-import itertools
-from .wrappers import wrap_dict_on_return, log_score_on_return, to_numpy_input_tensors, detach_input_tensors, to_cpu_input_tensors
+from itertools import chain
+from .wrappers import (
+    wrap_dict_on_return,
+    log_score_return_dict,
+    to_numpy_input_tensors,
+    detach_input_tensors,
+    to_cpu_input_tensors
+)
+
+
+def composite_function(*func):
+    def compose(f, g):
+        return lambda x: f(g(x))
+
+    return reduce(compose, func, lambda x: x)
 
 
 class MetricType(FunctionalType):
     @classmethod
     def __get_validators__(cls):
+        yield cls.get_function_from_name
         yield cls.field_validator
-        yield cls.field_wrapper
         yield cls.field_signature_validator
+        yield cls.field_wrapper
 
     @classmethod
     def field_signature_validator(cls, field_type, info):
         assert inspect.isfunction(field_type)
         signature = inspect.signature(field_type)
-        try:
-            assert signature.parameters['batch_output'].annotation == torch.Tensor, 'batch_output must be a torch.Tensor'
-            assert signature.parameters['batch_target'].annotation == torch.Tensor, 'batch_target must be a torch.Tensor'
-            assert signature.return_annotation == float
-        except KeyError as e:
-            raise ValueError(e)
-        
-        return log_score_on_return(field_type)
-    
+        expected = dict(batch_output=torch.Tensor,
+                        batch_target=torch.Tensor)
+
+        for name, annot in expected.items():
+            if name not in signature.parameters.keys():
+                raise ValueError(f'{name} must be an argument')
+            if signature.parameters[name].annotation != annot:
+                raise AssertionError(f'{name} must be of {annot}')
+        if signature.return_annotation == float:
+            field_type = wrap_dict_on_return(field_type)
+        else:
+            assert signature.return_annotation == typing.Dict[str, float]
+
+        return field_type
+
     @classmethod
     def field_wrapper(cls, field_type, info):
-        return detach_input_tensors(field_type)
+        wrapper = composite_function(log_score_return_dict,
+                                     detach_input_tensors)
+        return wrapper(field_type)
 
-
-class TorchMetricType(MetricType):
     @classmethod
-    def field_wrapper(cls, field_type, info):
-        signature = inspect.signature(field_type)
-        try:
-            assert signature.parameters['output'].annotation == torch.Tensor
-            assert signature.parameters['target'].annotation == torch.Tensor
-            assert signature.return_annotation == torch.Tensor
-        except KeyError as e:
-            raise ValueError(e)
+    def register_torch_metric(cls, fn):
+        assert inspect.isfunction(fn)
+        signature = inspect.signature(fn)
+        expected = dict(output=torch.Tensor,
+                        target=torch.Tensor)
 
-        @log_score_on_return
-        # @functools.wraps(field_type)
-        def wrapped_fn(batch_output: torch.Tensor, batch_target: torch.Tensor, **kwds) -> typing.Set[str, float]:
-            return field_type(output=batch_output, target=batch_target, **kwds)
-        
-        return wrapped_fn
+        for name, annot in expected.items():
+            if name not in signature.parameters.keys():
+                raise ValueError(f'{name} must be an argument')
+            if signature.parameters[name].annotation != annot:
+                raise AssertionError(f'{name} must be of {annot}')
+        assert signature.return_annotation == float
 
+        @wraps(fn)
+        def wrapped_fn(batch_output: torch.Tensor,
+                       batch_target: torch.Tensor,
+                       **kwds) -> typing.Set[str, float]:
+            return fn(output=batch_output, target=batch_target, **kwds)
 
-class NumpyMetricType(MetricType):
+        cls.register(wrapped_fn)
+
+        return fn
+
     @classmethod
-    def field_wrapper(cls, field_type, info):
-        signature = inspect.signature(field_type)
-        try:
-            assert signature.parameters['y_pred'].annotation == np.ndarray
-            assert signature.parameters['y_true'].annotation == np.ndarray
-            assert signature.return_annotation == np.ndarray
-        except KeyError as e:
-            raise ValueError(e)
+    def register_numpy_metric(cls, fn):
+        assert inspect.isfunction(fn)
+        signature = inspect.signature(fn)
+        expected = dict(y_pred=np.ndarray,
+                        y_true=np.ndarray)
 
-        @log_score_on_return
+        for name, annot in expected.items():
+            if name not in signature.parameters.keys():
+                raise ValueError(f'{name} must be an argument')
+            if signature.parameters[name].annotation != annot:
+                raise AssertionError(f'{name} must be of {annot}')
+        assert signature.return_annotation == float
+
         @to_cpu_input_tensors
         @to_numpy_input_tensors
-        # TODO: @functools.wraps(field_type)
-        def wrapped_fn(batch_output: torch.Tensor, batch_target: torch.Tensor, **kwds) -> typing.Dict[str, float]:
-            return field_type(y_pred=batch_output, y_true=batch_target, **kwds)
-        
-        return wrapped_fn
+        @wraps(fn)
+        def wrapped_fn(batch_output: torch.Tensor,
+                       batch_target: torch.Tensor,
+                       **kwds) -> typing.Dict[str, float]:
+            return fn(y_pred=batch_output, y_true=batch_target, **kwds)
 
+        return cls.register(wrapped_fn)
 
-TorchMetric = typing.Union[NumpyMetricType, TorchMetricType, MetricType]
+        return fn
 
 
 class MetricHandler(pydantic.BaseModel):
-    metrics: typing.Set[TorchMetric] = set()
+    metrics: typing.Set[MetricType] = set()
     collate_fn: typing.Callable = lambda batch, batch_output: dict(batch_output=batch_output, batch_target=batch[1])
     _handler: MeterHandler = pydantic.PrivateAttr(default_factory=MeterHandler)
 
     def compute(self, batch, batch_output):
         metric_kwargs = self.collate_fn(batch=batch, batch_output=batch_output)
-        proloque_functor = lambda metric: metric(**metric_kwargs).items()
-        return dict(itertools.chain.from_iterable(map(proloque_functor, self.metrics)))
-            
+        metric_dicts = map(lambda m: m(**metric_kwargs).items(), self.metrics)
+        return dict(chain.from_iterable(metric_dicts))

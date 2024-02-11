@@ -8,7 +8,7 @@ import warnings
 
 from ..utils import CircularIteratorProfiler, Profiler
 from ..models import TrainerModel
-from .._dev_utils import AverageMeter, MeterHandler
+from .._dev_utils import AverageMeter, MeterHandler, MetricHandler
 from ..callbacks import CallbackHandler, StopTrainingException, TrainerCallback
 
 from ..datasets._api import maybe_wrap
@@ -116,6 +116,7 @@ class Trainer:
         # initialize components
         callb_lst = CallbackHandler(callbacks=callbacks)
         score_lst = MeterHandler()
+        meter_lst = MetricHandler(metrics=metrics)
 
         # handlers
         for hdlr in handlers:
@@ -151,6 +152,7 @@ class Trainer:
 
                     # Step finishing
                     # finish computing train metrics ##
+                    meter_lst.compute(batch=batch, batch_output=output)
                     callb_lst.on_training_step_end(batch_index=index)
                     del index, batch, output
 
@@ -180,6 +182,7 @@ class Trainer:
 
                         # Step finishing
                         # finish computing valid metrics ##
+                        meter_lst.compute(batch=batch, batch_output=output)
                         callb_lst.on_validation_step_end(batch_index=index)
                         del index, batch, output
 
@@ -192,7 +195,6 @@ class Trainer:
         finally:
             callb_lst.on_termination()
 
-        
         for hdlr in handlers:
             self.logger.removeHandler(hdlr)
             self.model.remove_handler(hdlr)
@@ -223,8 +225,9 @@ class Trainer:
         # initialize components
         callb_lst = CallbackHandler(callbacks=callbacks)
         score_lst = MeterHandler()
+        meter_lst = MetricHandler(metrics=metrics)
         exec_timer = Profiler(name='exec_time')
-        
+
         # handlers
         for hdlr in handlers:
             self.logger.addHandler(hdlr)
@@ -257,13 +260,14 @@ class Trainer:
 
                     # Step finishing
                     # finish computing valid metrics ##
+                    meter_lst.compute(batch=batch, batch_output=output)
                     callb_lst.on_evaluation_step_end(batch_index=index)
                     del index, batch, output
 
                 # Epoch finishing
                 callb_lst.on_evaluation_run_end()
                 score_lst.reset_meters()
-                    
+
             except StopTrainingException:
                 callb_lst.on_stop_training_error()
             finally:

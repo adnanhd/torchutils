@@ -28,7 +28,7 @@ class BuilderType(_BaseModelType, metaclass=ClassNameRegistrar):
         if isinstance(field_type, str) and cls.has_subclass(field_type):
             return cls.get_subclass(field_type)
         return field_type
-    
+
     @abc.abstractclassmethod
     def builder_from_class(cls, field_type, info):
         pass
@@ -42,20 +42,28 @@ class FunctionalType(_BaseModelType, metaclass=FunctionalRegistrar):
 
     @classmethod
     def __get_validators__(cls):
+        yield cls.get_function_from_name
         yield cls.field_validator
         yield cls.field_signature_validator
+
+    @classmethod
+    def get_function_from_name(cls, field_type, info):
+        if isinstance(field_type, str) and cls.has_functional(field_type):
+            return cls.get_functional(field_type)
+        return field_type
 
     @classmethod
     def field_validator(cls, field_type, info):
         assert inspect.isfunction(field_type)
         return field_type
-    
+
     @classmethod
     def field_signature_validator(cls, field_type, info):
         return field_type
 
 
 _REGISTRY = {}
+
 
 class RegisteredBaseModel(pydantic.BaseModel):
     name: str
@@ -67,14 +75,14 @@ class RegisteredBaseModel(pydantic.BaseModel):
     def __init__(self, name: str, **kwargs):
         super().__init__(name=name, **kwargs)
         _REGISTRY[self.__class__.__name__][name] = self
-    
+
     def __hash__(self) -> int:
         return self.name.__hash__()
-    
+
     @classmethod
     def list_instance_names(cls):
         return _REGISTRY[cls.__name__].keys()
-    
+
     @classmethod
     def list_instances(cls):
         return _REGISTRY[cls.__name__].values()

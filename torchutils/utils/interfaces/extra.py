@@ -37,7 +37,7 @@ class ClassNameRegistrar(abc.ABCMeta):
     def has_subclass(cls, class_name: str):
         """Retrieves the registered instance by its class name."""
         return class_name in cls._registrar.keys()
-    
+
 
 class FunctionalRegistrar(abc.ABCMeta):
     def __new__(mcs, name, bases, attrs):
@@ -70,7 +70,7 @@ class InstanceRegistrar(abc.ABCMeta):
         cls = super().__new__(mcs, name, bases, attrs)
         cls._instances = dict()  # Initialize the dictionary for instances
         return cls
-    
+
     def add_instance(cls, name: str, obj):
         cls._instances[name] = obj
 
