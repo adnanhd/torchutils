@@ -4,4 +4,4 @@ from .callback import TrainerCallback, StopTrainingException
 from .handler import CallbackHandler
 from .early_stopping import EarlyStopping
 from .model_checkpoint import ModelCheckpoint
-from. score_logger import AverageScoreLogger
+from. score_logger import LogMetersCallback

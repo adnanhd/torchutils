@@ -1,5 +1,5 @@
 # Copyright © 2021 Chris Hughes
-from ..metrics import TrainerBaseModel
+from .._dev_utils import TrainerMeterModel
 
 
 class StopTrainingException(Exception):
@@ -14,7 +14,7 @@ class CallbackMethodNotImplemented(Exception):
 
 
 
-class TrainerCallback(TrainerBaseModel):
+class TrainerCallback(TrainerMeterModel):
     def on_initialization(self):
         """
         Event called at the end of trainer initialisation.
@@ -43,7 +43,7 @@ class TrainerCallback(TrainerBaseModel):
         """
         raise CallbackMethodNotImplemented
 
-    def on_training_step_end(self, batch_index, batch, batch_output):
+    def on_training_step_end(self, batch_index: int):
         """
         Event called at the end of a training step.
         :param batch: the current batch of training data
@@ -76,7 +76,7 @@ class TrainerCallback(TrainerBaseModel):
         """
         raise CallbackMethodNotImplemented
 
-    def on_validation_step_end(self, batch_index: int, batch, batch_output):
+    def on_validation_step_end(self, batch_index: int):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data
@@ -110,7 +110,7 @@ class TrainerCallback(TrainerBaseModel):
         """
         raise CallbackMethodNotImplemented
 
-    def on_evaluation_step_end(self, batch_index: int, batch, batch_output):
+    def on_evaluation_step_end(self, batch_index: int):
         """
         Event called at the end of an evaluation step.
         :param batch: the current batch of evaluation data

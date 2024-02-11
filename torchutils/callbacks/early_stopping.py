@@ -51,7 +51,7 @@ class EarlyStopping(TrainerCallback):
             level = verbose
         else:
             level = 10 if verbose else 20
-        super().__init__(readable_scores={monitor}, monitor=monitor, level=level, **kwds)
+        super().__init__(scores={monitor}, monitor=monitor, level=level, **kwds)
 
     def on_training_begin(self, hparams):
         self._nepv = hparams['num_epochs_per_validation']

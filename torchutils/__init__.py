@@ -40,10 +40,11 @@
 
 # import torchutils.data
 import torchutils.models
+import torchutils.metrics
 import torchutils.callbacks
 import torchutils.trainer
 import torchutils.logging
-import torchutils.metrics
+import torchutils._dev_utils
 import torchutils.utils
 
 from ._version import __version__

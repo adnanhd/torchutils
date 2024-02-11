@@ -2,12 +2,13 @@ from .callback import TrainerCallback, StopTrainingException
 from .callback import CallbackMethodNotImplemented
 import typing
 import logging
+from .._dev_utils import MeterModelContainer
 
 
 def evettriggermethod(method):
     def evettriggerdecorator(self, *args, **kwargs):
         stop_training = False
-        for callback in self.callbacks:
+        for callback in self.elements:
             try:
                 getattr(callback, method.__name__)(*args, **kwargs)
             except CallbackMethodNotImplemented:
@@ -24,37 +25,16 @@ def evettriggermethod(method):
     return evettriggerdecorator
 
 
-class CallbackHandler:
+class CallbackHandler(MeterModelContainer):
     """
     The :class:`CallbackHandler` is responsible for calling a list of callbacks.
     This class calls the callbacks in the order that they are given.
     """
-    __slots__ = ['callbacks']
-
     def __init__(self, callbacks=list()):
-        self.callbacks: typing.List[TrainerCallback] = callbacks
-
-    def add_handlers(self, handlers: typing.List[logging.Handler] = list()):
-        for cback in self.callbacks:
-            cback.add_handlers(handlers)
-
-    def remove_handlers(self, handlers: typing.List[logging.Handler] = list()):
-        for cback in self.callbacks:
-            cback.remove_handlers(handlers)
-
-    def attach_score_dict(self, score_dict: typing.Dict[str, float]):
-        for cback in self.callbacks:
-            cback.attach_score_dict(score_dict)
-
-    def detach_score_dict(self):
-        for cback in self.callbacks:
-            cback.detach_score_dict()
-
-    def __iter__(self):
-        return self.callbacks
+        super().__init__(elements=callbacks)
 
     def __repr__(self):
-        callbacks = ", ".join(cb.__class__.__name__ for cb in self.callbacks)
+        callbacks = ", ".join(cb.__class__.__name__ for cb in self.elements)
         return self.__class__.__name__ + '(' + callbacks + ')'
 
     @evettriggermethod
@@ -70,7 +50,7 @@ class CallbackHandler:
     def on_training_step_begin(self, batch_index: int): pass
 
     @evettriggermethod
-    def on_training_step_end(self, batch_index: int, batch, batch_output): pass
+    def on_training_step_end(self, batch_index: int): pass
 
     @evettriggermethod
     def on_training_epoch_end(self): pass
@@ -85,7 +65,7 @@ class CallbackHandler:
     def on_validation_step_begin(self, batch_index: int): pass
 
     @evettriggermethod
-    def on_validation_step_end(self, batch_index: int, batch, batch_output): pass
+    def on_validation_step_end(self, batch_index: int): pass
 
     @evettriggermethod
     def on_validation_run_end(self): pass
@@ -97,7 +77,7 @@ class CallbackHandler:
     def on_evaluation_step_begin(self, batch_index: int): pass
 
     @evettriggermethod
-    def on_evaluation_step_end(self, batch_index: int, batch, batch_output): pass
+    def on_evaluation_step_end(self, batch_index: int): pass
 
     @evettriggermethod
     def on_evaluation_run_end(self): pass

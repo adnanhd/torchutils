@@ -5,7 +5,7 @@ import torch
 import typing
 import math
 from .callback import TrainerCallback
-from ..models.hashs import digest
+from ..utils import digest
 from ..models import TrainerModel
 import collections
 import pydantic

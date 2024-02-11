@@ -1,4 +1,3 @@
-from collections import defaultdict
 import typing
 import inspect
 
@@ -12,15 +11,12 @@ def determine_types(args, kwargs):
         tuple((k, type(v)) for k, v in kwargs.items())
 
 
-function_table = defaultdict(dict)
-
-
 def obtain_registered_kwargs(fn: typing.Callable,
                              kwargs: typing.Dict[str, typing.Any]):
+    parameters = inspect.signature(fn).parameters.keys()
     return dict(
         filter(
-            lambda item: item[0] in inspect.signature(
-                fn).parameters.keys(),
+            lambda item: item[0] in parameters,
             kwargs.items()
         )
     )

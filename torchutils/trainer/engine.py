@@ -8,36 +8,40 @@ import warnings
 
 from ..utils import CircularIteratorProfiler, Profiler
 from ..models import TrainerModel
-from ..datasets import DataLoaderWrapper
-from ..metrics import AverageScore, AverageScoreHandler
+from .._dev_utils import AverageMeter, MeterHandler, MetricHandler
 from ..callbacks import CallbackHandler, StopTrainingException, TrainerCallback
 
+from ..datasets._api import maybe_wrap
+from ..datasets import (
+    Dataset as TrainerDataset,
+    Iterable as TrainerIterable,
+)
+
+from torch.utils.data import (
+    Dataset as TorchDataset,
+    IterableDataset as TorchIterable,
+    DataLoader as TorchDataLoader
+)
 
 class Trainer:
     __slots__ = [
         'model',
-        'device',
-        'train_dataset',
-        'valid_dataset',
+        'logger',
         'metrics',
-        'callbacks',
         'handlers',
-        'logger'
+        'callbacks',
     ]
+
+    @property
+    def device(self) -> torch.device:
+        return self.model.device
 
     def __init__(
         self,
         model: TrainerModel,
-        train_dataset: torch.utils.data.Dataset,
-        valid_dataset: typing.Optional[torch.utils.data.Dataset] = None,
-        train_dataloader_kwargs: dict = dict(),
-        valid_dataloader_kwargs: dict = dict(),
         log_level: int = logging.INFO
     ):
         self.model: TrainerModel = model
-        self.train_dataset: DataLoaderWrapper = DataLoaderWrapper(train_dataset, **train_dataloader_kwargs)
-        self.valid_dataset: DataLoaderWrapper = DataLoaderWrapper(valid_dataset, **valid_dataloader_kwargs)
-        
         self.metrics: typing.Set[str] = set()
         self.callbacks: typing.List[TrainerCallback] = list()
         self.handlers: typing.Iterable[logging.Handler] = list()
@@ -61,40 +65,49 @@ class Trainer:
         if handlers is not None:
             assert isinstance(handlers, list)
             self.handlers = handlers
-        
 
-    def _initialize_loaders(self, batch_size: int, nepv: int, hparams: dict, profile=False, **kwargs):
-        device = self.model.device
+    def _prep_dataset(
+            self,
+            dataset: typing.Union[torch.utils.data.Dataset, torch.utils.data.DataLoader, None],
+            train: bool,
+            **dataloader_kwargs
+    ):
+        if dataset is None or isinstance(dataset, TorchDataLoader):
+            self.logger.debug(f'Received {type(dataset)} as Datsaet')
+            return dataset            
+        elif isinstance(dataset, (TorchDataset, TrainerDataset)):
+            dataloader_kwargs.setdefault('batch_size', len(dataset))
+        elif isinstance(dataset, (TorchIterable, TrainerIterable)):
+            # TODO: make sure that iterable has __len__
+            assert 'batch_size' in dataloader_kwargs.keys()
 
-        if self.valid_dataset.dataset is None:
-            nepv = 0
-            valid_dataloader = []
-        else:
-            valid_dataloader = self.valid_dataset.dataloader(device=device, train=False, **kwargs)
-            
-        dataloader = self.train_dataset.dataloader(batch_size=batch_size, device=device, train=True, **kwargs)
-
-        if profile:
-            dataloader = CircularIteratorProfiler(iterable=dataloader, name='load_time')
-            if valid_dataloader != []:
-                valid_dataloader = CircularIteratorProfiler(iterable=valid_dataloader, name='valid_load_time')
-
-        hparams = dict(**hparams,
-                       batch_size=batch_size,
-                       num_epochs_per_validation=nepv,
-                       model_device=self.model.device)
-        return hparams, dataloader, valid_dataloader
+        return maybe_wrap(dataset=dataset).dataloader(train=train, device=self.model.device, **dataloader_kwargs)
 
     def train(
         self,
         num_epochs: int,
         batch_size: int,
+        train_dataset: torch.utils.data.Dataset,
+        valid_dataset: typing.Optional[torch.utils.data.Dataset] = None,
+        train_dataloader_kwargs: dict = dict(),
+        valid_dataloader_kwargs: dict = dict(),
         metrics: typing.Set[str] = set(),
         callbacks: typing.List[TrainerCallback] = list(),
         handlers: typing.Iterable[logging.Handler] = list(),
         num_epochs_per_validation: int = 1,
         **hparams
     ):
+        # type checking
+        assert train_dataset is not None
+
+        # prepare dataloaders
+        trainloader = self._prep_dataset(train_dataset, train=True, batch_size=batch_size, **train_dataloader_kwargs)
+        validloader = self._prep_dataset(valid_dataset, train=False, **valid_dataloader_kwargs)
+        hparams['num_epochs_per_validation'] = num_epochs_per_validation if validloader is not None else 0
+
+        # prepare profilers
+        exec_timer = Profiler(name='exec_time')
+
         # use compiled components
         metrics.update(self.metrics)
         callbacks += self.callbacks
@@ -102,18 +115,14 @@ class Trainer:
 
         # initialize components
         callb_lst = CallbackHandler(callbacks=callbacks)
-        score_lst = AverageScoreHandler()
-
-        # dataloader prepare
-        exec_timer = Profiler(name='exec_time')
-        hparams, trainloader, validloader = self._initialize_loaders(
-                batch_size=batch_size, hparams=hparams,
-                profile=True, nepv=num_epochs_per_validation)
+        score_lst = MeterHandler()
+        meter_lst = MetricHandler(metrics=metrics)
 
         # handlers
-        self.add_handlers(handlers)
-        self.model.add_handlers(handlers)
-        callb_lst.add_handlers(handlers)
+        for hdlr in handlers:
+            self.logger.addHandler(hdlr)
+            self.model.add_handler(hdlr)
+            callb_lst.add_handler(hdlr)
 
         # logging initialization
         self.logger.info('Training Starts...')
@@ -143,13 +152,14 @@ class Trainer:
 
                     # Step finishing
                     # finish computing train metrics ##
-                    callb_lst.on_training_step_end(batch_index=index, batch=batch, batch_output=output)
+                    meter_lst.compute(batch=batch, batch_output=output)
+                    callb_lst.on_training_step_end(batch_index=index)
                     del index, batch, output
 
                 # Epoch finishing
                 self.model.scheduler_step(epoch_idx=epoch)
                 callb_lst.on_training_epoch_end()
-                score_lst.reset_scores()
+                score_lst.reset_meters()
 
                 if hparams['num_epochs_per_validation'] <= 0 \
                         or (epoch + 1) % hparams['num_epochs_per_validation']:
@@ -172,27 +182,28 @@ class Trainer:
 
                         # Step finishing
                         # finish computing valid metrics ##
-                        callb_lst.on_validation_step_end(batch_index=index, batch=batch, batch_output=output)
+                        meter_lst.compute(batch=batch, batch_output=output)
+                        callb_lst.on_validation_step_end(batch_index=index)
                         del index, batch, output
 
                     # Epoch finishing
                     callb_lst.on_validation_run_end()
-                    score_lst.reset_scores()
+                    score_lst.reset_meters()
             callb_lst.on_training_end()
         except StopTrainingException:
             callb_lst.on_stop_training_error()
         finally:
             callb_lst.on_termination()
 
-        self.remove_handlers(handlers)
-        self.model.remove_handlers(handlers)
-        callb_lst.remove_handlers(handlers)
-
+        for hdlr in handlers:
+            self.logger.removeHandler(hdlr)
+            self.model.remove_handler(hdlr)
+            callb_lst.remove_handler(hdlr)
 
     @torch.no_grad()
     def predict(
         self,
-        *test_datasets: torch.utils.data.Dataset,
+        test_dataset: torch.utils.data.Dataset,
         metrics: typing.Set[str] = set(),
         callbacks: typing.List[TrainerCallback] = list(),
         handlers: typing.Iterable[logging.Handler] = list(),
@@ -200,6 +211,9 @@ class Trainer:
         profile: bool = False,
         **hparams
     ):
+        # type checking
+        assert test_dataset is not None
+
         # use compiled components
         metrics.update(self.metrics)
         if profile:
@@ -210,28 +224,22 @@ class Trainer:
 
         # initialize components
         callb_lst = CallbackHandler(callbacks=callbacks)
-        score_lst = AverageScoreHandler()
+        score_lst = MeterHandler()
+        meter_lst = MetricHandler(metrics=metrics)
         exec_timer = Profiler(name='exec_time')
-        
+
         # handlers
-        self.add_handlers(handlers)
-        self.model.add_handlers(handlers)
-        callb_lst.add_handlers(handlers)
+        for hdlr in handlers:
+            self.logger.addHandler(hdlr)
+            self.model.add_handler(hdlr)
+            callb_lst.add_handler(hdlr)
 
         # logging initialization
         self.logger.info('Prediction Starts...')
         self.logger.info("predict_params: " + str(hparams))
 
-        for test_nu, test_dataset in enumerate(test_datasets):
-            if not isinstance(test_dataset, DataLoaderWrapper):
-                test_dataset = DataLoaderWrapper(test_dataset)
-
-            dataloader_kwargs.setdefault('batch_size', len(test_dataset.dataset))
-            dataloader_kwargs['train'] = False
-            dataloader_kwargs['device'] = self.model.device
-            dataloader = test_dataset.dataloader(**dataloader_kwargs)
-            if profile:
-                dataloader = CircularIteratorProfiler(iterable=dataloader, name='load_time')
+        with torch.no_grad():
+            dataloader = self._prep_dataset(test_dataset, train=False, **dataloader_kwargs)
 
             try:
                 callb_lst.on_initialization()
@@ -252,26 +260,28 @@ class Trainer:
 
                     # Step finishing
                     # finish computing valid metrics ##
-                    callb_lst.on_evaluation_step_end(batch_index=index, batch=batch, batch_output=output)
+                    meter_lst.compute(batch=batch, batch_output=output)
+                    callb_lst.on_evaluation_step_end(batch_index=index)
                     del index, batch, output
 
                 # Epoch finishing
                 callb_lst.on_evaluation_run_end()
-                score_lst.reset_scores()
-                    
+                score_lst.reset_meters()
+
             except StopTrainingException:
                 callb_lst.on_stop_training_error()
             finally:
                 callb_lst.on_termination()
 
-        self.remove_handlers(handlers)
-        self.model.remove_handlers(handlers)
-        callb_lst.remove_handlers(handlers)
+        for hdlr in handlers:
+            self.logger.removeHandler(hdlr)
+            self.model.remove_handler(hdlr)
+            callb_lst.remove_handler(hdlr)
 
-    def add_handlers(self, hdlrs: typing.List[logging.Handler]):
+    def add_handler(self, *hdlrs: logging.Handler):
         for hdlr in hdlrs:
             self.logger.addHandler(hdlr)
 
-    def remove_handlers(self, hdlrs: typing.List[logging.Handler]):
+    def remove_handler(self, *hdlrs: logging.Handler):
         for hdlr in hdlrs:
             self.logger.removeHandler(hdlr)

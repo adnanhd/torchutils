@@ -4,9 +4,9 @@ import typing
 from .utils import LogLevelEnum
 
 
-class AverageScoreLogger(TrainerCallback):
+class LogMetersCallback(TrainerCallback):
     def __init__(self, *score_names, level=10):
-        super().__init__(readable_scores=set(score_names))
+        super().__init__(scores=set(score_names))
         self._logger.setLevel(level)
 
     ####################################################################
@@ -17,7 +17,7 @@ class AverageScoreLogger(TrainerCallback):
     def on_training_step_begin(self, batch_index: int):
         self._buffer['batch_index'] = batch_index
 
-    def on_training_step_end(self, batch_index, batch, batch_output):
+    def on_training_step_end(self, batch_index: int):
         values = self.get_score_values()
         values.update(self._buffer)
         self.log(level=LogLevelEnum.TRAINING_STEP_END.value, msg=values)
@@ -32,7 +32,7 @@ class AverageScoreLogger(TrainerCallback):
     def on_validation_step_begin(self, batch_index: int):
         self._buffer['batch_index'] = batch_index
     
-    def on_validation_step_end(self, batch_index, batch, batch_output):
+    def on_validation_step_end(self, batch_index: int):
         values = self.get_score_values()
         values.update(self._buffer)
         self.log(level=LogLevelEnum.VALIDATION_STEP_END.value, msg=values)
@@ -47,7 +47,7 @@ class AverageScoreLogger(TrainerCallback):
     def on_evaluation_step_begin(self, batch_index: int):
         self._buffer['batch_index'] = batch_index
 
-    def on_evaluation_step_end(self, batch_index, batch, batch_output):
+    def on_evaluation_step_end(self, batch_index: int):
         values = self.get_score_values()
         values['batch_index'] = self._buffer['batch_index']
         self.log(level=LogLevelEnum.EVALUATION_STEP_END.value, msg=values)
