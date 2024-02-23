@@ -35,14 +35,21 @@ trainer.train(num_epochs=120, batch_size=24)
 ```
 
 ## TO-DO
+### Important
+- [ ] Add torch.distributed support
 - [x] `Metric Handler.compute()` functions 
 - [x] and metric registration mechanism
   - [ ] adding some regression, classification, segmentation metrics
   - [ ] support also jit or ray computation
 - [x] passing `batch` and `batch_output` to `MetricHandler.compute()` only, not to `CallbackHandler`
 
+
+
+### Less-Important
+- [ ] Add configs for BuilderTypes
 - [ ] profilers logging etc.
 
+### Trivial
 - [x] get rid of DataLoaderWrapper instead use datasets.DatasetWrapper
 - [ ] register some well known datasets like mnist, cifar-10, cifar-100, voc
 
