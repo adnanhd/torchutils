@@ -61,7 +61,8 @@ class _DatasetBase(Base):
         self._chain_object = chain_object
 
     def random_split(self, *lengths, generator=default_generator):
-        return random_split(self, lengths, generator=generator)
+        # maybe_wrap = lambda obj: obj if isintance(obj, self.__class__) else self.__class__(obj)
+        return list(map(self.__class__, random_split(self, lengths, generator=generator)))
     
     def dataloader(self, train: bool = False, device: torch_device = 'cpu', **kwargs):
         assert isinstance(device, torch_device) or isinstance(device, str)

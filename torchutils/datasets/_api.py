@@ -1,4 +1,5 @@
 from .datasets import WrapDataset, WrapIterable, TorchDataset, TorchIterable, _Wrap, Dataset
+import functools
 
 
 DATASETS_DICT = dict()
@@ -26,6 +27,7 @@ def register_builder(name):
     def decorator(builder):
         DATASETS_DICT[name] = builder
 
+        @functools.wraps(builder)
         def wrapper(**kwds):
             return builder(**kwds)
         return wrapper
