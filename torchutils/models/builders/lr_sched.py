@@ -1,7 +1,6 @@
-import typing
 import torch
 import inspect
-from ...utils import BuilderType
+from ...utils import BuilderType, RegisterationError
 from ._dev_utils import obtain_registered_kwargs
 
 try:
@@ -10,7 +9,7 @@ except AttributeError:
     LRScheduler = torch.optim.lr_scheduler._LRScheduler
 
 
-class Scheduler(BuilderType):    
+class Scheduler(BuilderType):
     @classmethod
     def builder_from_class(cls, field_type, info):
         if inspect.isclass(field_type) and cls.__subclasscheck__(field_type):
@@ -20,6 +19,8 @@ class Scheduler(BuilderType):
         return field_type
 
 
-
 Scheduler.register_subclasses(LRScheduler)
-Scheduler.register(torch.optim.lr_scheduler.ReduceLROnPlateau)
+try:
+    Scheduler.register(torch.optim.lr_scheduler.ReduceLROnPlateau)
+except RegisterationError:  # ReduceLROnPlateau is subclass of LRScheduler
+    pass
