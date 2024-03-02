@@ -8,8 +8,9 @@ from collections import OrderedDict
 
 from ..utils import digest
 from .._dev_utils import AverageMeter, TrainerMeterModel
+from pydantic import ConfigDict
 from .tensor import GradTensor, Tensor
-from .builders import (
+from ._types import (
     NeuralNet,
     Criterion,
     Functional,
@@ -26,6 +27,8 @@ class TrainerModel(TrainerMeterModel):
     scheduler: typing.Optional[Scheduler]
     _backward_hooks: typing.List[GradTensor] = pydantic.PrivateAttr(default_factory=list)
     _loss: AverageMeter = pydantic.PrivateAttr()
+
+    model_config = ConfigDict(validate_assignment=True, frozen=True)
 
     @classmethod
     def __get_validators__(cls):
