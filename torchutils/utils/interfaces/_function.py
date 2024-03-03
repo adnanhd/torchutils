@@ -1,7 +1,6 @@
 from ._base import _BaseModelType, RegisterationError
 from abc import ABCMeta
-import inspect
-
+import types
 
 class FunctionalRegistrar(ABCMeta):
     def __new__(mcs, name, bases, attrs):
@@ -11,7 +10,7 @@ class FunctionalRegistrar(ABCMeta):
 
     def register(cls, instance):
         """Registers an instance with its class name as the key."""
-        assert inspect.isfunction(instance)
+        assert isinstance(instance, FunctionalType), f'{instance} is not of type FunctionalType'
         if instance.__name__ in cls._registrar:
             raise RegisterationError(f'class {instance.__name__}: already registered')
         cls._registrar[instance.__name__] = instance
@@ -49,9 +48,14 @@ class FunctionalType(_BaseModelType, metaclass=FunctionalRegistrar):
 
     @classmethod
     def field_validator(cls, field_type, info):
-        assert inspect.isfunction(field_type)
+        assert isinstance(field_type, FunctionalType), f'{field_type} is failed'
         return field_type
 
     @classmethod
     def field_signature_validator(cls, field_type, info):
         return field_type
+    
+
+
+## registary
+ABCMeta.register(FunctionalType, types.FunctionType)

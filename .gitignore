@@ -3,6 +3,7 @@ dist
 docs
 envs
 build
+.pytest_cache/
 torchutils/**/__pycache__
 torchutils/**/.vscode
 torchutils.egg-info

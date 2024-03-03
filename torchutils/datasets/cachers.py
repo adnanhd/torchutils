@@ -123,15 +123,15 @@ class Pickle(Cacher):
 
     Attributes
     ----------
-    path: pathlib.Path
+    path: str
             Path to the folder where samples will be saved and loaded from.
     extension: str
             Extension to use for saved pickle files. Default: `.pkl`
 
     """
 
-    def __init__(self, path: pathlib.Path, extension: str = ".pkl"):
-        self.path = path
+    def __init__(self, path: str, extension: str = ".pkl"):
+        self.path = pathlib.Path(path)
         self.path.mkdir(parents=True, exist_ok=True)
         self.extension = extension
 
@@ -234,7 +234,7 @@ class Tensor(Cacher):
 
     Attributes
     ----------
-    path: pathlib.Path
+    path: str
         Path to the folder where samples will be saved and loaded from.
     extension: str
         Extension to use for saved pickle files. Default: `.pt`
@@ -256,14 +256,14 @@ class Tensor(Cacher):
 
     def __init__(
         self,
-        path: pathlib.Path,
+        path: str,
         extension: str = ".pt",
         map_location=None,
         pickle_module=pickle,
         pickle_protocol=2,
         **pickle_load_args
     ):
-        self.path = path
+        self.path = pathlib.Path(path)
         self.path.mkdir(parents=True, exist_ok=True)
         self.extension = extension
         self.map_location = map_location
