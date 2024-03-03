@@ -84,7 +84,7 @@ class MeterBuffer(_Base_MeterDict):
 
 class MeterHandler(_Base_MeterDict):
     def __init__(self):
-        from ..utils.interfaces._base import _REGISTRY
+        from ..utils.interfaces._instance import _REGISTRY
         super().__init__(scores=set(_REGISTRY[AverageMeter.__name__].keys()))
 
     def reset_meters(self):
