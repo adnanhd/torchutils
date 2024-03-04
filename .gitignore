@@ -5,6 +5,6 @@ envs
 build
 .pytest_cache/
 torchutils/**/__pycache__
-torchutils/**/.vscode
+tests/**/__pycache__
 torchutils.egg-info
 torchutils.backup
