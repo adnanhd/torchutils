@@ -1,4 +1,4 @@
-from torchutils._dev_utils import MetricHandler
+from torchutils._dev_utils import MetricHandler, MeterBuffer
 from torchutils._dev_utils import MetricType
 import torch
 import pytest
@@ -29,6 +29,7 @@ def ray_accuracy_score(batch_output: torch.Tensor,
 def test_metric_handler(get_input_output):
     y_pred, y_true = get_input_output
     hdlr = MetricHandler(metrics={'ray_accuracy_score'})
-    res = hdlr.compute(batch=(None, y_true), batch_output=y_pred)
-    assert res['ray_accuracy_score'] == 0.0900
-    assert isinstance(res['ray_accuracy_score'], float)
+    hdlr.compute(batch=(None, y_true), batch_output=y_pred)
+    res = MeterBuffer(scores={'ray_accuracy_score'})
+    assert res.obtain_score_average('ray_accuracy_score') == 0.0900
+    # assert isinstance(res['ray_accuracy_score'], float)

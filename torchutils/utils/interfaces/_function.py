@@ -26,7 +26,7 @@ class FunctionalRegistrar(ABCMeta):
     def has_functional(cls, class_name: str):
         """Retrieves the registered instance by its class name."""
         return class_name in cls._registrar.keys()
-    
+
 
 class FunctionalType(_BaseModelType, metaclass=FunctionalRegistrar):
     @classmethod
@@ -42,7 +42,7 @@ class FunctionalType(_BaseModelType, metaclass=FunctionalRegistrar):
 
     @classmethod
     def get_function_from_name(cls, field_type, info):
-        if isinstance(field_type, str) and cls.has_functional(field_type):
+        if isinstance(field_type, str):  # and cls.has_functional(field_type):
             return cls.get_functional(field_type)
         return field_type
 
@@ -54,8 +54,7 @@ class FunctionalType(_BaseModelType, metaclass=FunctionalRegistrar):
     @classmethod
     def field_signature_validator(cls, field_type, info):
         return field_type
-    
 
 
-## registary
+# registary
 ABCMeta.register(FunctionalType, types.FunctionType)

@@ -8,14 +8,15 @@ class AverageMeter(RegisteredBaseModel):
     _sum: float = pydantic.PrivateAttr(0)
     _count: float = pydantic.PrivateAttr(0)
     _value: float = pydantic.PrivateAttr(math.nan)
+
     @pydantic.computed_field
     def average(self) -> float:
         return float(self._sum / self._count) if self._count != 0 else math.nan
-        
+
     @pydantic.computed_field
     def count(self) -> int:
         return int(self._count)
-        
+
     @property
     def counter(self) -> int:
         import warnings
@@ -40,32 +41,33 @@ class AverageMeter(RegisteredBaseModel):
 
 class _Base_MeterDict(pydantic.BaseModel):
     _scores: typing.Dict[str, AverageMeter] = pydantic.PrivateAttr(default_factory=dict)
+
     def __init__(self, scores: typing.Set[str]):
         super().__init__()
         scores = tuple(map(AverageMeter.get_instance, scores))
         names = map(lambda score: score.name, scores)
         self._scores = dict(zip(names, scores))
-    
+
     @pydantic.computed_field
     def score_names(self) -> typing.Set[str]:
         return set(self._scores.keys())
 
     def get_score_names(self) -> typing.Set[str]:
         return set(self._scores.keys())
-    
+
     def get_score_meters(self) -> typing.Set[AverageMeter]:
         return set(self._scores.values())
-    
+
     def add_score_meter(self, meter: AverageMeter):
         assert meter.name not in self._scores.keys()
         self._scores[meter.name] = meter
-    
+
     def add_score_name(self, name: str):
         assert name not in self._scores.keys()
         return self._scores.setdefault(name, AverageMeter(name=name))
-    
+
     def pop_score_name(self, name: str) -> AverageMeter:
-        return self._scores.pop(name) 
+        return self._scores.pop(name)
 
 
 class MeterBuffer(_Base_MeterDict):
